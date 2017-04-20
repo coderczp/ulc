@@ -14,6 +14,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.security.Key;
 import java.security.SecureRandom;
@@ -199,5 +201,19 @@ public class Utils {
 
 	public static Long bytesToLong(byte[] values) {
 		return ByteBuffer.wrap(values).getLong();
+	}
+
+	public static String getProcessId() {
+		String name = ManagementFactory.getRuntimeMXBean().getName();
+		String pid = name.split("@")[0];
+		return pid;
+	}
+	
+	public static String getCurrentHostIp() {
+		try {
+			return InetAddress.getLocalHost().getHostAddress();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 }

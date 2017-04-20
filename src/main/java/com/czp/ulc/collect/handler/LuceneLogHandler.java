@@ -39,6 +39,7 @@ import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.LogByteSizeMergePolicy;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
@@ -322,16 +323,20 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	}
 
 	private int searchInIndex(IndexSearcher searcher, String host, Searcher search, AtomicLong docsCount,
-			AtomicInteger hasAddSize) throws IOException {
+			AtomicInteger hasQuerySize) throws IOException {
+		Query query = search.getQuery();
+		long st = System.currentTimeMillis();
 		Set<String> fields = search.getFields();
-		TopDocs docs = searcher.search(search.getQuery(), search.getSize() - hasAddSize.get());
+		int querySize = search.getSize() - hasQuerySize.get();
+		TopDocs docs = searcher.search(query, querySize);
 		int totalHits = docs.totalHits;
 		docsCount.getAndAdd(totalHits);
-
+		long end = System.currentTimeMillis();
+		LOG.info("lucene query:{}  cost time:{}ms", query, end - st);
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
 			Document doc = searcher.doc(scoreDoc.doc, fields);
 			search.handle(host, doc, docsCount.get());
-			hasAddSize.incrementAndGet();
+			hasQuerySize.incrementAndGet();
 		}
 		return totalHits;
 	}

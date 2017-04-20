@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import com.czp.ulc.common.MessageCenter;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.bean.HostBean;
+import com.czp.ulc.common.dao.MonitoFileDao;
 import com.czp.ulc.common.util.Utils;
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
@@ -167,5 +168,10 @@ public class ConnectManager implements MessageListener<HostBean> {
 	@Override
 	public Class<HostBean> processClass() {
 		return HostBean.class;
+	}
+
+	public void connectAndMonitor(HostBean host, MonitoFileDao mDao) {
+		connect(host);
+		RemoteLogCollector.monitorIfNotExist(host, mDao);
 	}
 }

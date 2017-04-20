@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>ULC</title>
+<script src="//cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+<style type="text/css">
+body {
+	
+}
+
+textarea {
+	width: 90%;
+	height: 100px;
+	overflow-y: visible;
+}
+
+#result {
+	TEXT-ALIGN: left;
+	margin-left: 50px;
+	width: 80%;
+}
+
+.search {
+	margin-left: 50px;
+}
+
+.file {
+	margin-left: 40px;
+}
+
+.lines {
+	margin-left: 40px;
+	border: 1px solid blue;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	width: 90%;
+	max-width: 1024px;
+	color: white;
+	background: black;
+	word-spacing: 1px;
+	line-height: 15px;
+	word-spacing: 1px;
+}
+
+.line {
+	width: 600px;
+}
+
+.keyword {
+	color: red;
+	font: bold;
+}
+</style>
+</head>
+<body>
+	<div class="search">
+		<input type="text" id="key" placeholder="file" value="request.log"
+			size="10"> Start<input type="text" id="dTime" size="12" />
+		End<input type="text" id="dTimeEnd" size="12" /> host<select
+			id="host"></select>
+		<button id="search">Search</button>
+	</div>
+	<div id="result"></div>
+</body>
+<script type="text/javascript">
+        Date.prototype.Format = function (fmt) { //author: meizz 
+        var o = {
+        "M+": this.getMonth() + 1, //月份 
+        "d+": this.getDate(), //日 
+        "H+": this.getHours(), //小时 
+        "m+": this.getMinutes(), //分 
+        "s+": this.getSeconds(), //秒 
+        "q+": Math.floor((this.getMonth() + 3) / 3), //季度 
+        "S": this.getMilliseconds() //毫秒 
+      };
+       if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+       for (var k in o)
+           if (new RegExp("(" + k + ")").test(fmt)) fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+       return fmt;
+    }   
+
+	$(function() {
+		$.get('./host/list', function(d) {
+			var html = '<option value="">-all--</option>';
+			for ( var i in d) {
+				var host = d[i];
+				html += '<option value='+host.name+'>' + host.name + '</option>';
+			}
+			$('#host').html(html);
+		});
+               $('#dTime').val(new Date().Format('yyyy-MM-dd 00:00:00'));
+               $('#dTimeEnd').val(new Date().Format('yyyy-MM-dd HH:mm:ss'))
+	});
+
+	$('#search').click(
+			function() {
+				var q = $('#key').val();
+				var h = $('#host').val();
+                                var st = new Date($('#dTime').val()).getTime();
+                                var et = new Date($('#dTimeEnd').val()).getTime(); 
+				if (!q) {
+					$('#key').val('eneter file');
+					return;
+				}
+				$('#result').html('searching');
+				$.get('./count?file=' + q + '&host=' + h+'&start='+st+'&end='+et, function(
+						resp) {
+					var hosts = resp.host;
+					var html = "total:"+resp.total+"<hr/>";
+					for(var host in hosts){
+					    html +='<br>'+host+":"+hosts[host];
+					}
+					$('#result').html(html);
+				});
+			});
+
+</script>
+</html>

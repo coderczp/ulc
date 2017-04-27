@@ -33,7 +33,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 	private JSch jSch = new JSch();
 	private volatile boolean shutdown = false;
 	private List<String> notFound = new ArrayList<String>();
-	private Map<Integer, Session> maps = new ConcurrentHashMap<>();
+	private Map<String, Session> maps = new ConcurrentHashMap<>();
 
 	private static ConnectManager INSTANCE = new ConnectManager();
 	private static Logger LOG = LoggerFactory.getLogger(ConnectManager.class);
@@ -47,8 +47,8 @@ public class ConnectManager implements MessageListener<HostBean> {
 		return INSTANCE;
 	}
 
-	public List<String> exe(Integer hostId, String cmd) {
-		Session session = maps.get(hostId);
+	public List<String> exe(String host, String cmd) {
+		Session session = maps.get(host);
 		if (session == null)
 			return notFound;
 
@@ -66,7 +66,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 				res.add(errorInfo);
 			}
 			channel.disconnect();
-			LOG.info("sucess to execute:{} in host:{}", cmd, hostId);
+			LOG.info("sucess to execute:{} in host:{}", cmd, host);
 		} catch (Exception e) {
 			LOG.error("execute error:" + cmd, e);
 			res.add("server error,try again," + e);
@@ -80,7 +80,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 	 * @param bean
 	 */
 	public synchronized void connect(HostBean bean) {
-		Session session = maps.get(bean.getId());
+		Session session = maps.get(bean.getName());
 		if (session != null && session.isConnected()) {
 			LOG.info("host:{} has connected");
 			return;
@@ -96,7 +96,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 			session.setPassword(Utils.decrypt(bean.getPwd()));
 			session.connect(5000);
 			LOG.info("success connect:{}", bean);
-			maps.put(bean.getId(), session);
+			maps.put(bean.getName(), session);
 		} catch (JSchException e) {
 			throw new RuntimeException(e);
 		}
@@ -110,11 +110,11 @@ public class ConnectManager implements MessageListener<HostBean> {
 	 * @return
 	 */
 	public Channel openChannel(HostBean server, String type) {
-		Session session = maps.get(server.getId());
+		Session session = maps.get(server.getName());
 		try {
 			if (!session.isConnected()) {
 				buildAndCacheSession(server);
-				session = maps.get(server.getId());
+				session = maps.get(server.getName());
 			}
 			return session == null ? null : session.openChannel(type);
 		} catch (JSchException e) {
@@ -154,7 +154,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 	@Override
 	public void onExit() {
 		shutdown = true;
-		for (Entry<Integer, Session> item : maps.entrySet()) {
+		for (Entry<String, Session> item : maps.entrySet()) {
 			maps.remove(item.getKey());
 			item.getValue().disconnect();
 		}

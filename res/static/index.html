@@ -51,6 +51,19 @@ body {
 </style>
 </head>
 <body>
+	<nav class="navbar navbar-default" role="navigation">
+		<div class="container-fluid">
+			<div class="navbar-header">
+				<a class="navbar-brand" href="./index.html">ULC</a>
+			</div>
+			<div>
+				<ul class="nav navbar-nav">
+					<li class="active"><a href="./hosts.html">进程管理</a></li>
+					<li><a href="./index.html">日志搜索</a></li>
+				</ul>
+			</div>
+		</div>
+	</nav>
 	<div class="container-fluid">
 		<div class="panel panel-success">
 			<div class="panel-heading">
@@ -68,7 +81,7 @@ body {
 					</div>
 					<div class="form-group">
 						<div class='input-group date' id='start'>
-							<input type='text' class="form-control"  /> <span
+							<input type='text' class="form-control" /> <span
 								class="input-group-addon"> <span
 								class="glyphicon glyphicon-calendar"></span>
 							</span>
@@ -76,17 +89,19 @@ body {
 					</div>
 					<div class="form-group">
 						<div class='input-group date' id='end'>
-							<input type='text' class="form-control"/> <span
+							<input type='text' class="form-control" /> <span
 								class="input-group-addon"> <span
 								class="glyphicon glyphicon-calendar"></span>
 							</span>
 						</div>
 					</div>
 					<div class="form-group">
-						<input type="text" id="proc" placeholder="进程:service_booking" class="form-control">
+						<input type="text" id="proc" placeholder="进程:service_booking"
+							class="form-control">
 					</div>
 					<div class="form-group">
-						<input type="text" id="file" placeholder="文件:run.log" class="form-control">
+						<input type="text" id="file" placeholder="文件:run.log"
+							class="form-control">
 					</div>
 					<div class="form-group">
 						<div class="input-group">
@@ -99,7 +114,8 @@ body {
 					</div>
 					<div class="form-group">
 						<div class="checkbox">
-							<label> <input type="checkbox" id="loadLine" checked="checked">加载内容
+							<label> <input type="checkbox" id="loadLine"
+								checked="checked">加载内容
 							</label>
 						</div>
 					</div>
@@ -153,14 +169,16 @@ body {
 				$('#q').val('eneter keyword');
 				return;
 			}
+			$('#time').html();
 			$.post('./search', {
 				'json' : JSON.stringify(json)
 			}, function(resp) {
-				var data = resp.data,q = json.q;
+				var data = resp.data, q = json.q;
 				var mc = resp.matchCount, cc = resp.count, t = resp.time;
 				var html = '';
 				$('#time').html(
-						'find[<b>' + mc + '</b>]in[<b>' + cc + '</b>]records,time:' + t);
+						'find[<b>' + mc + '</b>]in[<b>' + cc
+								+ '</b>]records,time:' + t);
 				for ( var host in data) {
 					var files = data[host];
 					html += "<b>" + host + "</b><br>";

@@ -73,10 +73,13 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	private Analyzer analyzer = new StandardAnalyzer();
 
 	private HashMap<String, TreeMap<Long, File>> indexDirMap = new HashMap<>();
+	
 	/** 需要commit的index,每隔几秒同步一次 */
 	private BlockingQueue<JSONObject> commitWriter = new LinkedBlockingQueue<>();
+	
 	/*** 已经打开的writer */
 	private ConcurrentHashMap<File, IndexWriter> writers = new ConcurrentHashMap<>();
+	
 	/** 已经打开的目录的search */
 	private ConcurrentHashMap<File, IndexSearcher> openedDir = new ConcurrentHashMap<>();
 
@@ -194,8 +197,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	@Override
 	public void onExit() {
 		try {
-			Set<Entry<File, IndexWriter>> entrySet = writers.entrySet();
-			for (Entry<File, IndexWriter> entry : entrySet) {
+			for (Entry<File, IndexWriter> entry : writers.entrySet()) {
 				IndexWriter value = entry.getValue();
 				if (value.hasUncommittedChanges())
 					value.commit();
@@ -372,7 +374,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 	private IndexWriter createAndCacneIndexWriter(File file, SimpleDateFormat sdf) throws Exception {
 		LogByteSizeMergePolicy mergePolicy = new LogByteSizeMergePolicy();
-		mergePolicy.setMergeFactor(5000);
+		mergePolicy.setMergeFactor(50000);
 
 		IndexWriterConfig conf = new IndexWriterConfig(analyzer);
 		conf.setOpenMode(OpenMode.CREATE_OR_APPEND);

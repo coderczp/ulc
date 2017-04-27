@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>ULC</title>
+<link
+	href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css"
+	rel="stylesheet">
+<link
+	href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
+	rel="stylesheet">
+
+<script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+<script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<style type="text/css">
+body {
+	background-image:
+		url(data:image/gif;base64,R0lGODlhCAAIAJEAAMzMzP///////wAAACH5BAEHAAIALAAAAAAIAAgAAAINhG4nudroGJBRsYcxKAA7);
+	word-break: break-all;
+	word-wrap: break-word;
+}
+</style>
+<body>
+	<nav class="navbar navbar-default" role="navigation">
+		<div class="container-fluid">
+			<div class="navbar-header">
+				<a class="navbar-brand" href="./index.html">ULC</a>
+			</div>
+			<div>
+				<ul class="nav navbar-nav">
+					<li class="active"><a href="./hosts.html">进程管理</a></li>
+					<li><a href="./index.html">日志搜索</a></li>
+				</ul>
+			</div>
+		</div>
+	</nav>
+	<div class="container-fluid">
+		<div class="panel panel-success">
+			<div class="panel-heading">
+				host<select id="host"></select>
+				<button id="search">Search</button>
+			</div>
+			<div class="panel-body">
+				<div id="result" class="table-responsive"></div>
+			</div>
+		</div>
+	</div>
+</body>
+<script type="text/javascript">
+	$(function() {
+		$.get('./host/list', function(d) {
+			var html = '<option value="">-all--</option>';
+			for ( var i in d) {
+				var host = d[i];
+				html += '<option value='+host.name+'>' + host.name
+						+ '</option>';
+			}
+			$('#host').html(html);
+		});
+	});
+
+	$('#host').change(doSearch);
+	$('#search').click(doSearch);
+
+	function doSearch() {
+		var host = $('#host').val();
+		$.get('./proc/list?host=' + host, function(data) {
+			if (!data || data.length == 0) {
+				$('#result').html('no result');
+			} else {
+				var html = '<table class="table table-hover table-bordered">';
+				for ( var i in data) {
+					var proc = data[i];
+					var start = proc.indexOf('=') + 1;
+					var end = proc.indexOf('/tomcat7');
+					var size = end > 0 ? (end - start) : proc.length;
+					var info = proc.substr(start, size);
+					html += '<tr><td>' + createBtn(host, info) + '</td><td>'
+							+ info + '</td></tr>';
+				}
+				html += '</table>';
+				$('#result').html(html);
+			}
+		});
+
+		function createBtn(host, path) {
+			return "<button onclick=restartProc('" + host + "','" + path
+					+ "')>Restart</button>";
+		}
+	}
+
+	function restartProc(host, path) {
+		var a = confirm("确认重启吗?");
+		if (a == false)
+			return;
+		var btn = $(event.target);
+		btn.text('waiting....');
+		btn.attr({
+			"disabled" : "disabled"
+		});
+		$.get('./proc/restart?host=' + host + '&path=' + path, function(data) {
+			alert(data.join('\n'));
+			btn.text('Restart');
+			btn.removeAttr("disabled");
+		});
+	}
+</script>
+</body>

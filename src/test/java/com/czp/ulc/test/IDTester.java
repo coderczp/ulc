@@ -30,17 +30,17 @@ public class IDTester {
 		int count = 50;
 		final CountDownLatch lock = new CountDownLatch(count);
 		final IdGnerator instance = IdGnerator.getInstance();
-		final ConcurrentHashMap<byte[], Boolean> map = new ConcurrentHashMap<byte[], Boolean>();
+		final ConcurrentHashMap<Long, Boolean> map = new ConcurrentHashMap<>();
 		for (int i = 0; i < count; i++) {
 			new Thread(new Runnable() {
 
 				@Override
 				public void run() {
 					for (int i = 0; i < 100000; i++) {
-						byte[] id = instance.nextBytesId();
+						long id = instance.nextId(System.currentTimeMillis());
 						if (map.get(id) != null) {
-							System.out.println("repeat");
-							break;
+							System.out.println(map.get(id));
+							throw new RuntimeException("repeat");
 						}
 						map.put(id, true);
 					}

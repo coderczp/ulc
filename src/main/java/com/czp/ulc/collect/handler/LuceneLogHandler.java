@@ -11,6 +11,7 @@ package com.czp.ulc.collect.handler;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
@@ -30,12 +31,14 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
+import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
+import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.LogByteSizeMergePolicy;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
@@ -43,14 +46,17 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.ReadResult;
-import com.czp.ulc.common.LevelDB;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.ThreadPools;
+import com.czp.ulc.common.kv.KVDB;
+import com.czp.ulc.common.kv.LevelDB;
+import com.czp.ulc.common.util.IdGnerator;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -70,25 +76,35 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	private String nameFormat = "yyyy-MM-dd";
 	/*** 索引文件map {hostName:{time:indexFile}} */
 
+	/** 总行数 */
+	private AtomicLong lineCount = new AtomicLong();
+
 	private Analyzer analyzer = new StandardAnalyzer();
 
+	private IdGnerator idFactory = IdGnerator.getInstance();
+
 	private HashMap<String, TreeMap<Long, File>> indexDirMap = new HashMap<>();
-	
+
 	/** 需要commit的index,每隔几秒同步一次 */
 	private BlockingQueue<JSONObject> commitWriter = new LinkedBlockingQueue<>();
-	
+
 	/*** 已经打开的writer */
 	private ConcurrentHashMap<File, IndexWriter> writers = new ConcurrentHashMap<>();
-	
+
 	/** 已经打开的目录的search */
 	private ConcurrentHashMap<File, IndexSearcher> openedDir = new ConcurrentHashMap<>();
 
 	/*** 根目录 */
 	private static final File ROOT = new File("./log");
+
 	/** 索引根目录 */
 	private static final File INDEX_DIR = new File(ROOT, "index");
+
+	/** 记录行数的KEY */
+	private static final String LINE_COUNT_KEY = "LINE_COUNT_KEY";
+
 	/** meta信息 */
-	private LevelDB meta = LevelDB.open(new File(ROOT, "meta").getAbsolutePath());
+	private KVDB meta = LevelDB.open(new File(ROOT, "meta").getAbsolutePath());
 
 	private static final Logger LOG = LoggerFactory.getLogger(LuceneLogHandler.class);
 
@@ -114,7 +130,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 				indexDirMap.put(host, indexMap);
 			}
 			for (File index : file.listFiles()) {
-				// 第二层为时间和索引
+				// 第二层为时间目录 包含索引和数据目录
 				indexMap.put(sp.parse(index.getName()).getTime(), index);
 				count += meta.getLong(index.getAbsolutePath(), 0);
 			}
@@ -154,26 +170,37 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 					continue;
 				}
 				sb.append(line);
+				lineCount.getAndIncrement();
 			}
 
 			if (sb.length() == 0)
 				return true;
 
 			String all = sb.toString();
+			int nowId = idFactory.nextId(now);
 			String host = event.getHost().getName();
+
+			ByteBuffer data = ByteBuffer.allocate(Integer.BYTES + Long.BYTES);
+			data.putLong(now);
+			data.putInt(nowId);
+			byte[] dataId = data.array();
 
 			Document doc = new Document();
 			doc.add(new LongPoint("time", now));
-			doc.add(new TextField("line", all, Field.Store.YES));
+			doc.add(new StoredField("id", new BytesRef(dataId)));
+			doc.add(new TextField("line", all, Field.Store.NO));
 			doc.add(new TextField("file", file, Field.Store.YES));
 
 			SimpleDateFormat sdf = new SimpleDateFormat(nameFormat);
-			File indexDir = findCurrentIndexDir(host, now, sdf);
-			IndexWriter writer = getIndexWriter(indexDir, sdf);
+			File dir = findCurrentIndexDir(host, now, sdf);
+
+			IndexWriter writer = getIndexWriter(dir, sdf);
 			writer.addDocument(doc);
 
+			meta.put(dataId, all);
+
 			long nowDocs = writer.numDocs();
-			notifyCommitIndex(writer, indexDir, nowDocs);
+			notifyCommitIndex(writer, dir, nowDocs);
 
 			LOG.debug("create index time:{}ms docs:{}", (System.currentTimeMillis() - now), lastDocs);
 		} catch (Exception e) {
@@ -230,11 +257,11 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 		AtomicLong docs = new AtomicLong();
 		AtomicInteger hasAddSize = new AtomicInteger();
-		Map<String, Collection<File>> dirs = findMatchTimeIndexDir(hosts, search.getBegin(), search.getEnd());
+		Map<String, Collection<File>> dirs = findMatchTimeDir(hosts, search.getBegin(), search.getEnd());
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
 			String host = item.getKey();
 			for (File index : item.getValue()) {
-				searchInIndex(getOpenedSearcher(index), host, search, docs, hasAddSize);
+				searchInIndex(getOpenedSearcher(index), index, host, search, docs, hasAddSize);
 				if (hasAddSize.get() >= size)
 					break;
 			}
@@ -265,7 +292,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 		long total = 0;
 		JSONObject eachHost = new JSONObject();
 		TermQuery query = new TermQuery(new Term("file", file));
-		Map<String, Collection<File>> dirs = findMatchTimeIndexDir(hosts, start, end);
+		Map<String, Collection<File>> dirs = findMatchTimeDir(hosts, start, end);
 		for (Entry<String, Collection<File>> entry : dirs.entrySet()) {
 			long count = 0;
 			for (File indexDir : entry.getValue()) {
@@ -294,7 +321,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	 * @param end
 	 * @return
 	 */
-	public Map<String, Collection<File>> findMatchTimeIndexDir(Set<String> hosts, long start, long end) {
+	public Map<String, Collection<File>> findMatchTimeDir(Set<String> hosts, long start, long end) {
 		long from = Utils.igroeHMSTime(start).getTime();
 		long to = Utils.igroeHMSTime(end).getTime();
 		Map<String, Collection<File>> map = new HashMap<>();
@@ -311,6 +338,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 		if (reader != null)
 			return reader;
 
+		// 锁住父目录
 		synchronized (file) {
 			if (!openedDir.containsKey(file)) {
 				LOG.info("start open index:{}", file);
@@ -323,16 +351,22 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 		}
 	}
 
-	private int searchInIndex(IndexSearcher searcher, String host, Searcher search, AtomicLong docsCount,
+	private int searchInIndex(IndexSearcher searcher, File dir, String host, Searcher search, AtomicLong docsCount,
 			AtomicInteger hasAddSize) throws IOException {
 		Set<String> fields = search.getFields();
+		
 		TopDocs docs = searcher.search(search.getQuery(), search.getSize() - hasAddSize.get());
 		int totalHits = docs.totalHits;
 		docsCount.getAndAdd(totalHits);
 
+		String line = null;
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
 			Document doc = searcher.doc(scoreDoc.doc, fields);
-			search.handle(host, doc, docsCount.get());
+			IndexableField field = doc.getField("id");
+			if(field!=null){
+				line = meta.get(field.binaryValue().bytes);
+			}
+			search.handle(host, doc, line, docsCount.get());
 			hasAddSize.incrementAndGet();
 		}
 		return totalHits;
@@ -347,8 +381,10 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 				File indexDir = (File) task.get("file");
 				IndexWriter writer = (IndexWriter) task.get("writer");
 				writer.commit();
+				
 				long numDocs = writer.numDocs();
 				meta.put(indexDir.getAbsolutePath(), numDocs);
+				meta.put(LINE_COUNT_KEY, lineCount.get());
 				long end = System.currentTimeMillis();
 				long commitTime = end - st;
 				// 先put新的reader到map,再关闭老的reader,搜索线程要捕获异常,如搜索时被关闭,需要重新去map取
@@ -374,7 +410,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 	private IndexWriter createAndCacneIndexWriter(File file, SimpleDateFormat sdf) throws Exception {
 		LogByteSizeMergePolicy mergePolicy = new LogByteSizeMergePolicy();
-		mergePolicy.setMergeFactor(50000);
+		mergePolicy.setMergeFactor(5000);
 
 		IndexWriterConfig conf = new IndexWriterConfig(analyzer);
 		conf.setOpenMode(OpenMode.CREATE_OR_APPEND);
@@ -413,13 +449,18 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 			if (fileTime >= now)
 				continue;
 
+			// 关闭索引
 			IndexWriter remove = writers.remove(file);
 			// 先remove再关闭,避免关闭后搜索线程还使用这个writer
 			if (remove.hasUncommittedChanges()) {
-				Utils.close(remove);
+				try {
+					remove.commit();
+				} catch (IOException e) {
+					LOG.info("commit error", e);
+				}
 			}
 			Utils.close(remove);
-			LOG.info("sucess to close expire:{}", file);
+			LOG.info("sucess to close expire index:{}", file);
 		}
 	}
 

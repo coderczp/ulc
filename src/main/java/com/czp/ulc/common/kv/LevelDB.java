@@ -1,4 +1,4 @@
-package com.czp.ulc.common;
+package com.czp.ulc.common.kv;
 
 import static org.iq80.leveldb.impl.Iq80DBFactory.factory;
 
@@ -8,12 +8,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSONObject;
+import com.czp.ulc.common.ShutdownCallback;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -23,7 +25,7 @@ import com.czp.ulc.common.util.Utils;
  * @Author:coder_czp@126.com
  * @version:1.0
  */
-public class LevelDB implements ShutdownCallback {
+public class LevelDB implements ShutdownCallback, KVDB {
 
 	private DB db;
 	private Options options = new Options();
@@ -34,6 +36,7 @@ public class LevelDB implements ShutdownCallback {
 
 	private LevelDB(String path) {
 		try {
+			options.compressionType(CompressionType.SNAPPY);
 			options.createIfMissing(true);
 			db = factory.open(new File(path), options);
 			log.info("kvdb is inited,db:{} path:{}", db, path);
@@ -42,11 +45,11 @@ public class LevelDB implements ShutdownCallback {
 		}
 	}
 
-	public static LevelDB getGlobDB() {
+	public static KVDB getGlobDB() {
 		return open("./lv_db_glob");
 	}
 
-	public static LevelDB open(String path) {
+	public static KVDB open(String path) {
 		if (!dbs.containsKey(path)) {
 			synchronized (dbs) {
 				if (!dbs.containsKey(path)) {
@@ -57,6 +60,13 @@ public class LevelDB implements ShutdownCallback {
 		return dbs.get(path);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#append(java.lang.String,
+	 * java.lang.String)
+	 */
+	@Override
 	public boolean append(String key, String values) {
 		log.debug("start append key:{},value:{}", key, values);
 		String valuesbs = get(key);
@@ -71,6 +81,12 @@ public class LevelDB implements ShutdownCallback {
 		return true;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#put(java.lang.String, java.lang.String)
+	 */
+	@Override
 	public boolean put(String key, String values) {
 		log.debug("start put to kvdb,key:{},value:{}", key, values);
 		db.put(key.getBytes(charset), values.getBytes(charset));
@@ -78,6 +94,12 @@ public class LevelDB implements ShutdownCallback {
 		return true;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#put(java.lang.String, long)
+	 */
+	@Override
 	public boolean put(String key, long values) {
 		log.debug("start put to kvdb,key:{},value:{}", key, values);
 		db.put(key.getBytes(charset), Utils.longToBytes(values));
@@ -85,6 +107,12 @@ public class LevelDB implements ShutdownCallback {
 		return true;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#get(java.lang.String)
+	 */
+	@Override
 	public String get(String key) {
 		log.info("start get from to kvdb,key:{}", key);
 		byte[] values = db.get(key.getBytes(charset));
@@ -95,6 +123,12 @@ public class LevelDB implements ShutdownCallback {
 		return value;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#get(java.lang.Integer)
+	 */
+	@Override
 	public String get(Integer key) {
 		log.debug("start get from to kvdb,key:{}", key);
 		byte[] values = db.get(Utils.intToBytes(key));
@@ -104,6 +138,12 @@ public class LevelDB implements ShutdownCallback {
 		return new String(values, charset);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#hget(java.lang.String, java.lang.String)
+	 */
+	@Override
 	public String hget(String key, String haskKey) {
 		String values = get(key);
 		if (values == null)
@@ -112,6 +152,12 @@ public class LevelDB implements ShutdownCallback {
 		return value.getString(haskKey);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#hincr(java.lang.String, java.lang.String)
+	 */
+	@Override
 	public void hincr(String key, String haskKey) {
 		String values = get(key);
 		if (values == null) {
@@ -125,6 +171,12 @@ public class LevelDB implements ShutdownCallback {
 		}
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#hgetAll(java.lang.String)
+	 */
+	@Override
 	public JSONObject hgetAll(String key) {
 		String values = get(key);
 		if (values == null) {
@@ -133,6 +185,13 @@ public class LevelDB implements ShutdownCallback {
 		return JSONObject.parseObject(values);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#hput(java.lang.String, java.lang.String,
+	 * java.lang.Object)
+	 */
+	@Override
 	public boolean hput(String key, String hashKey, Object obj) {
 		String values = get(key);
 		if (values == null) {
@@ -147,6 +206,12 @@ public class LevelDB implements ShutdownCallback {
 		return true;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#getList(java.lang.String)
+	 */
+	@Override
 	public List<String> getList(String key) {
 		String value = get(key);
 		if (value == null)
@@ -160,18 +225,36 @@ public class LevelDB implements ShutdownCallback {
 		return res;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#put(byte[], byte[])
+	 */
+	@Override
 	public void put(byte[] key, byte[] value) {
 		log.debug("start put key:{},value:{}", key, value);
 		db.put(key, value);
 		log.debug("success put key:{},value:{}", key, value);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#put(byte[], java.lang.String)
+	 */
+	@Override
 	public void put(byte[] key, String value) {
 		log.debug("start put key:{},value:{}", key, value);
 		db.put(key, value.getBytes(charset));
 		log.debug("success put key:{},value:{}", key, value);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#get(byte[])
+	 */
+	@Override
 	public String get(byte[] key) {
 		log.debug("start get key:{}", key);
 		byte[] valuesBs = db.get(key);
@@ -194,16 +277,35 @@ public class LevelDB implements ShutdownCallback {
 		}
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#putInt(java.lang.Integer,
+	 * java.lang.String)
+	 */
+	@Override
 	public void putInt(Integer key, String value) {
 		log.debug("start put key:{},value:{}", key, value);
 		db.put(Utils.intToBytes(key), value.getBytes(charset));
 		log.debug("success put key:{},value:{}", key, value);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.czp.ulc.common.kv.KVDB#getLong(java.lang.String, long)
+	 */
+	@Override
 	public long getLong(String key, long dftVal) {
 		byte[] values = db.get(key.getBytes(charset));
 		if (values == null)
 			return dftVal;
 		return Utils.bytesToLong(values);
+	}
+
+	public static void close(String path) {
+		LevelDB levelDB = dbs.get(path);
+		if (levelDB != null)
+			levelDB.onSystemExit();
 	}
 }

@@ -85,7 +85,7 @@ public class SearchController {
 		queryFields.add("file");
 
 		if (loadLine != null && loadLine) {
-			queryFields.add("line");
+			queryFields.add("id");
 		}
 
 		String[] fields = { "line", "time", "file" };
@@ -98,11 +98,10 @@ public class SearchController {
 
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, Document doc, long total) {
+			public boolean handle(String host, Document doc, String line, long total) {
 
 				matchCount.set(total);
 				String file = doc.get("file");
-				String line = doc.get("line");
 
 				JSONObject files = data.getJSONObject(host);
 				if (files == null) {

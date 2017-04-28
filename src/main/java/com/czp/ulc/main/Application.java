@@ -35,6 +35,7 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
 import com.czp.ulc.collect.ConnectManager;
+import com.czp.ulc.collect.RemoteLogCollector;
 import com.czp.ulc.collect.handler.ErrorLogHandler;
 import com.czp.ulc.collect.handler.LuceneLogHandler;
 import com.czp.ulc.common.MessageCenter;
@@ -54,8 +55,8 @@ import com.czp.ulc.rule.AlarmSender;
 
 @EnableAutoConfiguration
 @ComponentScan(value = { "com.czp.ulc" })
-public class Application extends WebMvcConfigurerAdapter implements BeanDefinitionRegistryPostProcessor,
-		ApplicationListener<ContextRefreshedEvent> {
+public class Application extends WebMvcConfigurerAdapter
+		implements BeanDefinitionRegistryPostProcessor, ApplicationListener<ContextRefreshedEvent> {
 
 	private static Logger LOG = LoggerFactory.getLogger(Application.class);
 	private MessageCenter dispatch = MessageCenter.getInstance();
@@ -137,7 +138,8 @@ public class Application extends WebMvcConfigurerAdapter implements BeanDefiniti
 
 		List<HostBean> hosts = hostDao.list(null);
 		for (HostBean host : hosts) {
-			ConnectManager.getInstance().connectAndMonitor(host, mDao);
+			ConnectManager.getInstance().connect(host);
+			RemoteLogCollector.monitorIfNotExist(host, mDao);
 		}
 	}
 

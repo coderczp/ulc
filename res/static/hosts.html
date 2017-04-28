@@ -1,78 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
 <title>ULC</title>
-<script src="//cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
-<style type="text/css">
-table td {
-	border: 1px solid black;
-}
-</style>
+</head>
 <body>
-	<div class="search">
-		choose host<select id="host"></select>
-		<button id="search">Search</button>
-	</div>
-	<hr>
-	<div id="result"></div>
-</body>
-<script type="text/javascript">
-	$(function() {
-		$.get('./host/list', function(d) {
-			var html = '<option value="">-all--</option>';
-			for ( var i in d) {
-				var host = d[i];
-				html += '<option value='+host.id+'>' + host.name + '</option>';
-			}
-			$('#host').html(html);
-		});
-	});
-
-	$('#host').change(doSearch);
-	$('#search').click(doSearch);
-
-	function doSearch() {
-		var host = $('#host').val();
-		$.get('./proc/list?host=' + host, function(data) {
-			if (data.error) {
-				$('#result').html(data.info);
-			} else if (!data || data.length == 0) {
-				$('#result').html('no result');
-			} else {
-				var html = '<table>';
-				for ( var i in data) {
-					var proc = data[i];
-					var start = proc.indexOf('=') + 1;
-					var end = proc.indexOf('/tomcat7');
-					var flag = end<=0?proc.length:end-start;
-					var info = proc.substr(start, flag);
-
-					html += '<tr><td>' + info + '</td><td>'
-							+ createBtn(host, info) + '</td></tr>';
-				}
-				html += '</table>';
-				$('#result').html(html);
-			}
-		});
-
-		function createBtn(host, path) {
-			return "<button onclick=restartProc('" + host + "','" + path
-					+ "')>Restart</button>";
-		}
-	}
-
-	function restartProc(host, path) {
-		var btn = $(event.target);
-		btn.text('waiting....');
-		btn.attr({
-			"disabled" : "disabled"
-		});
-		$.get('./proc/restart?host=' + host + '&path=' + path, function(data) {
-			alert(data.join('\n'));
-			btn.text('Restart');
-			btn.removeAttr("disabled");
-		});
-	}
-</script>
+	<script language="javascript" type="text/javascript">
+		top.location = "./hosts2.html";
+	</script>
 </body>

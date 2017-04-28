@@ -1,0 +1,19 @@
+body {
+	background-image:
+		url(data:image/gif;base64,R0lGODlhCAAIAJEAAMzMzP///////wAAACH5BAEHAAIALAAAAAAIAAgAAAINhG4nudroGJBRsYcxKAA7);
+	word-break: break-all;
+	word-wrap: break-word;
+}
+
+xdiv {
+	border: 1px solid red;
+}
+
+.navbar {
+	margin-bottom: 2px;
+}
+
+.container-fluid{
+	padding-left: 2px;
+	padding-right: 2px;
+}

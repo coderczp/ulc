@@ -26,30 +26,30 @@ public class CmdController {
 	private Environment env;
 
 	@RequestMapping("/list")
-	public List<String> exe(int hostId) {
+	public List<String> exe(String host) {
 		String cmd = env.getProperty("process_list_cmd");
 		Assert.notNull(cmd, "process_list_cmd is nul,please add in properties");
-		return ConnectManager.getInstance().exe(hostId, cmd);
+		return ConnectManager.getInstance().exe(host, cmd);
 	}
 
 	@RequestMapping("/restart")
-	public List<String> restart(Integer host, String path) {
+	public List<String> restart(String host, String path) {
 		String cmd = String.format("cd %s;./service.sh restart", path);
 		List<String> res = ConnectManager.getInstance().exe(host, cmd);
 		return res;
 	}
 
-	/***
-	 * 检查主机的进程状态
-	 * 
-	 * @param host
-	 * @return
-	 */
-	@RequestMapping("/check")
-	public JSONArray checkProcessStatus(int hostId) {
-		List<String> procs = exe(hostId);
-		
-		return null;
-	}
+//	/***
+//	 * 检查主机的进程状态
+//	 * 
+//	 * @param host
+//	 * @return
+//	 */
+//	@RequestMapping("/check")
+//	public JSONArray checkProcessStatus(int hostId) {
+//		List<String> procs = exe(hostId);
+//		
+//		return null;
+//	}
 
 }

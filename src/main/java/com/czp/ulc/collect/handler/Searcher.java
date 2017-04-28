@@ -75,5 +75,5 @@ public abstract class Searcher {
 		this.query = query;
 	}
 
-	public abstract boolean handle(String host,Document doc, long total);
+	public abstract boolean handle(String host,Document doc,String line, long total);
 }

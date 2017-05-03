@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.ReadResult;
+import com.czp.ulc.collect.handler.Searcher;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.ThreadPools;
 import com.czp.ulc.common.kv.KVDB;

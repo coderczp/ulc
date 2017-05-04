@@ -85,7 +85,7 @@ public class SearchController {
 		queryFields.add("file");
 
 		if (loadLine != null && loadLine) {
-			queryFields.add("id");
+			queryFields.add("data");
 		}
 
 		String[] fields = { "line", "time", "file" };
@@ -98,7 +98,7 @@ public class SearchController {
 
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, Document doc, String line, long total) {
+			public boolean handle(String host, Document doc, List<String> linesRead, long total) {
 
 				matchCount.set(total);
 				String file = doc.get("file");
@@ -113,8 +113,8 @@ public class SearchController {
 					lines = new LinkedList<>();
 					files.put(file, lines);
 				}
-				if (line != null) {
-					lines.add(line);
+				if (linesRead != null) {
+					lines.addAll(linesRead);
 				}
 				return true;
 			}

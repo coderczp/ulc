@@ -11,11 +11,11 @@ package com.czp.ulc.collect.handler;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -31,14 +31,13 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
-import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
-import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.LogByteSizeMergePolicy;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
@@ -46,7 +45,6 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +54,7 @@ import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.ThreadPools;
 import com.czp.ulc.common.kv.KVDB;
 import com.czp.ulc.common.kv.LevelDB;
-import com.czp.ulc.common.util.IdGnerator;
+import com.czp.ulc.common.meta.MetaWriter;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -76,12 +74,11 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	private String nameFormat = "yyyy-MM-dd";
 	/*** 索引文件map {hostName:{time:indexFile}} */
 
+	private MetaWriter metaWriter;
 	/** 总行数 */
 	private AtomicLong lineCount = new AtomicLong();
 
 	private Analyzer analyzer = new StandardAnalyzer();
-
-	private IdGnerator idFactory = IdGnerator.getInstance();
 
 	private HashMap<String, TreeMap<Long, File>> indexDirMap = new HashMap<>();
 
@@ -100,6 +97,9 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	/** 索引根目录 */
 	private static final File INDEX_DIR = new File(ROOT, "index");
 
+	/** 索引根目录 */
+	private static final File DATA_DIR = new File(ROOT, "data");
+
 	/** 记录行数的KEY */
 	private static final String LINE_COUNT_KEY = "LINE_COUNT_KEY";
 
@@ -111,7 +111,9 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	public LuceneLogHandler() {
 		try {
 			INDEX_DIR.mkdirs();
+			DATA_DIR.mkdirs();
 			loadAllIndexDir();
+			metaWriter = new MetaWriter(DATA_DIR.toString());
 			ThreadPools.getInstance().startThread("lucene-index", this, true);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -159,12 +161,13 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 			LOG.debug("recive message:{}", event);
 
 			String file = event.getFile();
+			List<String> lines = event.getLines();
 			if (file.isEmpty()) {
-				LOG.info("file name is empty:{}", event.getLines());
+				LOG.info("file name is empty:{}", lines);
 				return false;
 			}
 			StringBuilder sb = new StringBuilder();
-			for (String line : event.getLines()) {
+			for (String line : lines) {
 				line = line.trim();
 				if (line.length() == 0) {
 					continue;
@@ -177,27 +180,20 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 				return true;
 
 			String all = sb.toString();
-			int nowId = idFactory.nextId(now);
 			String host = event.getHost().getName();
-
-			ByteBuffer data = ByteBuffer.allocate(Integer.BYTES + Long.BYTES);
-			data.putLong(now);
-			data.putInt(nowId);
-			byte[] dataId = data.array();
+			String json = metaWriter.write(lines);
 
 			Document doc = new Document();
 			doc.add(new LongPoint("time", now));
-			doc.add(new StoredField("id", new BytesRef(dataId)));
 			doc.add(new TextField("line", all, Field.Store.NO));
 			doc.add(new TextField("file", file, Field.Store.YES));
+			doc.add(new StringField("data", json,Field.Store.YES));
 
 			SimpleDateFormat sdf = new SimpleDateFormat(nameFormat);
 			File dir = findCurrentIndexDir(host, now, sdf);
 
 			IndexWriter writer = getIndexWriter(dir, sdf);
 			writer.addDocument(doc);
-
-			meta.put(dataId, all);
 
 			long nowDocs = writer.numDocs();
 			notifyCommitIndex(writer, dir, nowDocs);
@@ -354,19 +350,16 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	private int searchInIndex(IndexSearcher searcher, File dir, String host, Searcher search, AtomicLong docsCount,
 			AtomicInteger hasAddSize) throws IOException {
 		Set<String> fields = search.getFields();
-		
+
 		TopDocs docs = searcher.search(search.getQuery(), search.getSize() - hasAddSize.get());
 		int totalHits = docs.totalHits;
 		docsCount.getAndAdd(totalHits);
 
-		String line = null;
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
 			Document doc = searcher.doc(scoreDoc.doc, fields);
-			IndexableField field = doc.getField("id");
-			if(field!=null){
-				line = meta.get(field.binaryValue().bytes);
-			}
-			search.handle(host, doc, line, docsCount.get());
+			String jsonStr = doc.get("data");
+			List<String> lines = metaWriter.read(jsonStr,  search.getSize());
+			search.handle(host, doc, lines, docsCount.get());
 			hasAddSize.incrementAndGet();
 		}
 		return totalHits;
@@ -381,7 +374,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 				File indexDir = (File) task.get("file");
 				IndexWriter writer = (IndexWriter) task.get("writer");
 				writer.commit();
-				
+
 				long numDocs = writer.numDocs();
 				meta.put(indexDir.getAbsolutePath(), numDocs);
 				meta.put(LINE_COUNT_KEY, lineCount.get());
@@ -410,12 +403,12 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 	private IndexWriter createAndCacneIndexWriter(File file, SimpleDateFormat sdf) throws Exception {
 		LogByteSizeMergePolicy mergePolicy = new LogByteSizeMergePolicy();
-		mergePolicy.setMergeFactor(5000);
+		mergePolicy.setMergeFactor(10000);
 
 		IndexWriterConfig conf = new IndexWriterConfig(analyzer);
 		conf.setOpenMode(OpenMode.CREATE_OR_APPEND);
 		conf.setMergePolicy(mergePolicy);
-		conf.setUseCompoundFile(true);
+		conf.setUseCompoundFile(false);
 
 		IndexWriter writer = new IndexWriter(FSDirectory.open(file.toPath()), conf);
 		DirectoryReader reader = DirectoryReader.open(writer);

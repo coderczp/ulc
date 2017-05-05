@@ -14,7 +14,9 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -38,8 +40,8 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
-import org.apache.lucene.index.LogByteSizeMergePolicy;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
@@ -54,7 +56,7 @@ import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.ThreadPools;
 import com.czp.ulc.common.kv.KVDB;
 import com.czp.ulc.common.kv.LevelDB;
-import com.czp.ulc.common.meta.MetaWriter;
+import com.czp.ulc.common.meta.MetaReadWriter;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -74,7 +76,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	private String nameFormat = "yyyy-MM-dd";
 	/*** 索引文件map {hostName:{time:indexFile}} */
 
-	private MetaWriter metaWriter;
+	private MetaReadWriter metaWriter;
 	/** 总行数 */
 	private AtomicLong lineCount = new AtomicLong();
 
@@ -90,6 +92,9 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 	/** 已经打开的目录的search */
 	private ConcurrentHashMap<File, IndexSearcher> openedDir = new ConcurrentHashMap<>();
+
+	/** 标记search的状态,处理多线程下关闭的问题,状态为1为需要关闭 */
+	private ConcurrentHashMap<IndexSearcher, Integer> searchFlag = new ConcurrentHashMap<>();
 
 	/*** 根目录 */
 	private static final File ROOT = new File("./log");
@@ -107,13 +112,16 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	private KVDB meta = LevelDB.open(new File(ROOT, "meta").getAbsolutePath());
 
 	private static final Logger LOG = LoggerFactory.getLogger(LuceneLogHandler.class);
+	private static final Integer STATUS_NOTHONG = -1;
+	private static final Integer STATUS_USING = 0;
+	private static final Integer STATUS_CLOSE = 1;
 
 	public LuceneLogHandler() {
 		try {
 			INDEX_DIR.mkdirs();
 			DATA_DIR.mkdirs();
 			loadAllIndexDir();
-			metaWriter = new MetaWriter(DATA_DIR.toString());
+			metaWriter = new MetaReadWriter(DATA_DIR.toString());
 			ThreadPools.getInstance().startThread("lucene-index", this, true);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -187,7 +195,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 			doc.add(new LongPoint("time", now));
 			doc.add(new TextField("line", all, Field.Store.NO));
 			doc.add(new TextField("file", file, Field.Store.YES));
-			doc.add(new StringField("data", json,Field.Store.YES));
+			doc.add(new StringField("data", json, Field.Store.YES));
 
 			SimpleDateFormat sdf = new SimpleDateFormat(nameFormat);
 			File dir = findCurrentIndexDir(host, now, sdf);
@@ -349,18 +357,39 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 	private int searchInIndex(IndexSearcher searcher, File dir, String host, Searcher search, AtomicLong docsCount,
 			AtomicInteger hasAddSize) throws IOException {
+
+		// 标记当前的searcher正在使用,不用关闭
+		synchronized (searcher) {
+			searchFlag.put(searcher, STATUS_USING);
+		}
+
 		Set<String> fields = search.getFields();
+		List<Document> matchDocs = new LinkedList<>();
 
 		TopDocs docs = searcher.search(search.getQuery(), search.getSize() - hasAddSize.get());
+		for (ScoreDoc scoreDoc : docs.scoreDocs) {
+			matchDocs.add(searcher.doc(scoreDoc.doc, fields));
+		}
+
+		// 如果当前searcher已经被commit线程标记为关闭,则关闭
+		synchronized (searcher) {
+			if (searchFlag.getOrDefault(searcher, STATUS_NOTHONG) == 1) {
+				searcher.getIndexReader().close();
+				openedDir.remove(dir);
+			}
+		}
+
 		int totalHits = docs.totalHits;
 		docsCount.getAndAdd(totalHits);
 
-		for (ScoreDoc scoreDoc : docs.scoreDocs) {
-			Document doc = searcher.doc(scoreDoc.doc, fields);
+		List<String> lines = Collections.emptyList();
+		for (Document doc : matchDocs) {
 			String jsonStr = doc.get("data");
-			List<String> lines = metaWriter.read(jsonStr,  search.getSize());
+			if (jsonStr != null) {
+				lines = metaWriter.read(jsonStr);
+			}
 			search.handle(host, doc, lines, docsCount.get());
-			hasAddSize.incrementAndGet();
+			hasAddSize.getAndAdd(lines.size());
 		}
 		return totalHits;
 	}
@@ -380,11 +409,17 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 				meta.put(LINE_COUNT_KEY, lineCount.get());
 				long end = System.currentTimeMillis();
 				long commitTime = end - st;
-				// 先put新的reader到map,再关闭老的reader,搜索线程要捕获异常,如搜索时被关闭,需要重新去map取
+				// 先put新的reader到map,再关闭老的reader
 				IndexSearcher search = openedDir.get(indexDir);
 				IndexReader newReader = DirectoryReader.open(writer);
 				openedDir.put(indexDir, new IndexSearcher(newReader));
-				Utils.close(search.getIndexReader());
+
+				// 如果search正在使用,只是标记为close,搜索线程用完后关闭
+				if (searchFlag.containsKey(search)) {
+					searchFlag.put(search, STATUS_CLOSE);
+				} else {
+					Utils.close(search.getIndexReader());
+				}
 				long reopenTime = System.currentTimeMillis() - end;
 				LOG.debug(String.format("commit:%sms,reopen reader:%sms docs:%s", commitTime, reopenTime, numDocs));
 			} catch (Exception e) {
@@ -402,13 +437,11 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	}
 
 	private IndexWriter createAndCacneIndexWriter(File file, SimpleDateFormat sdf) throws Exception {
-		LogByteSizeMergePolicy mergePolicy = new LogByteSizeMergePolicy();
-		mergePolicy.setMergeFactor(10000);
-
+		TieredMergePolicy mergePolicy = new TieredMergePolicy();
 		IndexWriterConfig conf = new IndexWriterConfig(analyzer);
 		conf.setOpenMode(OpenMode.CREATE_OR_APPEND);
 		conf.setMergePolicy(mergePolicy);
-		conf.setUseCompoundFile(false);
+		conf.setUseCompoundFile(true);
 
 		IndexWriter writer = new IndexWriter(FSDirectory.open(file.toPath()), conf);
 		DirectoryReader reader = DirectoryReader.open(writer);

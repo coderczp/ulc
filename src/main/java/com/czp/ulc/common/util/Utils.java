@@ -10,7 +10,6 @@
 package com.czp.ulc.common.util;
 
 import java.io.BufferedReader;
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -166,11 +165,13 @@ public class Utils {
 		return lines;
 	}
 
-	public static void close(Closeable item) {
+	public static void close(AutoCloseable item) {
 		try {
-			item.close();
-			LOG.debug("close:{}", item);
-		} catch (IOException e) {
+			if (item != null) {
+				item.close();
+				LOG.debug("close:{}", item);
+			}
+		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 	}

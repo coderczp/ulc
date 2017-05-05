@@ -1,21 +1,11 @@
 package com.czp.ulc.test;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.PathMatcher;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.LinkedList;
 import java.util.List;
 
 import org.junit.Test;
 
-import com.czp.ulc.common.meta.MetaCompressTask;
-import com.czp.ulc.common.meta.MetaWriter;
+import com.czp.ulc.common.meta.MetaCompressManager;
 
 /**
  * 请添加描述
@@ -27,39 +17,26 @@ import com.czp.ulc.common.meta.MetaWriter;
 
 public class DataCompressWriterTest {
 
-	private File dir = new File("D:/WorkSpaces/Eclipse4.4_AOLIDAY_sendy2/service_booking/booking");
-
-	@Test
+	//@Test
 	public void testCompress() {
-		MetaCompressTask dt = MetaCompressTask.getInstance(false);
-		dt.add(dir);
-		dt.onSystemExit();
+		File src = new File("./log/data/20170504");
+		File outPut = new File("./log/data/20170504.zip");
+		MetaCompressManager instance = MetaCompressManager.getInstance();
+		instance.doCompress(src, outPut, true);
+		instance.onSystemExit();
 	}
 
-	@Test
-	public void testWriter() throws Exception {
-		PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:**/*.java");
-		LinkedList<File> files = new LinkedList<>();
-		SimpleFileVisitor<Path> visitor = new SimpleFileVisitor<Path>() {
-
-			@Override
-			public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
-				if (matcher.matches(path)) {
-					files.add(path.toFile());
-				}
-				return super.visitFile(path, attrs);
-			}
-
-		};
-		Files.walkFileTree(dir.toPath(), visitor);
-		MetaWriter mw = new MetaWriter("./meta_log");
-		for (File file : files) {
-			List<String> lines = Files.readAllLines(file.toPath());
-			String write = mw.write(lines);
-			System.out.println(write);
+	//@Test
+	public void testReader() throws Exception {
+		int size = 4;
+		String zipItem = "0.log";
+		File zipFile = new File("./log/data/20170504.zip");
+		long lineStart = 10;
+		MetaCompressManager instance = MetaCompressManager.getInstance();
+		List<String> lines = instance.readFromCompressFile(zipFile, lineStart, size);
+		for (String string : lines) {
+			System.out.println(string);
 		}
-		mw.close();
-		System.out.println("press any key to quit");
-		System.in.read();
+		instance.onSystemExit();
 	}
 }

@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -32,6 +31,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
@@ -356,7 +356,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	}
 
 	private int searchInIndex(IndexSearcher searcher, File dir, String host, Searcher search, AtomicLong docsCount,
-			AtomicInteger hasAddSize) throws IOException {
+			AtomicInteger hasAddSize) throws Exception {
 
 		// 标记当前的searcher正在使用,不用关闭
 		synchronized (searcher) {
@@ -373,7 +373,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 		// 如果当前searcher已经被commit线程标记为关闭,则关闭
 		synchronized (searcher) {
-			if (searchFlag.getOrDefault(searcher, STATUS_NOTHONG) == 1) {
+			if (searchFlag.getOrDefault(searcher, STATUS_NOTHONG) == STATUS_CLOSE) {
 				searcher.getIndexReader().close();
 				openedDir.remove(dir);
 			}
@@ -381,15 +381,30 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 		int totalHits = docs.totalHits;
 		docsCount.getAndAdd(totalHits);
+		boolean loadMeta = fields.contains("data");
+		if (loadMeta == false) {
+			for (Document doc : matchDocs) {
+				search.handle(host, doc, "", docsCount.get());
+				hasAddSize.getAndIncrement();
+			}
+			return totalHits;
+		}
 
-		List<String> lines = Collections.emptyList();
+		List<JSONObject> lineRequest = new LinkedList<>();
 		for (Document doc : matchDocs) {
 			String jsonStr = doc.get("data");
-			if (jsonStr != null) {
-				lines = metaWriter.read(jsonStr);
-			}
-			search.handle(host, doc, lines, docsCount.get());
-			hasAddSize.getAndAdd(lines.size());
+			JSONObject obj = JSONObject.parseObject(jsonStr);
+			doc.add(new StringField("metaLineNo", obj.getString(MetaReadWriter.LINE_NO), Store.NO));
+			doc.add(new StringField("metaFile", obj.getString(MetaReadWriter.FILE_NAME), Store.NO));
+			lineRequest.add(obj);
+		}
+		Map<String, Map<Long, String>> linesMap = metaWriter.mergeRead(lineRequest);
+		for (Document doc : matchDocs) {
+			String file = doc.get("metaFile");
+			long lineNo = Long.valueOf(doc.get("metaLineNo"));
+			String line = linesMap.get(file).getOrDefault(lineNo, "");
+			search.handle(host, doc, line, docsCount.get());
+			hasAddSize.getAndIncrement();
 		}
 		return totalHits;
 	}

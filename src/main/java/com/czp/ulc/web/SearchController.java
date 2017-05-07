@@ -98,7 +98,7 @@ public class SearchController {
 
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, Document doc, List<String> linesRead, long total) {
+			public boolean handle(String host, Document doc, String linesRead, long total) {
 
 				matchCount.set(total);
 				String file = doc.get("file");
@@ -114,7 +114,7 @@ public class SearchController {
 					files.put(file, lines);
 				}
 				if (linesRead != null) {
-					lines.addAll(linesRead);
+					lines.add(linesRead);
 				}
 				return true;
 			}

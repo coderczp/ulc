@@ -36,7 +36,7 @@ public class DataWriter implements AutoCloseable {
 		this.file = file;
 		this.lineNo = readLineNo(file);
 		this.pointer = new AtomicLong(file.length());
-		this.writer = new BufferedOutputStream(new FileOutputStream(file));
+		this.writer = new BufferedOutputStream(new FileOutputStream(file,append));
 	}
 
 	public int writeLine(String str) throws IOException {

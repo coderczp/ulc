@@ -398,7 +398,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 			doc.add(new StringField("metaFile", obj.getString(MetaReadWriter.FILE_NAME), Store.NO));
 			lineRequest.add(obj);
 		}
-		Map<String, Map<Long, String>> linesMap = metaWriter.mergeRead(lineRequest);
+		Map<String, Map<Long, String>> linesMap = MetaReadWriter.mergeRead(lineRequest);
 		for (Document doc : matchDocs) {
 			String file = doc.get("metaFile");
 			long lineNo = Long.valueOf(doc.get("metaLineNo"));

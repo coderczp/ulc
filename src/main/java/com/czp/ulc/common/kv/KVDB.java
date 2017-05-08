@@ -42,6 +42,8 @@ public interface KVDB {
 	void put(byte[] key, String value);
 
 	String get(byte[] key);
+	
+	byte[] getBytes(byte[] key);
 
 	void putInt(Integer key, String value);
 

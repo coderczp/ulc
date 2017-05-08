@@ -11,6 +11,7 @@ package com.czp.ulc.collect.handler;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
@@ -31,9 +32,8 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
-import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.LongPoint;
-import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -47,6 +47,7 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -186,12 +187,12 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 					continue;
 				}
 				lineCount.getAndIncrement();
-				String json = metaWriter.write(line);
+				byte[] metaId = metaWriter.write(line);
 				Document doc = new Document();
 				doc.add(new LongPoint("time", now));
+				doc.add(new StoredField("mId", metaId));
 				doc.add(new TextField("line", line, Field.Store.NO));
 				doc.add(new TextField("file", file, Field.Store.YES));
-				doc.add(new StringField("data", json, Field.Store.YES));
 				writer.addDocument(doc);
 			}
 			long nowDocs = writer.numDocs();
@@ -380,19 +381,18 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 			return;
 		}
 
-		List<JSONObject> lineRequest = new LinkedList<>();
+		List<byte[]> lineRequest = new LinkedList<>();
 		for (Document doc : matchDocs) {
-			String jsonStr = doc.get("data");
-			JSONObject obj = JSONObject.parseObject(jsonStr);
-			doc.add(new StringField("metaLineNo", obj.getString(MetaReadWriter.LINE_NO), Store.NO));
-			doc.add(new StringField("metaFile", obj.getString(MetaReadWriter.FILE_NAME), Store.NO));
-			lineRequest.add(obj);
+			BytesRef metaId = doc.getBinaryValue("mId");
+			lineRequest.add(metaId.bytes);
 		}
-		Map<String, Map<Long, String>> linesMap = MetaReadWriter.mergeRead(lineRequest);
+		Map<Integer, Map<Long, String>> linesMap = metaWriter.mergeRead(lineRequest);
 		for (Document doc : matchDocs) {
-			String file = doc.get("metaFile");
-			long lineNo = Long.valueOf(doc.get("metaLineNo"));
-			String line = linesMap.get(file).getOrDefault(lineNo, "");
+			BytesRef metaId = doc.getBinaryValue("mId");
+			ByteBuffer buf = ByteBuffer.wrap(metaId.bytes);
+			int metaFileNo = buf.getInt();
+			long lineNo = buf.getLong();
+			String line = linesMap.get(metaFileNo).get(lineNo);
 			search.handle(host, doc, line, docsCount.get(), lineCount.get());
 			hasAddSize.getAndIncrement();
 		}

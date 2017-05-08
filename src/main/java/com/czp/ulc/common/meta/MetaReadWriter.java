@@ -8,14 +8,10 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
-import java.text.SimpleDateFormat;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -23,6 +19,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -30,7 +27,8 @@ import java.util.zip.ZipOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.alibaba.fastjson.JSONObject;
+import com.czp.ulc.common.kv.KVDB;
+import com.czp.ulc.common.kv.LevelDB;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -47,6 +45,7 @@ public class MetaReadWriter implements AutoCloseable {
 	private long eachFileSize;
 	private long nowFileLines;
 	private DataWriter nowWriter;
+	private AtomicInteger nowFileNo = new AtomicInteger();
 	private ExecutorService worker = Executors.newSingleThreadExecutor();
 
 	/** 这些信息会存储到索引,为了节省空间,将名称简化为字符 */
@@ -61,7 +60,6 @@ public class MetaReadWriter implements AutoCloseable {
 	private static final long MAX_SKIP_BUFFER_SIZE = 1024 * 20;
 	private static final long DEFAUT_EACH_FILE_SIZE = 1024 * 1024 * 200;
 
-	private static final long[] EMPTY_LONG_ARR = new long[] { 0, 0 };
 	private static final Logger log = LoggerFactory.getLogger(MetaReadWriter.class);
 
 	public MetaReadWriter(String baseDir) throws Exception {
@@ -71,31 +69,33 @@ public class MetaReadWriter implements AutoCloseable {
 	public MetaReadWriter(String baseDir, long eachFileSize) throws Exception {
 		this.baseDir = new File(baseDir);
 		this.eachFileSize = eachFileSize;
-		this.nowWriter = getCurrentFileWriter(getTodayDir(this.baseDir));
+		this.nowWriter = getCurrentFileWriter(this.baseDir);
 		this.nowFileLines = nowWriter.getlineNo();
 		this.checkHasUncompressFile();
 	}
 
 	/***
-	 * 滚动写文件,返回文件的当前行号
+	 * 滚动写文件,返回文件的当前行号和文件号
 	 * 
 	 * @param lines
 	 * @return
 	 * @throws IOException
 	 */
-	public synchronized String write(String line) throws Exception {
+	public synchronized byte[] write(String line) throws Exception {
 		if (nowWriter.getFile().length() >= eachFileSize) {
 			Utils.close(nowWriter);
-			nowWriter = getCurrentFileWriter(getTodayDir(baseDir));
+			nowWriter = getCurrentFileWriter(baseDir);
 		}
 		long lineNo = nowWriter.getlineNo();
 		long pointer = nowWriter.getPointer();
-		nowWriter.writeLine(line);
-		JSONObject json = new JSONObject();
-		json.put(LINE_NO, lineNo);
-		json.put(LINE_POS, pointer);
-		json.put(FILE_NAME, nowWriter.getFile());
-		return json.toJSONString();
+		int size = nowWriter.writeLine(line);
+		// 4字节文件ID+8字节行号
+		ByteBuffer metaId = ByteBuffer.allocate(12);
+		metaId.putInt(nowFileNo.get());
+		metaId.putLong(lineNo);
+		metaId.flip();
+		byte[] array = metaId.array();
+		return array;
 	}
 
 	/**
@@ -107,47 +107,59 @@ public class MetaReadWriter implements AutoCloseable {
 		ZipFile zf = null;
 		long count = nowFileLines;
 		for (File file : dir.listFiles()) {
-			if (!file.isDirectory())
+			if (!file.getName().endsWith(ZIP_SUFIX))
 				continue;
-			for (File item : file.listFiles()) {
-				if (!item.getName().endsWith(ZIP_SUFIX))
-					continue;
-				try {
-					zf = new ZipFile(item);
-					String indexFile = item.getName().replaceAll(ZIP_SUFIX, INDEX_SUFIX);
-					long size = zf.getEntry(indexFile).getSize();
-					count += size / Long.BYTES;
-				} catch (Exception e) {
-					log.error("read count error:" + item, e);
-				} finally {
-					Utils.close(zf);
-				}
+			try {
+				zf = new ZipFile(file);
+				String indexFile = file.getName().replaceAll(ZIP_SUFIX, INDEX_SUFIX);
+				long size = zf.getEntry(indexFile).getSize();
+				count += size / Long.BYTES;
+			} catch (Exception e) {
+				log.error("read count error:" + file, e);
+			} finally {
+				Utils.close(zf);
 			}
 		}
 		log.info("file:{} linecount:{}", dir, count);
 		return count;
 	}
 
-	public static void doCompress(File file, File outPut, boolean delSrc) {
+	public void doCompress(File file, File outPut, boolean delSrc) {
 		try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outPut)))) {
 			long st1 = System.currentTimeMillis();
-			long startPos = 0;
 			String line = null;
+			long startPos = 0, lineNo = 0;
 			byte[] lineSpliter = DataWriter.lineSpliter;
+
+			ByteBuffer metaId = ByteBuffer.allocate(12);
+			ByteBuffer metaValue = ByteBuffer.allocate(12);
+			Integer fileNumber = getFileNumber(file.getName());
 			zos.putNextEntry(new ZipEntry(file.getName()));
-			LinkedList<Long> linePointer = new LinkedList<>();
 			try (BufferedReader br = Files.newBufferedReader(file.toPath())) {
 				while ((line = br.readLine()) != null) {
 					byte[] bytes = line.getBytes(DataWriter.UTF8);
-					startPos += bytes.length + lineSpliter.length;
-					linePointer.add(startPos);
+					int len = bytes.length + lineSpliter.length;
+
 					zos.write(bytes);
 					zos.write(lineSpliter);
+
+					metaId.putInt(fileNumber);
+					metaId.putLong(lineNo);
+					metaId.flip();
+
+					metaValue.putLong(startPos);
+					metaValue.putInt(len);
+					metaValue.flip();
+
+					metaDB.put(metaId.array(), metaValue.array());
+					metaId.clear();
+					metaValue.clear();
+					lineNo++;
+					startPos += len;
 				}
 			}
 			long oldSize = file.length();
 			long size = outPut.length();
-			writeLineIndexFile(file, zos, linePointer);
 			boolean del = delSrc ? file.delete() : false;
 			long end1 = System.currentTimeMillis();
 			log.info("compress[{}],size[{}]->[{}],del[{}],time[{}]ms", file, oldSize, size, del, end1 - st1);
@@ -173,6 +185,7 @@ public class MetaReadWriter implements AutoCloseable {
 		if (nowFile == null) {
 			nowFile = new File(baseDir, fileNo + SUFIX);
 		}
+		nowFileNo.set(fileNo);
 		return new DataWriter(nowFile, true);
 	}
 
@@ -185,17 +198,6 @@ public class MetaReadWriter implements AutoCloseable {
 		});
 	}
 
-	private static void writeLineIndexFile(File file, ZipOutputStream zos, LinkedList<Long> index) throws IOException {
-		zos.putNextEntry(new ZipEntry(getIndexFileName(file)));
-		for (Long num : index) {
-			zos.write(Utils.longToBytes(num));
-		}
-	}
-
-	private static String getIndexFileName(File file) {
-		return file.getName().concat(INDEX_SUFIX);
-	}
-
 	private static File getZipFile(File file) {
 		return new File(file + ZIP_SUFIX);
 	}
@@ -204,122 +206,64 @@ public class MetaReadWriter implements AutoCloseable {
 		return Integer.valueOf(name.substring(0, name.indexOf(".")));
 	}
 
-	private File getTodayDir(File baseDir) {
-		Date day = Utils.igroeHMSTime(System.currentTimeMillis());
-		SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd");
-		String fileStr = format.format(day);
-		File file = new File(baseDir, fileStr);
-		file.mkdirs();
-		return file;
-	}
-
-	// 先读取索引,在根据索引快速定位行对应的文件指针读取行
-	private static long[] getLinePointer(ZipFile zf, File file, long lineNo, int lineSize) throws IOException {
-		if (lineNo <= 0) {
-			return EMPTY_LONG_ARR;
-		}
-		lineSize = lineSize <= 1 ? 2 : lineSize;
-		ZipEntry indexFile = zf.getEntry(getIndexFileName(file));
-		try (BufferedInputStream bis = new BufferedInputStream(zf.getInputStream(indexFile))) {
-			int bytes = Long.BYTES;
-			bis.skip((lineNo - 1) * bytes);
-			byte[] buf = new byte[bytes * lineSize];
-			bis.read(buf);
-			long fristLineOffset = ByteBuffer.wrap(buf, 0, bytes).getLong();
-			long lastLineOffset = ByteBuffer.wrap(buf, (lineSize - 1) * bytes, bytes).getLong();
-			return new long[] { fristLineOffset, lastLineOffset - fristLineOffset };
-		}
-	}
-
 	@Override
 	public void close() throws Exception {
 		Utils.close(nowWriter);
 		worker.shutdown();
 	}
 
-	public static Map<Long, String> readFromUnCompressFile(File file, InputStream is, Set<JSONObject> lineRequest)
-			throws IOException {
-		// 纪录已经跳过的字节数
-		long lastSkip = 0;
-		// 纪录已经读取的字节数
-		long hasReadSize = 0;
-		// 映射行号和内容
-		Map<Long, String> lineMap = new HashMap<>();
-		try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
-			for (JSONObject json : lineRequest) {
-				long lineNo = json.getLongValue(LINE_NO);
-				long linePos = json.getLongValue(LINE_POS);
-				long skip = linePos - lastSkip - hasReadSize;
-				skipSpecBytes(file, is, skip);
-				String line = br.readLine();
-				if (line != null) {
-					line = line.concat(DataWriter.LINE_SPLITER);
-					hasReadSize += line.length();
-				}
-				lineMap.put(lineNo, line);
-				lastSkip = skip;
-			}
-		}
-		return lineMap;
-	}
-
 	// 合并读取,避免同一个文件打开关闭多次
-	public static Map<String, Map<Long, String>> mergeRead(List<JSONObject> lineRequest) throws Exception {
-		Map<String, Map<Long, String>> datas = new HashMap<>();
-		Map<String, Set<JSONObject>> readLines = classifyByFile(lineRequest);
-		for (Entry<String, Set<JSONObject>> entry : readLines.entrySet()) {
-			Set<JSONObject> jsons = entry.getValue();
-			String fileName = entry.getKey();
-			File file = new File(fileName);
-			Map<Long, String> lines = null;
-			String logName = fileName;
-
+	public Map<Integer, Map<Long, String>> mergeRead(List<byte[]> lineRequest) throws Exception {
+		Map<Integer, Map<Long, String>> datas = new HashMap<>();
+		Map<Integer, Set<byte[]>> readLines = classifyByFileId(lineRequest);
+		for (Entry<Integer, Set<byte[]>> entry : readLines.entrySet()) {
+			Set<byte[]> jsons = entry.getValue();
+			int fileId = entry.getKey();
+			File file = buildFileNameWithFileId(fileId);
 			long st = System.currentTimeMillis();
-			if (file.exists()) {
-				lines = readFromUnCompressFile(file, new FileInputStream(file), jsons);
-			} else {
-				lines = readFromCompressFile(jsons, file);
-				logName = getZipFile(file).getName();
-			}
-			datas.put(fileName, lines);
+			datas.put(fileId, readLines(file, jsons));
 			long end = System.currentTimeMillis();
-			log.info("read[{}]lines,from[{}],time:[{}]ms", jsons.size(), logName, end - st);
+			log.info("read[{}]lines,from[{}],time:[{}]ms", jsons.size(), file.getName(), end - st);
 		}
 		return datas;
 	}
 
-	private static Map<Long, String> readFromCompressFile(Set<JSONObject> jsons, File file) throws Exception {
-		File zipFile = getZipFile(file);
-		Map<Long, String> linesMap = new HashMap<>();
-		try (ZipFile zf = new ZipFile(zipFile)) {
-			ZipEntry logFile = zf.getEntry(file.getName());
-			try (BufferedInputStream br = new BufferedInputStream(zf.getInputStream(logFile))) {
-				long lastSkip = 0, hasReadSize = 0;
-				for (JSONObject json : jsons) {
-					long lineNo = json.getLongValue(LINE_NO);
-					int lineSize = (int) json.getOrDefault(LINE_SIZE, 2);
-					long[] linePointer = getLinePointer(zf, file, lineNo, lineSize);
-					int lineBytes = (int) linePointer[1];
-					if (linePointer[0] <= 0 || lineBytes <= 0) {
-						log.error("can't find index for line:{} in:{}", lineNo, zipFile);
-						linesMap.put(lineNo, "N/A");
-					} else {
-						long skip = linePointer[0] - lastSkip - hasReadSize;
-						skipSpecBytes(zipFile, br, skip);
-						byte[] buf = new byte[lineBytes];
-						br.read(buf);
-						linesMap.put(lineNo, new String(buf, DataWriter.UTF8));
-						hasReadSize += buf.length;
-						lastSkip = skip;
-					}
-				}
+	private Map<Long, String> readLines(File file, Set<byte[]> metas) throws IOException {
+		ZipFile zf = null;
+		InputStream is = null;
+		Map<Long, String> lineMap = new HashMap<>();
+		try {
+			if (file.exists()) {
+				is = new FileInputStream(file);
+			} else {
+				zf = new ZipFile(getZipFile(file));
+				ZipEntry logFile = zf.getEntry(file.getName());
+				is = new BufferedInputStream(zf.getInputStream(logFile));
 			}
+			for (byte[] bs : metas) {
+				byte[] value = metaDB.getBytes(bs);
+				ByteBuffer metaId = ByteBuffer.wrap(bs);
+				ByteBuffer buf = ByteBuffer.wrap(value);
+				long linePos = buf.getLong();
+				int size = buf.getInt();
+				skipSpecBytes(file, is, linePos);
+				byte[] lines = new byte[size];
+				is.read(lines);
+				lineMap.put(metaId.getLong(), new String(lines, DataWriter.UTF8));
+			}
+		} finally {
+			Utils.close(is);
+			Utils.close(zf);
 		}
-		return linesMap;
+		return lineMap;
+	}
+
+	private File buildFileNameWithFileId(int fileId) {
+		return new File(baseDir, fileId + ".log");
 	}
 
 	// JDK skip 不能正确的跳过指定字节,会导致CPU 100%
-	private static void skipSpecBytes(File zipFile, InputStream in, long skip) throws IOException {
+	private static void skipSpecBytes(File file, InputStream in, long skip) throws IOException {
 		long st = System.currentTimeMillis();
 		if (in instanceof FileInputStream) {
 			while (skip > 0) {
@@ -336,41 +280,41 @@ public class MetaReadWriter implements AutoCloseable {
 			remaining -= nr;
 		}
 		long end = System.currentTimeMillis();
-		log.info("skip:[{}]bytes,from:[{}],time:[{}]ms", skip, zipFile, end - st);
+		log.info("skip:[{}]bytes,from:[{}],time:[{}]ms", skip, file, end - st);
 	}
 
 	// 把读请求按文件分类,这样一个文件只打开一次
-	private static Map<String, Set<JSONObject>> classifyByFile(List<JSONObject> lineRequest) {
-		Map<String, Set<JSONObject>> readLines = new HashMap<>();
-		for (JSONObject json : lineRequest) {
-			String fileName = (String) json.remove(FILE_NAME);
-			Set<JSONObject> lineNos = readLines.get(fileName);
-			if (lineNos != null) {
-				lineNos.add(json);
-				continue;
+	private static Map<Integer, Set<byte[]>> classifyByFileId(List<byte[]> lineRequest) {
+		Map<Integer, Set<byte[]>> readLines = new HashMap<>();
+		for (byte[] meta : lineRequest) {
+			ByteBuffer buf = ByteBuffer.wrap(meta);
+			int metaFileNo = buf.getInt();
+			Set<byte[]> lineNos = readLines.get(metaFileNo);
+			if (lineNos == null) {
+				lineNos = new TreeSet<>(new Comparator<byte[]>() {
+					public int compare(byte[] o1, byte[] o2) {
+						ByteBuffer buf1 = ByteBuffer.wrap(o1);
+						ByteBuffer buf2 = ByteBuffer.wrap(o2);
+						// int metaFileNo1 = buf1.getInt();
+						// int metaFileNo2= buf2.getInt();
+						Long metaLineNo1 = buf1.getLong();
+						Long metaLineNo2 = buf2.getLong();
+						return metaLineNo1.compareTo(metaLineNo2);
+					}
+				});
 			}
-			lineNos = new TreeSet<>(new Comparator<JSONObject>() {
-				public int compare(JSONObject o1, JSONObject o2) {
-					return o1.getInteger(LINE_NO).compareTo(o2.getInteger(LINE_NO));
-				}
-			});
-			lineNos.add(json);
-			readLines.put(fileName, lineNos);
+			lineNos.add(meta);
+			readLines.put(metaFileNo, lineNos);
 		}
 		return readLines;
 	}
 
 	private void checkHasUncompressFile() {
-		File tadayFile = getTodayDir(baseDir);
 		for (File file : baseDir.listFiles()) {
-			if (file.getName().equals(tadayFile))
+			if (!file.getName().endsWith(SUFIX) || file.length() < eachFileSize)
 				continue;
-			for (File item : file.listFiles()) {
-				if (!item.getName().endsWith(SUFIX))
-					continue;
-				ansyComprecessFile(item, true);
-				log.info("find required file:{},will compress", item);
-			}
+			ansyComprecessFile(file, true);
+			log.info("find required file:{},will compress", file);
 		}
 	}
 }

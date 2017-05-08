@@ -17,41 +17,63 @@ import com.czp.ulc.common.meta.MetaReadWriter;
 import com.czp.ulc.common.util.Utils;
 
 /**
- * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月3日 上午9:56:01</li>
+ * 请添加描述
+ * <li>创建人：Jeff.cao</li>
+ * <li>创建时间：2017年5月3日 上午9:56:01</li>
  * 
  * @version 0.0.1
  */
 
 public class DataCompressWriterTest {
 
-	 @Test
+	@Test
 	public void testCompress() throws IOException {
-		File outPut = new File("/Users/itrip/Documents/xlog/0.log.index");
-		System.out.println(outPut.length()/1024.0/1024);
-		BufferedInputStream fis = new BufferedInputStream(new FileInputStream(outPut));
-		byte[] buf = new byte[Long.BYTES];
-		int i = 0;
-		while(fis.read(buf)!=-1&&i<200){
-			System.out.println(i+"---"+Utils.bytesToLong(buf));
-			i++;
+		File file = new File("./tmp/0.log");
+		if (file.exists()) {
+			File outPut = new File(file + ".zip");
+			for (int i = 0; i < 0; i++) {
+				MetaReadWriter.doCompress(file, outPut, false);
+			}
 		}
-		fis.close();
+	}
+
+	@Test
+	public void testLoadLine() throws IOException {
+		File file = new File("./tmp");
+		if (!file.exists())
+			return;
+		// System.out.println(MetaReadWriter.loadLineCount(file));
+	}
+
+	@Test
+	public void testReadLinePos() throws IOException {
+		File file = new File("./tmp/0.log.index");
+		if (!file.exists())
+			return;
+		int line = 0;
+		BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
+		byte[] buf = new byte[8];
+		while (bis.read(buf) != -1) {
+			System.out.println(line + "-->" + Utils.bytesToLong(buf));
+			line++;
+		}
+		bis.close();
 	}
 
 	@Test
 	public void testReader() throws Exception {
-		// File zipFile = new File("/Users/itrip/Documents/0.log.zip");
+		String file = "./tmp/old/0.log";
 		List<JSONObject> lineRequest = new LinkedList<JSONObject>();
 		JSONObject json = new JSONObject();
-		json.put("f", "/Users/itrip/Documents/xlog/0.log");
+		json.put("f", file);
 		json.put("l", 200);
 		json.put("s", 10);
 		lineRequest.add(json);
-		
+
 		JSONObject json2 = new JSONObject();
-		json2.put("f", "/Users/itrip/Documents/xlog/0.log");
+		json2.put("f", file);
 		json2.put("l", 2);
-		json2.put("s", 5);
+		json2.put("s", 1);
 		lineRequest.add(json2);
 		Map<String, Map<Long, String>> mergeRead = MetaReadWriter.mergeRead(lineRequest);
 		Set<Entry<String, Map<Long, String>>> entrySet = mergeRead.entrySet();
@@ -59,8 +81,8 @@ public class DataCompressWriterTest {
 			Map<Long, String> value = entry.getValue();
 			Set<Entry<Long, String>> entrySet2 = value.entrySet();
 			for (Entry<Long, String> entry2 : entrySet2) {
-				System.out.println("line:"+entry2.getKey());
-				System.out.println("\t"+entry2.getValue());
+				System.out.println("line:" + entry2.getKey());
+				System.out.println("\t" + entry2.getValue());
 			}
 		}
 	}

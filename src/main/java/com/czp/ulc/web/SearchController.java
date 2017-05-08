@@ -92,17 +92,18 @@ public class SearchController {
 		NumSupportQueryParser parser = new NumSupportQueryParser(fields, luceneSearch.getAnalyzer());
 		parser.addSpecFied("time", LongPoint.class);
 
+		AtomicLong allLine = new AtomicLong();
 		AtomicLong matchCount = new AtomicLong();
 		JSONObject data = new JSONObject();
 		Searcher search = new Searcher() {
 
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, Document doc, String linesRead, long total) {
+			public boolean handle(String host, Document doc, String linesRead, long total, long lineCount) {
 
+				allLine.set(lineCount);
 				matchCount.set(total);
 				String file = doc.get("file");
-
 				JSONObject files = data.getJSONObject(host);
 				if (files == null) {
 					files = new JSONObject();
@@ -129,12 +130,13 @@ public class SearchController {
 		search.setSize(size);
 
 		long allDocs = luceneSearch.search(search);
-		long cost = System.currentTimeMillis() - now;
+		double cost = (System.currentTimeMillis() - now) / 1000.0;
 
 		JSONObject res = new JSONObject();
 		res.put("data", data);
-		res.put("count", allDocs);
-		res.put("time", cost / 1000.0);
+		res.put("time", cost);
+		res.put("docCount", allDocs);
+		res.put("lineCount", allLine.get());
 		res.put("matchCount", matchCount.get());
 		LOG.info("query:[{}] time:{}ms", q, cost);
 		return res;

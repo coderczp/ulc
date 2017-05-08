@@ -1,6 +1,5 @@
 package com.czp.ulc.collect.handler;
 
-import java.util.List;
 import java.util.Set;
 
 import org.apache.lucene.document.Document;
@@ -76,5 +75,5 @@ public abstract class Searcher {
 		this.query = query;
 	}
 
-	public abstract boolean handle(String host,Document doc,String line, long total);
+	public abstract boolean handle(String host,Document doc,String line, long total,long lineCount);
 }

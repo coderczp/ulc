@@ -193,9 +193,8 @@ public class Utils {
 	}
 
 	public static byte[] longToBytes(long num) {
-		ByteBuffer buffer = ByteBuffer.allocate(8);
-		buffer.putLong(num);
-		return buffer.array();
+		ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+		return buffer.putLong(num).array();
 	}
 
 	public static Long bytesToLong(byte[] values) {

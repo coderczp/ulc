@@ -122,6 +122,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 			DATA_DIR.mkdirs();
 			loadAllIndexDir();
 			metaWriter = new MetaReadWriter(DATA_DIR.toString());
+			lineCount.set(metaWriter.loadLineCount(DATA_DIR));
 			ThreadPools.getInstance().startThread("lucene-index", this, true);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -156,7 +157,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	 * 
 	 * @return
 	 */
-	private File findCurrentIndexDir(String host, long time, SimpleDateFormat sdf) {
+	private File findTodayIndexDir(String host, long time, SimpleDateFormat sdf) {
 		File hostDir = new File(INDEX_DIR, host);
 		hostDir.mkdirs();
 		return new File(hostDir, sdf.format(Utils.igroeHMSTime(time)));
@@ -174,38 +175,27 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 				LOG.info("file name is empty:{}", lines);
 				return false;
 			}
-			StringBuilder sb = new StringBuilder();
+			String host = event.getHost().getName();
+			SimpleDateFormat sdf = new SimpleDateFormat(nameFormat);
+			File dir = findTodayIndexDir(host, now, sdf);
+			IndexWriter writer = getIndexWriter(dir, sdf);
+
 			for (String line : lines) {
 				line = line.trim();
 				if (line.length() == 0) {
 					continue;
 				}
-				sb.append(line);
 				lineCount.getAndIncrement();
+				String json = metaWriter.write(line);
+				Document doc = new Document();
+				doc.add(new LongPoint("time", now));
+				doc.add(new TextField("line", line, Field.Store.NO));
+				doc.add(new TextField("file", file, Field.Store.YES));
+				doc.add(new StringField("data", json, Field.Store.YES));
+				writer.addDocument(doc);
 			}
-
-			if (sb.length() == 0)
-				return true;
-
-			String all = sb.toString();
-			String host = event.getHost().getName();
-			String json = metaWriter.write(lines);
-
-			Document doc = new Document();
-			doc.add(new LongPoint("time", now));
-			doc.add(new TextField("line", all, Field.Store.NO));
-			doc.add(new TextField("file", file, Field.Store.YES));
-			doc.add(new StringField("data", json, Field.Store.YES));
-
-			SimpleDateFormat sdf = new SimpleDateFormat(nameFormat);
-			File dir = findCurrentIndexDir(host, now, sdf);
-
-			IndexWriter writer = getIndexWriter(dir, sdf);
-			writer.addDocument(doc);
-
 			long nowDocs = writer.numDocs();
 			notifyCommitIndex(writer, dir, nowDocs);
-
 			LOG.debug("create index time:{}ms docs:{}", (System.currentTimeMillis() - now), lastDocs);
 		} catch (Exception e) {
 			LOG.error("process message error", e);
@@ -355,7 +345,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 		}
 	}
 
-	private int searchInIndex(IndexSearcher searcher, File dir, String host, Searcher search, AtomicLong docsCount,
+	private void searchInIndex(IndexSearcher searcher, File dir, String host, Searcher search, AtomicLong docsCount,
 			AtomicInteger hasAddSize) throws Exception {
 
 		// 标记当前的searcher正在使用,不用关闭
@@ -384,10 +374,10 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 		boolean loadMeta = fields.contains("data");
 		if (loadMeta == false) {
 			for (Document doc : matchDocs) {
-				search.handle(host, doc, "", docsCount.get());
+				search.handle(host, doc, null, docsCount.get(), lineCount.get());
 				hasAddSize.getAndIncrement();
 			}
-			return totalHits;
+			return;
 		}
 
 		List<JSONObject> lineRequest = new LinkedList<>();
@@ -403,10 +393,9 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 			String file = doc.get("metaFile");
 			long lineNo = Long.valueOf(doc.get("metaLineNo"));
 			String line = linesMap.get(file).getOrDefault(lineNo, "");
-			search.handle(host, doc, line, docsCount.get());
+			search.handle(host, doc, line, docsCount.get(), lineCount.get());
 			hasAddSize.getAndIncrement();
 		}
-		return totalHits;
 	}
 
 	@Override

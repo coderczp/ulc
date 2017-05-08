@@ -23,19 +23,19 @@
 <style type="text/css">
 .lines {
 	text-overflow: ellipsis;
-	background: black;
+	background: #993366;
 	word-spacing: 1px;
 	color: white;
 }
 
 .keyword {
-	color: red;
+	color: #00FF33;
 	font-weight: bold;
 }
 
 code {
 	color: white;
-	background-color: black;
+	background-color:#993366;
 }
 </style>
 </head>
@@ -156,12 +156,13 @@ code {
 				$('#q').val('eneter keyword');
 				return;
 			}
-			$('#time').html();
+			$('#time').html('');
+			$('#result').html('loading..........');
 			$.post('./search', {
 				'json' : JSON.stringify(json)
 			}, function(resp) {
 				var data = resp.data, q = json.q;
-				var mc = resp.matchCount, cc = resp.count, t = resp.time;
+				var mc = resp.matchCount, cc = resp.lineCount, t = resp.time;
 				var html = '';
 				$('#time').html(
 						'find[<b>' + mc + '</b>]in[<b>' + cc

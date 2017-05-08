@@ -1,9 +1,11 @@
 package com.czp.ulc.test;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -30,12 +32,19 @@ public class DataCompressWriterTest {
 
 	@Test
 	public void testCompress() throws IOException {
-		File file = new File("./tmp/0.log");
+		File file = new File("./log/data/20170508/0.log");
 		if (file.exists()) {
-			File outPut = new File("./test/0.log.zip");
-			for (int i = 0; i < 1; i++) {
-				mw.doCompress(file, outPut, false);
-			}
+//			File outPut = new File("./test/0.log.zip");
+//			for (int i = 0; i < 1; i++) {
+//				mw.doCompress(file, outPut, false);
+//			}
+			//1816-->774720
+			//1817-->775236
+			FileInputStream fis = new FileInputStream(file);
+			fis.skip(774720);
+			BufferedReader br = new BufferedReader(new InputStreamReader(fis));
+			System.out.println(br.readLine());
+			fis.close();
 		}
 	}
 
@@ -49,7 +58,7 @@ public class DataCompressWriterTest {
 
 	@Test
 	public void testReadLinePos() throws IOException {
-		File file = new File("./tmp/0.log.index");
+		File file = new File("./log//data/20170508/0.log.index");
 		if (!file.exists())
 			return;
 		int line = 0;

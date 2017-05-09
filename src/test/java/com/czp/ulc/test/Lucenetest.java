@@ -2,21 +2,15 @@ package com.czp.ulc.test;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.IndexWriterConfig.OpenMode;
-import org.apache.lucene.index.LogByteSizeMergePolicy;
-import org.apache.lucene.store.FSDirectory;
+
+import com.czp.ulc.common.lucene.AnalyzerUtil;
+import com.czp.ulc.common.lucene.MyAnalyzer;
 
 /**
  * 请添加描述
@@ -29,27 +23,25 @@ import org.apache.lucene.store.FSDirectory;
 public class Lucenetest {
 
 	public static void main(String[] args) throws IOException {
-		Analyzer analyzer = new StandardAnalyzer();
-		LogByteSizeMergePolicy mergePolicy = new LogByteSizeMergePolicy();
-		mergePolicy.setMergeFactor(50000);
+		 String path = "./log/data/20170509/0.log";
+		 BufferedReader br = new BufferedReader(new FileReader(new
+		 File(path)));
+		 String temp = "";
+		 int line = 50;
+		 while (line-- > 0 && (temp = br.readLine()) != null) {
+		 Analyzer analyzer = new MyAnalyzer();
+		 AnalyzerUtil.displayToken(temp, analyzer);
+		 analyzer.close();
+		 }
+		 br.close();
+		// Analyzer analyzer2 = new StopAnalyzer(Version.LUCENE_40);
+		// Analyzer analyzer3 = new SimpleAnalyzer(Version.LUCENE_40);
+		// Analyzer analyzer4 = new WhitespaceAnalyzer(Version.LUCENE_40);
 
-		IndexWriterConfig conf = new IndexWriterConfig(analyzer);
-		conf.setOpenMode(OpenMode.CREATE_OR_APPEND);
-		conf.setMergePolicy(mergePolicy);
-		conf.setUseCompoundFile(false);
-
-		File log = new File("./b.log");
-		File file = new File("./new_log");
-		long st = System.currentTimeMillis();
-		IndexWriter writer = new IndexWriter(FSDirectory.open(file.toPath()), conf);
-		InputStream stream = Files.newInputStream(log.toPath());
-		InputStreamReader in = new InputStreamReader(stream, StandardCharsets.UTF_8);
-		Document doc = new Document();
-		doc.add(new TextField("contents", new BufferedReader(in)));
-		writer.addDocument(doc);
-		stream.close();
-		writer.close();
-		long end = System.currentTimeMillis();
-		System.out.println(end-st);
+//		Pattern p = Pattern.compile("([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*([a-zA-Z_$][a-zA-Z\\d_$]*)");
+//		Matcher matcher = p.matcher("com.czp.ulc.collect.RemoteLogCollector.java:48");
+//		while (matcher.find()) {
+//			System.out.println(matcher.group(matcher.groupCount()));
+//		}
 	}
 }

@@ -2,7 +2,6 @@ package com.czp.ulc.collect.handler;
 
 import java.util.Set;
 
-import org.apache.lucene.document.Document;
 import org.apache.lucene.search.Query;
 
 /**
@@ -16,8 +15,6 @@ import org.apache.lucene.search.Query;
 public abstract class Searcher {
 
 	private Set<String> hosts;
-
-	private Set<String> fields;
 
 	private int size;
 
@@ -33,14 +30,6 @@ public abstract class Searcher {
 
 	public void setHosts(Set<String> hosts) {
 		this.hosts = hosts;
-	}
-
-	public Set<String> getFields() {
-		return fields;
-	}
-
-	public void setFields(Set<String> fields) {
-		this.fields = fields;
 	}
 
 	public int getSize() {
@@ -75,5 +64,5 @@ public abstract class Searcher {
 		this.query = query;
 	}
 
-	public abstract boolean handle(String host,Document doc,String line, long total,long lineCount);
+	public abstract boolean handle(String host, String  file,String line, long total,long lineCount);
 }

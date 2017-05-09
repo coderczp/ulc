@@ -2,11 +2,12 @@ package com.czp.ulc.common.lucene;
 
 import java.io.IOException;
 import java.util.LinkedList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
 
 /**
  * 对类类路径进行分词
@@ -16,17 +17,16 @@ import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
  * @version 0.0.1
  */
 
-public class ClassNameFilter extends TokenFilter {
+public class LogFilter extends TokenFilter {
 
 	private CharTermAttribute termAttribute;
-	private PositionIncrementAttribute positionIncrementAttribute;
-
+	private Pattern p = Pattern.compile("\\[(.*?)\\]");
+	//private Pattern clsP = Pattern.compile("([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*([a-zA-Z_$][a-zA-Z\\d_$]*)");
 	private LinkedList<String> terms = new LinkedList<String>();
 
-	public ClassNameFilter(TokenStream in) {
+	public LogFilter(TokenStream in) {
 		super(in);
 		termAttribute = this.addAttribute(CharTermAttribute.class);
-		positionIncrementAttribute = this.addAttribute(PositionIncrementAttribute.class);
 	}
 
 	/*
@@ -55,17 +55,14 @@ public class ClassNameFilter extends TokenFilter {
 		char[] nextTerm = terms.removeFirst().toCharArray();
 		termAttribute.resizeBuffer(nextTerm.length);
 		termAttribute.copyBuffer(nextTerm, 0, nextTerm.length);
-		positionIncrementAttribute.setPositionIncrement(0);
 	}
 
 	private void splitTerm() {
 		String term = termAttribute.toString();
-		String[] t = term.split("\\.");
-		if (t.length > 1) {
-			terms = new LinkedList<String>();
-			for (String s : t) {
-				terms.add(s);
-			}
+		Matcher matcher = p.matcher(term);
+		while (matcher.find()) {
+			term = matcher.group(1);
+			terms.add(term);
 		}
 	}
 

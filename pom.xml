@@ -70,6 +70,11 @@
 			<version>6.5.0</version>
 		</dependency>
 		<dependency>
+			<groupId>org.apache.lucene</groupId>
+			<artifactId>lucene-analyzers-common</artifactId>
+			<version>6.4.1</version>
+		</dependency>
+		<dependency>
 			<groupId>com.alibaba</groupId>
 			<artifactId>fastjson</artifactId>
 			<version>1.2.29</version>
@@ -84,11 +89,8 @@
 			<artifactId>jsch</artifactId>
 			<version>0.1.53</version>
 		</dependency>
-		<!-- <dependency>
-			<groupId>org.rocksdb</groupId>
-			<artifactId>rocksdbjni</artifactId>
-			<version>5.2.1</version>
-		</dependency> -->
+		<!-- <dependency> <groupId>org.rocksdb</groupId> <artifactId>rocksdbjni</artifactId> 
+			<version>5.2.1</version> </dependency> -->
 		<dependency>
 			<groupId>org.apache.zookeeper</groupId>
 			<artifactId>zookeeper</artifactId>

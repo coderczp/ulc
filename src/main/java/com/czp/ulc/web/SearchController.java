@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.lucene.document.Document;
 import org.apache.lucene.document.LongPoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.handler.LuceneLogHandler;
+import com.czp.ulc.collect.handler.LuceneLogHandler.DocFieldConst;
 import com.czp.ulc.collect.handler.NumSupportQueryParser;
 import com.czp.ulc.collect.handler.Searcher;
 import com.czp.ulc.common.util.Utils;
@@ -44,7 +44,6 @@ public class SearchController {
 
 	@Autowired
 	private LuceneLogHandler luceneSearch;
-
 	private static final Logger LOG = LoggerFactory.getLogger(SearchController.class);
 
 	@RequestMapping("/count")
@@ -70,27 +69,19 @@ public class SearchController {
 		long timeEnd = obj.containsKey("end") ? obj.getLongValue("end") : now;
 		long timeStart = obj.containsKey("start") ? obj.getLongValue("start") : now;
 
-		if (!q.startsWith("line:")) {
-			q = String.format("line:%s", q);
+		if (!q.startsWith(DocFieldConst.LINE)) {
+			q = String.format("%s:%s", DocFieldConst.LINE, q);
 		}
 		if (Utils.notEmpty(proc)) {
-			q = String.format("%s AND file:%s", q, proc);
+			q = String.format("%s AND %s:%s", q, DocFieldConst.FILE, proc);
 		}
 		if (Utils.notEmpty(file)) {
-			q = String.format("%s AND file:%s", q, file);
+			q = String.format("%s AND %s:%s", q, DocFieldConst.FILE, file);
 		}
-		q = String.format("%s AND time:[%s TO %s]", q, timeStart, timeEnd);
+		q = String.format("%s AND %s:[%s TO %s]", q, DocFieldConst.TIME, timeStart, timeEnd);
 
-		Set<String> queryFields = new HashSet<>();
-		queryFields.add("file");
-
-		if (loadLine != null && loadLine) {
-			queryFields.add("data");
-		}
-
-		String[] fields = { "line", "time", "file" };
-		NumSupportQueryParser parser = new NumSupportQueryParser(fields, luceneSearch.getAnalyzer());
-		parser.addSpecFied("time", LongPoint.class);
+		NumSupportQueryParser parser = new NumSupportQueryParser(DocFieldConst.ALL_FEILD, luceneSearch.getAnalyzer());
+		parser.addSpecFied(DocFieldConst.TIME, LongPoint.class);
 
 		AtomicLong allLine = new AtomicLong();
 		AtomicLong matchCount = new AtomicLong();
@@ -99,37 +90,35 @@ public class SearchController {
 
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, Document doc, String linesRead, long total, long lineCount) {
-
+			public boolean handle(String host, String file, String line, long total, long lineCount) {
 				allLine.set(lineCount);
 				matchCount.set(total);
-				String file = doc.get("file");
 				JSONObject files = data.getJSONObject(host);
 				if (files == null) {
 					files = new JSONObject();
 					data.put(host, files);
 				}
+
+				if (line == null)
+					return true;
+
 				List<String> lines = (List<String>) files.get(file);
 				if (lines == null) {
 					lines = new LinkedList<>();
 					files.put(file, lines);
 				}
-				if (linesRead != null) {
-					lines.add(linesRead);
-				}
+				lines.add(line);
 				return true;
 			}
-
 		};
 
 		search.setQuery(parser.parse(q));
-		search.setFields(queryFields);
 		search.setBegin(timeStart);
 		search.setHosts(hosts);
 		search.setEnd(timeEnd);
 		search.setSize(size);
 
-		long allDocs = luceneSearch.search(search);
+		long allDocs = luceneSearch.search(search, Boolean.TRUE.equals(loadLine));
 		double cost = (System.currentTimeMillis() - now) / 1000.0;
 
 		JSONObject res = new JSONObject();

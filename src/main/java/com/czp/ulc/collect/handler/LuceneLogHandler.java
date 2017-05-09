@@ -28,12 +28,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
-import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.LongPoint;
-import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -56,6 +54,7 @@ import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.ThreadPools;
 import com.czp.ulc.common.kv.KVDB;
 import com.czp.ulc.common.kv.LevelDB;
+import com.czp.ulc.common.lucene.MyAnalyzer;
 import com.czp.ulc.common.meta.MetaReadWriter;
 import com.czp.ulc.common.util.Utils;
 
@@ -75,39 +74,28 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	/** 索引文件目录名格式 */
 	private String nameFormat = "yyyy-MM-dd";
 	/*** 索引文件map {hostName:{time:indexFile}} */
-
 	private MetaReadWriter metaWriter;
+	private Analyzer analyzer = new MyAnalyzer();
 	/** 总行数 */
 	private AtomicLong lineCount = new AtomicLong();
-
-	private Analyzer analyzer = new StandardAnalyzer();
-
 	private HashMap<String, TreeMap<Long, File>> indexDirMap = new HashMap<>();
-
 	/** 需要commit的index,每隔几秒同步一次 */
 	private BlockingQueue<JSONObject> commitWriter = new LinkedBlockingQueue<>();
-
 	/*** 已经打开的writer */
 	private ConcurrentHashMap<File, IndexWriter> writers = new ConcurrentHashMap<>();
-
 	/** 已经打开的目录的search */
 	private ConcurrentHashMap<File, IndexSearcher> openedDir = new ConcurrentHashMap<>();
-
 	/** 标记search的状态,处理多线程下关闭的问题,状态为1为需要关闭 */
 	private ConcurrentHashMap<IndexSearcher, Integer> searchFlag = new ConcurrentHashMap<>();
 
 	/*** 根目录 */
 	private static final File ROOT = new File("./log");
-
 	/** 索引根目录 */
 	private static final File INDEX_DIR = new File(ROOT, "index");
-
 	/** 索引根目录 */
 	private static final File DATA_DIR = new File(ROOT, "data");
-
 	/** 记录行数的KEY */
 	private static final String LINE_COUNT_KEY = "LINE_COUNT_KEY";
-
 	/** meta信息 */
 	private KVDB meta = LevelDB.open(new File(ROOT, "meta").getAbsolutePath());
 
@@ -115,6 +103,14 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	private static final Integer STATUS_NOTHONG = -1;
 	private static final Integer STATUS_USING = 0;
 	private static final Integer STATUS_CLOSE = 1;
+
+	public static interface DocFieldConst {
+		String TIME = "t";
+		String FILE = "f";
+		String LINE = "l";
+		String metaId = "m";
+		String[] ALL_FEILD = { TIME, FILE, LINE, metaId };
+	}
 
 	public LuceneLogHandler() {
 		try {
@@ -185,14 +181,14 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 				if (line.length() == 0) {
 					continue;
 				}
-				lineCount.getAndIncrement();
-				String json = metaWriter.write(line);
+				byte[] metaId = metaWriter.write(line);
 				Document doc = new Document();
-				doc.add(new LongPoint("time", now));
-				doc.add(new TextField("line", line, Field.Store.NO));
-				doc.add(new TextField("file", file, Field.Store.YES));
-				doc.add(new StringField("data", json, Field.Store.YES));
+				doc.add(new LongPoint(DocFieldConst.TIME, now));
+				doc.add(new StoredField(DocFieldConst.metaId, metaId));
+				doc.add(new TextField(DocFieldConst.LINE, line, Field.Store.NO));
+				doc.add(new TextField(DocFieldConst.FILE, file, Field.Store.YES));
 				writer.addDocument(doc);
+				lineCount.getAndIncrement();
 			}
 			long nowDocs = writer.numDocs();
 			notifyCommitIndex(writer, dir, nowDocs);
@@ -238,10 +234,11 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	/***
 	 * 
 	 * @param search
+	 * @param loadMeta
 	 * @return
 	 * @throws Exception
 	 */
-	public long search(Searcher search) throws Exception {
+	public long search(Searcher search, boolean loadMeta) throws Exception {
 
 		int size = search.getSize();
 		long sum = hasCommitDocCount + lastDocs;
@@ -255,7 +252,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
 			String host = item.getKey();
 			for (File index : item.getValue()) {
-				searchInIndex(getOpenedSearcher(index), index, host, search, docs, hasAddSize);
+				searchInIndex(getOpenedSearcher(index), index, host, search, docs, hasAddSize, loadMeta);
 				if (hasAddSize.get() >= size)
 					break;
 			}
@@ -285,7 +282,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 		long total = 0;
 		JSONObject eachHost = new JSONObject();
-		TermQuery query = new TermQuery(new Term("file", file));
+		TermQuery query = new TermQuery(new Term(DocFieldConst.FILE, file));
 		Map<String, Collection<File>> dirs = findMatchTimeDir(hosts, start, end);
 		for (Entry<String, Collection<File>> entry : dirs.entrySet()) {
 			long count = 0;
@@ -346,19 +343,16 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 	}
 
 	private void searchInIndex(IndexSearcher searcher, File dir, String host, Searcher search, AtomicLong docsCount,
-			AtomicInteger hasAddSize) throws Exception {
+			AtomicInteger hasAddSize, boolean loadMeta) throws Exception {
 
 		// 标记当前的searcher正在使用,不用关闭
 		synchronized (searcher) {
 			searchFlag.put(searcher, STATUS_USING);
 		}
-
-		Set<String> fields = search.getFields();
 		List<Document> matchDocs = new LinkedList<>();
-
 		TopDocs docs = searcher.search(search.getQuery(), search.getSize() - hasAddSize.get());
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
-			matchDocs.add(searcher.doc(scoreDoc.doc, fields));
+			matchDocs.add(searcher.doc(scoreDoc.doc));
 		}
 
 		// 如果当前searcher已经被commit线程标记为关闭,则关闭
@@ -371,29 +365,28 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 
 		int totalHits = docs.totalHits;
 		docsCount.getAndAdd(totalHits);
-		boolean loadMeta = fields.contains("data");
 		if (loadMeta == false) {
 			for (Document doc : matchDocs) {
-				search.handle(host, doc, null, docsCount.get(), lineCount.get());
+				String file = doc.get(DocFieldConst.FILE);
+				search.handle(host, file, null, docsCount.get(), lineCount.get());
 				hasAddSize.getAndIncrement();
 			}
 			return;
 		}
 
-		List<JSONObject> lineRequest = new LinkedList<>();
+		List<byte[]> lineRequest = new LinkedList<>();
 		for (Document doc : matchDocs) {
-			String jsonStr = doc.get("data");
-			JSONObject obj = JSONObject.parseObject(jsonStr);
-			doc.add(new StringField("metaLineNo", obj.getString(MetaReadWriter.LINE_NO), Store.NO));
-			doc.add(new StringField("metaFile", obj.getString(MetaReadWriter.FILE_NAME), Store.NO));
-			lineRequest.add(obj);
+			lineRequest.add(doc.getBinaryValue(DocFieldConst.metaId).bytes);
 		}
-		Map<String, Map<Long, String>> linesMap = MetaReadWriter.mergeRead(lineRequest);
+		Map<Long, Map<Long, String>> linesMap = metaWriter.mergeRead(lineRequest);
 		for (Document doc : matchDocs) {
-			String file = doc.get("metaFile");
-			long lineNo = Long.valueOf(doc.get("metaLineNo"));
-			String line = linesMap.get(file).getOrDefault(lineNo, "");
-			search.handle(host, doc, line, docsCount.get(), lineCount.get());
+			byte[] metaId = doc.getBinaryValue(DocFieldConst.metaId).bytes;
+			long[] meta = MetaReadWriter.decodeMetaId(metaId);
+			long uuid = meta[0];
+			long lineId = meta[1];
+			String file = doc.get(DocFieldConst.FILE);
+			String line = linesMap.get(uuid).get(lineId);
+			search.handle(host, file, line, docsCount.get(), lineCount.get());
 			hasAddSize.getAndIncrement();
 		}
 	}

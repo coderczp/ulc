@@ -34,16 +34,11 @@ public class AnalyzerUtil {
 			CharTermAttribute cta = stream.addAttribute(CharTermAttribute.class);
 			stream.reset();
 			while (stream.incrementToken()) {
-				System.out.println(cta);
+				System.out.print(cta+">");
 			}
+			System.out.println();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-
-//	public static void main(String[] args) {
-//		 Analyzer aly1 = new MyAnalyzer();
-//		 String str = "2017-04-01 16:45:44.760 INFO 9764 --- [nio-9123-exec-6]  java.lang.NullPointerException";
-//		 AnalyzerUtil.displayToken(str, aly1);
-//	}
 }

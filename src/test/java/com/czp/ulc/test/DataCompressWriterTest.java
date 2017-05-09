@@ -6,10 +6,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Arrays;
 
 import org.junit.Before;
 import org.junit.Test;
 
+import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.common.meta.MetaReadWriter;
 import com.czp.ulc.common.util.Utils;
 
@@ -27,19 +29,31 @@ public class DataCompressWriterTest {
 
 	@Before
 	public void init() throws Exception {
-		mw = new MetaReadWriter("./test");
+		// mw = new MetaReadWriter("./test");
+	}
+
+	@Test
+	public void testEncodeId() {
+		byte[] metaId = MetaReadWriter.encodeMetaId(20170508, 11, 1175);
+		System.out.println(Arrays.toString(metaId));
+		long[] ids = MetaReadWriter.decodeMetaId(metaId);
+		long x = ids[0];
+		int dirId = (int) (x >> 32);
+		int fileId = (int) x;
+		System.out.println(dirId+"--->"+fileId);
+		System.out.println(Arrays.toString(ids));
 	}
 
 	@Test
 	public void testCompress() throws IOException {
 		File file = new File("./log/data/20170508/0.log");
 		if (file.exists()) {
-//			File outPut = new File("./test/0.log.zip");
-//			for (int i = 0; i < 1; i++) {
-//				mw.doCompress(file, outPut, false);
-//			}
-			//1816-->774720
-			//1817-->775236
+			// File outPut = new File("./test/0.log.zip");
+			// for (int i = 0; i < 1; i++) {
+			// mw.doCompress(file, outPut, false);
+			// }
+			// 1816-->774720
+			// 1817-->775236
 			FileInputStream fis = new FileInputStream(file);
 			fis.skip(774720);
 			BufferedReader br = new BufferedReader(new InputStreamReader(fis));

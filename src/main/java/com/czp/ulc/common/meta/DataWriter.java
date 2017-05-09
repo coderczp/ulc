@@ -15,7 +15,9 @@ import org.slf4j.LoggerFactory;
 import com.czp.ulc.common.util.Utils;
 
 /**
- * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月4日 上午11:27:03</li>
+ * 请添加描述
+ * <li>创建人：Jeff.cao</li>
+ * <li>创建时间：2017年5月4日 上午11:27:03</li>
  * 
  * @version 0.0.1
  */
@@ -23,6 +25,8 @@ import com.czp.ulc.common.util.Utils;
 public class DataWriter implements AutoCloseable {
 
 	private File file;
+	private int dirId;
+	private int fileId;
 	private AtomicLong lineNo;
 	private AtomicLong pointer;
 	private BufferedOutputStream writer;
@@ -34,12 +38,15 @@ public class DataWriter implements AutoCloseable {
 	private static Logger log = LoggerFactory.getLogger(DataWriter.class);
 
 	public DataWriter(File file, boolean append) throws Exception {
-		String indexFile = MetaReadWriter.getIndexFileName(file);
-		FileOutputStream out = new FileOutputStream(new File(file.getParent(), indexFile));
-		this.indexWriter = new BufferedOutputStream(out);
+		File indexFile = MetaReadWriter.getIndexFile(file);
+		FileOutputStream out = new FileOutputStream(indexFile);
+
 		this.file = file;
-		this.lineNo = readLineNo(file);
+		this.fileId = MetaReadWriter.getFileId(file);
 		this.pointer = new AtomicLong(file.length());
+		this.indexWriter = new BufferedOutputStream(out);
+		this.lineNo = readLineNo(file);
+		this.dirId = Integer.parseInt(file.getParentFile().getName());
 		this.writer = new BufferedOutputStream(new FileOutputStream(file, append));
 	}
 
@@ -86,7 +93,7 @@ public class DataWriter implements AutoCloseable {
 				line++;
 			}
 		} catch (Exception e) {
-			throw new RuntimeException(e.getCause());
+			throw new RuntimeException(e);
 		}
 		long end = System.currentTimeMillis();
 		log.info("count:{} line from:{} time:{}ms", line, file, end - st);
@@ -95,5 +102,13 @@ public class DataWriter implements AutoCloseable {
 
 	public void writeIndex(long lineNo, long pointer) throws IOException {
 		indexWriter.write(Utils.longToBytes(pointer));
+	}
+
+	public int getDirId() {
+		return dirId;
+	}
+
+	public int getFileId() {
+		return fileId;
 	}
 }

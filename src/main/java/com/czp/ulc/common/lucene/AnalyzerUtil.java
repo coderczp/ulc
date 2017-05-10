@@ -34,7 +34,7 @@ public class AnalyzerUtil {
 			CharTermAttribute cta = stream.addAttribute(CharTermAttribute.class);
 			stream.reset();
 			while (stream.incrementToken()) {
-				System.out.print(cta+">");
+				System.out.print(cta+"->");
 			}
 			System.out.println();
 		} catch (IOException e) {

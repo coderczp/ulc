@@ -10,9 +10,11 @@ import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.StopFilter;
 import org.apache.lucene.analysis.StopwordAnalyzerBase;
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.WordlistLoader;
 import org.apache.lucene.analysis.core.WhitespaceTokenizer;
 import org.apache.lucene.analysis.standard.StandardFilter;
+import org.apache.lucene.analysis.standard.StandardTokenizer;
 
 /**
  * 请添加描述
@@ -33,7 +35,7 @@ public class MyAnalyzer extends StopwordAnalyzerBase {
 	static {
 		final List<String> stopWords = Arrays.asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
 				"if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then",
-				"there", "these", "they", "this", "to", "was", "will", "with", "null", "class","[","]");
+				"there", "these", "they", "this", "to", "was", "will", "with", "null", "class", "[", "]");
 		final CharArraySet stopSet = new CharArraySet(stopWords, false);
 		ENGLISH_STOP_WORDS_SET = CharArraySet.unmodifiableSet(stopSet);
 	}
@@ -97,9 +99,9 @@ public class MyAnalyzer extends StopwordAnalyzerBase {
 
 	@Override
 	protected TokenStreamComponents createComponents(final String fieldName) {
-		final WhitespaceTokenizer src = new WhitespaceTokenizer();
+		Tokenizer src = new StandardTokenizer();
 		TokenStream tok = new StopFilter(src, stopwords);
-		tok = new LogFilter(tok);
+		tok = new LogTokenFilter(tok);
 		tok = new LowerCaseFilter(tok);
 		return new TokenStreamComponents(src, tok);
 	}

@@ -17,14 +17,13 @@ import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
  * @version 0.0.1
  */
 
-public class LogFilter extends TokenFilter {
+public class LogTokenFilter extends TokenFilter {
 
 	private CharTermAttribute termAttribute;
 	private Pattern p = Pattern.compile("\\[(.*?)\\]");
-	//private Pattern clsP = Pattern.compile("([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*([a-zA-Z_$][a-zA-Z\\d_$]*)");
 	private LinkedList<String> terms = new LinkedList<String>();
 
-	public LogFilter(TokenStream in) {
+	public LogTokenFilter(TokenStream in) {
 		super(in);
 		termAttribute = this.addAttribute(CharTermAttribute.class);
 	}

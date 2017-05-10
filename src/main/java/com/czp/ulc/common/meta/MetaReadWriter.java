@@ -40,6 +40,52 @@ import com.czp.ulc.common.util.Utils;
 
 public class MetaReadWriter implements AutoCloseable {
 
+	public static class LinePos {
+		long linePos;
+		long size;
+
+		public LinePos(long linePos, long size) {
+			this.linePos = linePos;
+			this.size = size;
+		}
+
+		@Override
+		public String toString() {
+			return "[linePos=" + linePos + ", size=" + size + "]";
+		}
+
+	}
+
+	public static class Meta {
+		private int dirId;
+		private int fileId;
+		private long lineNo;
+
+		public Meta(int dirId, int fileId, long lineNo) {
+			this.dirId = dirId;
+			this.fileId = fileId;
+			this.lineNo = lineNo;
+		}
+
+		public int getDirId() {
+			return dirId;
+		}
+
+		public int getFileId() {
+			return fileId;
+		}
+
+		public long getLineNo() {
+			return lineNo;
+		}
+
+		public long getUUID() {
+			long dirId = this.dirId;
+			return (dirId << 32) | fileId;
+		}
+
+	}
+
 	private File baseDir;
 	private long eachFileSize;
 	private long nowFileLines;
@@ -50,16 +96,15 @@ public class MetaReadWriter implements AutoCloseable {
 	private static final String ZIP_SUFIX = ".zip";
 	private static final String INDEX_SUFIX = ".index";
 	private static final long MAX_SKIP_BUFFER_SIZE = 1024 * 20;
-	private static final long DEFAUT_EACH_FILE_SIZE = 1024 * 1024 * 200;
+	private static final int DEFAUT_EACH_FILE_SIZE = 1024 * 1024 * 200;
 
-	private static final long[] EMPTY_LONG_ARR = new long[] { 0, 0 };
 	private static final Logger log = LoggerFactory.getLogger(MetaReadWriter.class);
 
 	public MetaReadWriter(String baseDir) throws Exception {
 		this(baseDir, DEFAUT_EACH_FILE_SIZE);
 	}
 
-	public MetaReadWriter(String baseDir, long eachFileSize) throws Exception {
+	public MetaReadWriter(String baseDir, int eachFileSize) throws Exception {
 		this.baseDir = new File(baseDir);
 		this.eachFileSize = eachFileSize;
 		this.nowWriter = getTodayWriter(getTodayDir(this.baseDir));
@@ -77,19 +122,19 @@ public class MetaReadWriter implements AutoCloseable {
 	public synchronized byte[] write(String line) throws Exception {
 		if (nowWriter.getFile().length() >= eachFileSize) {
 			Utils.close(nowWriter);
+			nowWriter = null;
 			nowWriter = getTodayWriter(getTodayDir(baseDir));
 		}
 		int dirId = nowWriter.getDirId();
 		int fileId = nowWriter.getFileId();
 		long lineNo = nowWriter.getlineNo();
-		long pointer = nowWriter.getPointer();
 		nowWriter.writeLine(line);
-		nowWriter.writeIndex(lineNo, pointer);
 		return encodeMetaId(dirId, fileId, lineNo);
 	}
 
 	/***
-	 * 4字节目录编号 4字节文件编号 8字节行号将文件id和目录ID编码为一个long
+	 * 4字节目录编号 4字节文件编号 x字节行号(<128:1byte 65536:2byte ....)<br>
+	 * 将文件id和目录ID编码为一个long
 	 * 
 	 * @param dirId
 	 * @param fileId
@@ -98,17 +143,38 @@ public class MetaReadWriter implements AutoCloseable {
 	 */
 	public static byte[] encodeMetaId(int dirId, int fileId, long lineNo) {
 		ByteBuffer buf = ByteBuffer.allocate(16);
-		long uuId = ((long) dirId << 32) | fileId;
-		buf.putLong(uuId);
-		buf.putLong(lineNo);
-		return buf.array();
+		buf.putInt(dirId);
+		buf.putInt(fileId);
+		if (lineNo < Byte.MAX_VALUE) {
+			buf.put((byte) lineNo);
+		} else if (lineNo < Character.MAX_VALUE) {
+			buf.putChar((char) lineNo);
+		} else if (lineNo < Integer.MAX_VALUE) {
+			buf.putInt((int) lineNo);
+		} else {
+			buf.putLong(lineNo);
+		}
+		buf.flip();
+		byte[] realArr = new byte[buf.limit()];
+		System.arraycopy(buf.array(), 0, realArr, 0, buf.limit());
+		return realArr;
 	}
 
-	public static long[] decodeMetaId(byte[] metaId) {
+	public static Meta decodeMetaId(byte[] metaId) {
 		ByteBuffer buf = ByteBuffer.wrap(metaId);
-		long uuid = buf.getLong();
-		long lineNo = buf.getLong();
-		return new long[] { uuid, lineNo };
+		int dirId = buf.getInt();
+		int fileId = buf.getInt();
+		int remain = buf.remaining();
+		long lineNo = 0;
+		if (remain == 1)
+			lineNo = buf.get();
+		else if (remain == 2)
+			lineNo = buf.getChar();
+		else if (remain == 4)
+			lineNo = buf.getInt();
+		else
+			lineNo = buf.getLong();
+		return new Meta(dirId, fileId, lineNo);
 	}
 
 	private String getFileNameFrom(long uuid) {
@@ -235,28 +301,37 @@ public class MetaReadWriter implements AutoCloseable {
 		return file;
 	}
 
-	private long[] getLinePos(ZipFile zf, File file, long lineNo) throws IOException {
+	private LinePos getLinePos(ZipFile zf, File file, long lineNo) throws IOException {
 		if (zf == null) {
-			return readLinePos(file, new FileInputStream(getIndexFile(file)), lineNo);
+			synchronized (this) {
+				if (file.equals(nowWriter.getFile())) {
+					long pos = nowWriter.getLinePost(lineNo);
+					long nexLinePos = nowWriter.getLinePost(lineNo+1);
+					return new LinePos(pos, nexLinePos-pos);
+				}
+			}
+			throw new RuntimeException(file + " is not equals nowWriter file:" + nowWriter.getFile());
 		}
 		ZipEntry indexFile = zf.getEntry(getIndexFile(file).getName());
 		return readLinePos(file, zf.getInputStream(indexFile), lineNo);
 	}
 
 	// 先读取索引,在根据索引快速定位行对应的文件指针读取行
-	private long[] readLinePos(File file, InputStream is, long lineNo) throws IOException {
+	private LinePos readLinePos(File file, InputStream is, long lineNo) throws IOException {
 		try (InputStream io = is) {
 			if (lineNo < 0)
-				return EMPTY_LONG_ARR;
+				return new LinePos(0, 0);
 			int bytes = Long.BYTES;
-			long skip = lineNo * bytes;
+			long skip = (lineNo - 1) * bytes;
 			byte[] buf = new byte[bytes * 2];
 			skipSpecBytes(file, is, skip);
-			is.read(buf);
+			if (is.read(buf) == -1) {
+				throw new IOException("reach end of:" + file);
+			}
 			ByteBuffer wrap = ByteBuffer.wrap(buf);
-			long fristLineOffset = wrap.getLong();
-			long lastLineOffset = wrap.getLong();
-			return new long[] { fristLineOffset, lastLineOffset - fristLineOffset };
+			long linePos = wrap.getLong();
+			long nextLinePos = wrap.getLong();
+			return new LinePos(linePos, nextLinePos - linePos);
 		}
 	}
 
@@ -266,17 +341,17 @@ public class MetaReadWriter implements AutoCloseable {
 		worker.shutdown();
 	}
 
-	public Map<Long, String> readFromLogFile(File file, InputStream is, Set<byte[]> lineRequest) throws IOException {
+	public Map<Long, String> readFromLogFile(File file, InputStream is, Set<Meta> lineRequest) throws IOException {
 		return readMetaData(lineRequest, file, is, null);
 	}
 
 	// 合并读取,避免同一个文件打开关闭多次
 	public Map<Long, Map<Long, String>> mergeRead(List<byte[]> lineRequest) throws Exception {
 		Map<Long, Map<Long, String>> datas = new HashMap<>();
-		Map<Long, Set<byte[]>> readLines = classifyByFile(lineRequest);
-		for (Entry<Long, Set<byte[]>> entry : readLines.entrySet()) {
+		Map<Long, Set<Meta>> readLines = classifyByFile(lineRequest);
+		for (Entry<Long, Set<Meta>> entry : readLines.entrySet()) {
 			long st = System.currentTimeMillis();
-			Set<byte[]> jsons = entry.getValue();
+			Set<Meta> metas = entry.getValue();
 			long uuid = entry.getKey();
 
 			String fileName = getFileNameFrom(uuid);
@@ -284,47 +359,48 @@ public class MetaReadWriter implements AutoCloseable {
 			Map<Long, String> lines = null;
 			String logName = fileName;
 			if (file.exists()) {
-				lines = readFromLogFile(file, new FileInputStream(file), jsons);
+				lines = readFromLogFile(file, new FileInputStream(file), metas);
 			} else {
-				lines = readFromZipFile(jsons, file);
+				lines = readFromZipFile(metas, file);
 				logName = getZipFile(file).getName();
 			}
 			datas.put(uuid, lines);
 			long end = System.currentTimeMillis();
-			log.info("read[{}]lines,from[{}],time:[{}]ms", jsons.size(), logName, end - st);
+			log.info("read[{}]lines,from[{}],time:[{}]ms", metas.size(), logName, end - st);
 		}
 		return datas;
 	}
 
-	private Map<Long, String> readFromZipFile(Set<byte[]> lineRequest, File file) throws Exception {
+	private Map<Long, String> readFromZipFile(Set<Meta> lineRequest, File file) throws Exception {
 		try (ZipFile zf = new ZipFile(getZipFile(file))) {
 			ZipEntry logFile = zf.getEntry(file.getName());
 			return readMetaData(lineRequest, file, zf.getInputStream(logFile), zf);
 		}
 	}
 
-	private Map<Long, String> readMetaData(Set<byte[]> metas, File file, InputStream ins, ZipFile zf)
-			throws IOException {
+	private Map<Long, String> readMetaData(Set<Meta> metas, File file, InputStream ins, ZipFile zf) throws IOException {
 		Map<Long, String> linesMap = new HashMap<>();
 		try (InputStream br = ins) {
 			long lastSkip = 0, hasReadSize = 0;
-			for (byte[] item : metas) {
-				long[] meta = decodeMetaId(item);
-				long lineNo = meta[1];
-				long[] linePointer = getLinePos(zf, file, lineNo);
-				int size = (int) linePointer[1];
-				long pos = linePointer[0];
-				if (pos < 0 || size <= 0) {
-					log.error("find index err,file:{},line:{},pos:{},size:{}", file, lineNo, pos, size);
+			for (Meta item : metas) {
+				long lineNo = item.getLineNo();
+				LinePos pos = getLinePos(zf, file, lineNo);
+				long skip = pos.linePos - lastSkip - hasReadSize;
+				long size = pos.size;
+				if(skipSpecBytes(file, ins, skip)!=skip){
+					System.out.println("=-----------------------------error");
+				}
+				if (size <= 0) {
+					log.error("find index err,file:{},post:{}", file, pos);
 					linesMap.put(lineNo, "N/A");
 				} else {
-					long skip = pos - lastSkip - hasReadSize;
-					skipSpecBytes(file, br, skip);
-					byte[] buf = new byte[size];
-					br.read(buf);
-					linesMap.put(lineNo, new String(buf, DataWriter.UTF8));
-					hasReadSize += buf.length;
+					byte[] buf = new byte[(int) size];
+					br.read(buf, 0, buf.length);
+					String value = new String(buf);
+					linesMap.put(lineNo, value);
+					hasReadSize += value.length();
 					lastSkip = skip;
+					//System.out.println(skip+"-->"+lineNo+"-->"+pos+"-->"+value);
 				}
 			}
 		}
@@ -332,45 +408,51 @@ public class MetaReadWriter implements AutoCloseable {
 	}
 
 	// JDK skip 不能正确的跳过指定字节,会导致CPU 100%
-	private static void skipSpecBytes(File file, InputStream in, long skip) throws IOException {
+	private static long skipSpecBytes(File file, InputStream in, long skip) throws IOException {
 		if (skip <= 0)
-			return;
+			return 0;
+		long remaining = skip;
 		long st = System.currentTimeMillis();
 		if (in instanceof FileInputStream) {
-			while (skip > 0) {
-				skip -= in.skip(skip);
+			while (remaining > 0) {
+				long nr = in.skip(skip);
+				if (nr == -1) {
+					throw new IOException("reach end of:" + file);
+				}
+				remaining -= nr;
 			}
-			return;
+			return skip;
 		}
 		int nr = 0;
-		long remaining = skip;
 		int size = (int) Math.min(MAX_SKIP_BUFFER_SIZE, remaining);
 		byte[] skipBuffer = new byte[size];
 		while (remaining > 0 && nr < 0) {
 			nr = in.read(skipBuffer, 0, (int) Math.min(size, remaining));
+			if (nr == -1) {
+				throw new IOException("reach end of:" + file);
+			}
 			remaining -= nr;
 		}
 		long end = System.currentTimeMillis();
 		log.info("skip:[{}]bytes,from:[{}],time:[{}]ms", skip, file, end - st);
+		return skip;
 	}
 
 	// 把读请求按文件分类,这样一个文件只打开一次
-	private Map<Long, Set<byte[]>> classifyByFile(List<byte[]> lineRequest) {
-		Map<Long, Set<byte[]>> readLines = new HashMap<>();
-		for (byte[] item : lineRequest) {
-			long[] meta = decodeMetaId(item);
-			long uuid = meta[0];
-			Set<byte[]> lineNos = readLines.get(uuid);
+	private Map<Long, Set<Meta>> classifyByFile(List<byte[]> metaBytes) {
+		Map<Long, Set<Meta>> readLines = new HashMap<>();
+		for (byte[] item : metaBytes) {
+			Meta meta = decodeMetaId(item);
+			long uuid = meta.getUUID();
+			Set<Meta> lineNos = readLines.get(uuid);
 			if (lineNos == null) {
-				lineNos = new TreeSet<>(new Comparator<byte[]>() {
-					public int compare(byte[] o1, byte[] o2) {
-						Long lineId = decodeMetaId(o1)[1];
-						Long lineId2 = decodeMetaId(o2)[1];
-						return lineId.compareTo(lineId2);
+				lineNos = new TreeSet<>(new Comparator<Meta>() {
+					public int compare(Meta o1, Meta o2) {
+						return ((Long) o1.getLineNo()).compareTo(o2.getLineNo());
 					}
 				});
 			}
-			lineNos.add(item);
+			lineNos.add(meta);
 			readLines.put(uuid, lineNos);
 		}
 		return readLines;
@@ -379,7 +461,7 @@ public class MetaReadWriter implements AutoCloseable {
 	private void checkHasUncompressFile() {
 		File tadayFile = getTodayDir(baseDir);
 		for (File file : baseDir.listFiles()) {
-			if (file.getName().equals(tadayFile.getName()))
+			if (!file.exists() || file.getName().equals(tadayFile.getName()))
 				continue;
 			for (File item : file.listFiles()) {
 				if (!item.getName().endsWith(SUFIX))

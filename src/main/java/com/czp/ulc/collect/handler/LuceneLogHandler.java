@@ -56,6 +56,7 @@ import com.czp.ulc.common.kv.KVDB;
 import com.czp.ulc.common.kv.LevelDB;
 import com.czp.ulc.common.lucene.MyAnalyzer;
 import com.czp.ulc.common.meta.MetaReadWriter;
+import com.czp.ulc.common.meta.MetaReadWriter.Meta;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -108,8 +109,8 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 		String TIME = "t";
 		String FILE = "f";
 		String LINE = "l";
-		String metaId = "m";
-		String[] ALL_FEILD = { TIME, FILE, LINE, metaId };
+		String META_ID = "m";
+		String[] ALL_FEILD = { TIME, FILE, LINE, META_ID };
 	}
 
 	public LuceneLogHandler() {
@@ -184,7 +185,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 				byte[] metaId = metaWriter.write(line);
 				Document doc = new Document();
 				doc.add(new LongPoint(DocFieldConst.TIME, now));
-				doc.add(new StoredField(DocFieldConst.metaId, metaId));
+				doc.add(new StoredField(DocFieldConst.META_ID, metaId));
 				doc.add(new TextField(DocFieldConst.LINE, line, Field.Store.NO));
 				doc.add(new TextField(DocFieldConst.FILE, file, Field.Store.YES));
 				writer.addDocument(doc);
@@ -192,7 +193,8 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 			}
 			long nowDocs = writer.numDocs();
 			notifyCommitIndex(writer, dir, nowDocs);
-			LOG.debug("create index time:{}ms docs:{}", (System.currentTimeMillis() - now), lastDocs);
+			long end = now = System.currentTimeMillis();
+			LOG.debug("create index time:{}ms docs:{}", (end - now), lastDocs);
 		} catch (Exception e) {
 			LOG.error("process message error", e);
 		}
@@ -374,18 +376,16 @@ public class LuceneLogHandler implements MessageListener<ReadResult>, Runnable {
 			return;
 		}
 
-		List<byte[]> lineRequest = new LinkedList<>();
+		List<byte[]> metaBytes = new LinkedList<>();
 		for (Document doc : matchDocs) {
-			lineRequest.add(doc.getBinaryValue(DocFieldConst.metaId).bytes);
+			metaBytes.add(doc.getBinaryValue(DocFieldConst.META_ID).bytes);
 		}
-		Map<Long, Map<Long, String>> linesMap = metaWriter.mergeRead(lineRequest);
+		Map<Long, Map<Long, String>> linesMap = metaWriter.mergeRead(metaBytes);
 		for (Document doc : matchDocs) {
-			byte[] metaId = doc.getBinaryValue(DocFieldConst.metaId).bytes;
-			long[] meta = MetaReadWriter.decodeMetaId(metaId);
-			long uuid = meta[0];
-			long lineId = meta[1];
+			byte[] metaId = doc.getBinaryValue(DocFieldConst.META_ID).bytes;
+			Meta meta = MetaReadWriter.decodeMetaId(metaId);
 			String file = doc.get(DocFieldConst.FILE);
-			String line = linesMap.get(uuid).get(lineId);
+			String line = linesMap.get(meta.getUUID()).get(meta.getLineNo());
 			search.handle(host, file, line, docsCount.get(), lineCount.get());
 			hasAddSize.getAndIncrement();
 		}

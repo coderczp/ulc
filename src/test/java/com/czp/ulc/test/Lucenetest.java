@@ -23,7 +23,7 @@ import com.czp.ulc.common.lucene.MyAnalyzer;
 public class Lucenetest {
 
 	public static void main(String[] args) throws IOException {
-		 String path = "./log/data/20170509/0.log";
+		 String path = "./log/data/20170510/0.log";
 		 BufferedReader br = new BufferedReader(new FileReader(new
 		 File(path)));
 		 String temp = "";

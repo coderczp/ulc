@@ -24,10 +24,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
+import com.czp.ulc.collect.handler.DocField;
 import com.czp.ulc.collect.handler.LuceneLogHandler;
-import com.czp.ulc.collect.handler.LuceneLogHandler.DocFieldConst;
 import com.czp.ulc.collect.handler.NumSupportQueryParser;
 import com.czp.ulc.collect.handler.Searcher;
+import com.czp.ulc.common.meta.DataMeta;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -52,7 +53,8 @@ public class SearchController {
 		Set<String> hostSet = buildHost(host);
 		long timeEnd = (end == null) ? now : end;
 		long timeStart = (start == null) ? now - MILLS : start;
-		return luceneSearch.count(file, hostSet, timeEnd, timeStart);
+		return new JSONObject();// return luceneSearch.count(file, hostSet,
+								// timeEnd, timeStart);
 	}
 
 	@RequestMapping("/search")
@@ -69,19 +71,19 @@ public class SearchController {
 		long timeEnd = obj.containsKey("end") ? obj.getLongValue("end") : now;
 		long timeStart = obj.containsKey("start") ? obj.getLongValue("start") : now;
 
-		if (!q.startsWith(DocFieldConst.LINE)) {
-			q = String.format("%s:%s", DocFieldConst.LINE, q);
+		if (!q.startsWith(DocField.LINE)) {
+			q = String.format("%s:%s", DocField.LINE, q);
 		}
 		if (Utils.notEmpty(proc)) {
-			q = String.format("%s AND %s:%s", q, DocFieldConst.FILE, proc);
+			q = String.format("%s AND %s:%s", q, DocField.FILE, proc);
 		}
 		if (Utils.notEmpty(file)) {
-			q = String.format("%s AND %s:%s", q, DocFieldConst.FILE, file);
+			q = String.format("%s AND %s:%s", q, DocField.FILE, file);
 		}
-		q = String.format("%s AND %s:[%s TO %s]", q, DocFieldConst.TIME, timeStart, timeEnd);
+		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
 
-		NumSupportQueryParser parser = new NumSupportQueryParser(DocFieldConst.ALL_FEILD, luceneSearch.getAnalyzer());
-		parser.addSpecFied(DocFieldConst.TIME, LongPoint.class);
+		NumSupportQueryParser parser = new NumSupportQueryParser(DocField.ALL_FEILD, luceneSearch.getAnalyzer());
+		parser.addSpecFied(DocField.TIME, LongPoint.class);
 
 		AtomicLong allLine = new AtomicLong();
 		AtomicLong matchCount = new AtomicLong();
@@ -90,24 +92,23 @@ public class SearchController {
 
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, String file, String line, long total, long lineCount) {
-				allLine.set(lineCount);
-				matchCount.set(total);
+			public boolean handle(String host, String file, String line,long matchs, DataMeta meta) {
+				allLine.set(meta.getLines());
+				matchCount.set(matchs);
 				JSONObject files = data.getJSONObject(host);
 				if (files == null) {
 					files = new JSONObject();
 					data.put(host, files);
 				}
 
-				if (line == null)
-					return true;
-
 				List<String> lines = (List<String>) files.get(file);
 				if (lines == null) {
 					lines = new LinkedList<>();
 					files.put(file, lines);
 				}
-				lines.add(line);
+				if (line != null)
+					lines.add(line);
+
 				return true;
 			}
 		};
@@ -132,9 +133,9 @@ public class SearchController {
 	}
 
 	private Set<String> buildHost(String host) {
-		if (!Utils.notEmpty(host))
-			return null;
 		Set<String> hostSet = new HashSet<>();
+		if (!Utils.notEmpty(host))
+			return hostSet;
 		for (String string : host.split(",")) {
 			hostSet.add(string);
 		}

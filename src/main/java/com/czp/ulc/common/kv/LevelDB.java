@@ -232,9 +232,9 @@ public class LevelDB implements ShutdownCallback, KVDB {
 	 */
 	@Override
 	public void put(byte[] key, byte[] value) {
-		//log.debug("start put key:{},value:{}", key, value);
+		// log.debug("start put key:{},value:{}", key, value);
 		db.put(key, value);
-		//log.debug("success put key:{},value:{}", key, value);
+		// log.debug("success put key:{},value:{}", key, value);
 	}
 
 	/*
@@ -312,5 +312,10 @@ public class LevelDB implements ShutdownCallback, KVDB {
 	@Override
 	public byte[] getBytes(byte[] key) {
 		return db.get(key);
+	}
+
+	@Override
+	public void close() {
+		onSystemExit();
 	}
 }

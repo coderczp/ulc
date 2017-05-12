@@ -10,6 +10,8 @@
 package com.czp.ulc.common.util;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -199,5 +201,15 @@ public class Utils {
 
 	public static Long bytesToLong(byte[] values) {
 		return ByteBuffer.wrap(values).getLong();
+	}
+
+	public static FilenameFilter newFileFile(String suffix) {
+		return new FilenameFilter() {
+
+			@Override
+			public boolean accept(File dir, String name) {
+				return name.endsWith(suffix);
+			}
+		};
 	}
 }

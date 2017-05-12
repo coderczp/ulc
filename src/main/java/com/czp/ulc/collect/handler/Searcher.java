@@ -1,8 +1,11 @@
 package com.czp.ulc.collect.handler;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.lucene.search.Query;
+
+import com.czp.ulc.common.meta.DataMeta;
 
 /**
  * 请添加描述
@@ -14,8 +17,6 @@ import org.apache.lucene.search.Query;
 
 public abstract class Searcher {
 
-	private Set<String> hosts;
-
 	private int size;
 
 	private long begin;
@@ -23,6 +24,8 @@ public abstract class Searcher {
 	private long end;
 
 	private Query query;
+
+	private Set<String> hosts = new HashSet<>();
 
 	public Set<String> getHosts() {
 		return hosts;
@@ -64,5 +67,5 @@ public abstract class Searcher {
 		this.query = query;
 	}
 
-	public abstract boolean handle(String host, String  file,String line, long total,long lineCount);
+	public abstract boolean handle(String host, String file, String line, long matchCount, DataMeta meta);
 }

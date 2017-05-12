@@ -48,5 +48,7 @@ public interface KVDB {
 	void putInt(Integer key, String value);
 
 	long getLong(String key, long dftVal);
+	
+	void close();
 
 }

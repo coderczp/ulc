@@ -357,21 +357,21 @@ public class MetaReadWriter implements AutoCloseable {
 			HashMap<File, Integer> zipFileIdMap) throws IOException {
 		GZIPOutputStream gzos = zosMap.get(indexDir);
 		if (gzos == null) {
-			File zipFile = getZipFile(zipDir, zipFileIdMap);
+			File zipFile = getZipFile(zipDir);
 			FileOutputStream out = new FileOutputStream(zipFile);
 			gzos = new GZIPOutputStream(new BufferedOutputStream(out));
+			zipFileIdMap.put(zipDir, getFileId(zipFile));
 			zosMap.put(indexDir, gzos);
 		}
 		return gzos;
 	}
 
-	protected File getZipFile(File indexBaseDir, HashMap<File, Integer> zipFileIdMap) {
+	protected File getZipFile(File zipDir) {
 		int num = 0;
-		for (File file : indexBaseDir.listFiles()) {
+		for (File file : zipDir.listFiles()) {
 			num = getFileId(file) + 1;
 		}
-		zipFileIdMap.put(indexBaseDir, num);
-		return new File(String.format("%s/%s.gzip", indexBaseDir, num));
+		return new File(String.format("%s/%s.gzip", zipDir, num));
 	}
 
 	public String readLine(int fileId, int offset) {

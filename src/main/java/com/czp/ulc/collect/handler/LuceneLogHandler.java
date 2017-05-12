@@ -45,6 +45,7 @@ import org.apache.lucene.store.RAMDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.ReadResult;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.lucene.MyAnalyzer;
@@ -61,12 +62,13 @@ import com.czp.ulc.common.util.Utils;
  */
 public class LuceneLogHandler implements MessageListener<ReadResult> {
 
+	private DirectoryReader ramReader;
 	private MetaReadWriter readWriter;
 	private volatile IndexWriter ramWriter;
 	private Analyzer analyzer = new MyAnalyzer();
 	public static final String FORMAT = "yyyyMMdd";
 
-	private DataMeta meta;
+	private DataMeta meta = DataMeta.EMPTY;
 	/*** 根目录 */
 	private static final File ROOT = new File("./log");
 	/** 已压缩文件目录 */
@@ -83,13 +85,18 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 	private static final Logger LOG = LoggerFactory.getLogger(LuceneLogHandler.class);
 
 	public LuceneLogHandler() {
-		DATA_DIR.mkdirs();
-		INDEX_DIR.mkdirs();
-		ZIP_DIR.mkdirs();
-		ramWriter = createRAMIndexWriter();
-		readWriter = new MetaReadWriter(DATA_DIR, ZIP_DIR, INDEX_DIR, this);
-		meta = readWriter.loadMeta();
-		loadAllIndexDir();
+		try {
+			DATA_DIR.mkdirs();
+			INDEX_DIR.mkdirs();
+			ZIP_DIR.mkdirs();
+			ramWriter = createRAMIndexWriter();
+			ramReader = DirectoryReader.open(ramWriter);
+			readWriter = new MetaReadWriter(DATA_DIR, ZIP_DIR, INDEX_DIR, this);
+			meta = readWriter.loadMeta();
+			loadAllIndexDir();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	@Override
@@ -129,10 +136,9 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 				line = line.trim();
 				if (line.isEmpty())
 					continue;
-
-				meta.updateRAMLines(1);
 				writerRAMDocument(now, file, host, line);
 				readWriter.write(host, file, line, now);
+				meta.updateRAMLines(1);
 			}
 			long end = now = System.currentTimeMillis();
 			LOG.debug("create index time:{}ms", (end - now));
@@ -213,7 +219,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		builder.add(query, Occur.MUST);
 		BooleanQuery bQuery = builder.build();
 
-		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.open(ramWriter));
+		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
 		TopDocs docs = ramSearcher.search(bQuery, search.getSize() - hasReturn.get());
 		long allDoc = ramSearcher.getIndexReader().numDocs();
 		int totalHits = docs.totalHits;
@@ -223,9 +229,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			String host = doc.get(DocField.HOST);
 			String line = loadMeta ? doc.get(DocField.LINE) : null;
 			search.handle(host, file, line, totalHits, meta);
-			hasReturn.getAndDecrement();
 		}
-		ramSearcher.getIndexReader().close();
 		LOG.info("query:{} return:{} in ram", bQuery, totalHits);
 		return allDoc;
 	}
@@ -305,9 +309,13 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 	}
 
 	private void swapRamWriterReader() throws IOException {
+		DirectoryReader lastReader = ramReader;
 		IndexWriter lastWriter = ramWriter;
 		ramWriter = createRAMIndexWriter();
-		lastWriter.close();
+		ramReader = DirectoryReader.open(ramWriter);
+		Utils.close(lastReader);
+		Utils.close(lastWriter);
+		LOG.info("success to swap ram wirter");
 	}
 
 	private IndexWriter createRAMIndexWriter() {
@@ -319,5 +327,13 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		} catch (IOException e) {
 			throw new RuntimeException(e.toString(), e);
 		}
+	}
+
+	public JSONObject count(String file, Set<String> hostSet, long timeEnd, long timeStart) {
+		return new JSONObject();
+	}
+
+	public DataMeta getMeta() {
+		return meta;
 	}
 }

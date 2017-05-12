@@ -53,8 +53,12 @@ public class SearchController {
 		Set<String> hostSet = buildHost(host);
 		long timeEnd = (end == null) ? now : end;
 		long timeStart = (start == null) ? now - MILLS : start;
-		return new JSONObject();// return luceneSearch.count(file, hostSet,
-								// timeEnd, timeStart);
+		return luceneSearch.count(file, hostSet, timeEnd, timeStart);
+	}
+
+	@RequestMapping("/meta")
+	public JSONObject meta() throws Exception {
+		return (JSONObject) JSONObject.toJSON(luceneSearch.getMeta());
 	}
 
 	@RequestMapping("/search")
@@ -92,7 +96,7 @@ public class SearchController {
 
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, String file, String line,long matchs, DataMeta meta) {
+			public boolean handle(String host, String file, String line, long matchs, DataMeta meta) {
 				allLine.set(meta.getLines());
 				matchCount.set(matchs);
 				JSONObject files = data.getJSONObject(host);
@@ -128,7 +132,7 @@ public class SearchController {
 		res.put("docCount", allDocs);
 		res.put("lineCount", allLine.get());
 		res.put("matchCount", matchCount.get());
-		LOG.info("query:[{}] time:{}ms", q, cost);
+		LOG.info("query:[{}] time:{}s", q, cost);
 		return res;
 	}
 

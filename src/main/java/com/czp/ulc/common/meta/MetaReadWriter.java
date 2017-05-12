@@ -20,6 +20,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -43,9 +44,7 @@ import com.czp.ulc.collect.handler.LuceneLogHandler;
 import com.czp.ulc.common.util.Utils;
 
 /**
- * 请添加描述
- * <li>创建人：Jeff.cao</li>
- * <li>创建时间：2017年5月3日 下午12:40:14</li>
+ * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月3日 下午12:40:14</li>
  * 
  * @version 0.0.1
  */
@@ -58,14 +57,16 @@ public class MetaReadWriter implements AutoCloseable {
 	private LuceneLogHandler handler;
 	private volatile File currentFile;
 	private volatile BufferedWriter currentWriter;
+	private AtomicLong hasWritesize = new AtomicLong();
 	private AtomicBoolean hasCompress = new AtomicBoolean();
 	private ExecutorService worker = Executors.newSingleThreadExecutor();
 
+	public static final String SUFFIX = ".gz";
 	public static final String META_FILE_NAME = "meta.json";
 	public static final String LINE_SPLITER = getLineSpliter();
 	public static final Charset UTF8 = Charset.forName("UTF-8");
 	public static byte[] SPLITER_BYTES = LINE_SPLITER.getBytes(UTF8);
-	private static final int DEFAUT_EACH_FILE_SIZE = 1024 * 1024 * 200;
+	private static final int DEFAUT_EACH_FILE_SIZE = 1024 * 1024 * 250;
 	private static final Logger log = LoggerFactory.getLogger(MetaReadWriter.class);
 
 	public MetaReadWriter(File baseDir, File zipDir, File indexBaseDir, LuceneLogHandler handler) {
@@ -83,7 +84,7 @@ public class MetaReadWriter implements AutoCloseable {
 	}
 
 	private void checkHasUnCompressFile(File baseDir) {
-		for (File file : baseDir.listFiles(Utils.newFileFile(".log"))) {
+		for (File file : baseDir.listFiles(Utils.newFilter(".log"))) {
 			indexUnCompressFileToRamwriter(file);
 			if (file.length() >= DEFAUT_EACH_FILE_SIZE) {
 				asynCompress(file);
@@ -91,17 +92,20 @@ public class MetaReadWriter implements AutoCloseable {
 		}
 	}
 
-	private synchronized BufferedWriter getCurrentWriter(File baseDir) {
+	private BufferedWriter getCurrentWriter(File baseDir) {
 		try {
 			int num = 0;
-			for (File file : baseDir.listFiles(Utils.newFileFile(".log"))) {
-				num = getFileId(file);
-				if (file.length() >= DEFAUT_EACH_FILE_SIZE) {
+			for (File file : baseDir.listFiles(Utils.newFilter(".log"))) {
+				num = Math.max(num, getFileId(file));
+				if (file.length() >= DEFAUT_EACH_FILE_SIZE)
 					num++;
-				}
 			}
-			currentFile = new File(baseDir, String.format("%s.log", num));
-			return new BufferedWriter(new FileWriter(currentFile, true));
+			File file = new File(baseDir, String.format("%s.log", num));
+			BufferedWriter writer = new BufferedWriter(new FileWriter(file, true));
+			currentFile = file;
+			currentWriter = writer;
+			hasWritesize.set(file.length());
+			return writer;
 		} catch (IOException e) {
 			throw new RuntimeException(e.toString(), e);
 		}
@@ -123,17 +127,17 @@ public class MetaReadWriter implements AutoCloseable {
 	 * @return
 	 * @throws IOException
 	 */
-	public boolean write(String host, String file, String line, long now) throws Exception {
-		if (currentFile.length() >= DEFAUT_EACH_FILE_SIZE) {
+	public synchronized boolean write(String host, String file, String line, long now) throws Exception {
+		if (hasWritesize.get() >= DEFAUT_EACH_FILE_SIZE) {
 			Utils.close(currentWriter);
-			asynCompress(new File(currentFile.getAbsolutePath()));
+			asynCompress(currentFile);
 			currentWriter = getCurrentWriter(dataDir);
-			return true;
 		}
 		String string = encodeData(host, file, line, now);
+		hasWritesize.getAndAdd(string.length() + 1);
 		currentWriter.write(string);
 		currentWriter.newLine();
-		return false;
+		return true;
 	}
 
 	private String encodeData(String host, String file, String line, long now) {
@@ -152,7 +156,7 @@ public class MetaReadWriter implements AutoCloseable {
 		int indexHost = line.indexOf("*");
 		int indexFile = line.indexOf("@");
 		if (indexTime < 0 || indexHost < 0 || indexFile < 0) {
-			log.error("error line:{}", line);
+			log.debug("error line:{}", line);
 			return null;
 		}
 		String time = line.substring(0, indexTime);
@@ -168,9 +172,9 @@ public class MetaReadWriter implements AutoCloseable {
 	 * @throws IOException
 	 */
 	private void indexUnCompressFileToRamwriter(File unCompressFile) {
-		long now = System.currentTimeMillis();
 		try (BufferedReader br = Files.newBufferedReader(unCompressFile.toPath())) {
 			String line;
+			long now = System.currentTimeMillis();
 			while ((line = br.readLine()) != null) {
 				String[] decodeData = decodeData(line);
 				if (decodeData == null) {
@@ -185,12 +189,12 @@ public class MetaReadWriter implements AutoCloseable {
 			long end = System.currentTimeMillis();
 			log.info("index:{} bytes time:{} ms", unCompressFile.length(), (end - now));
 		} catch (IOException e) {
-			e.printStackTrace();
+			log.error("index error", e);
 		}
 	}
 
 	private void asynCompress(File file) {
-		System.out.println("-------------->" + file);
+		log.error("will compress file:{}", file);
 		Path path = file.toPath();
 		worker.execute(new Runnable() {
 
@@ -200,15 +204,16 @@ public class MetaReadWriter implements AutoCloseable {
 				Analyzer analyzer = handler.getAnalyzer();
 				Map<File, Integer> offsetMap = new HashMap<>();
 				Map<File, IndexWriter> indexMap = new HashMap<>();
-				Map<File, GZIPOutputStream> zosMap = new HashMap<>();
-				HashMap<File, Integer> zipFileIdMap = new HashMap<>();
 				Date day = Utils.igroeHMSTime(System.currentTimeMillis());
 				String date = new SimpleDateFormat(LuceneLogHandler.FORMAT).format(day);
 
+				GZIPOutputStream gzos = null;
 				long sumBytes = 0, docCount = 0, lineCount = 0;
 				try (BufferedReader br = Files.newBufferedReader(path)) {
 					String line;
-
+					File zipFile = getCompressFile(zipDir);
+					int fileId = getFileId(zipFile);
+					gzos = getOutputStream(zipFile);
 					while ((line = br.readLine()) != null) {
 						String[] decodeData = decodeData(line);
 						if (decodeData == null) {
@@ -220,16 +225,14 @@ public class MetaReadWriter implements AutoCloseable {
 						long time = Long.valueOf(decodeData[0]);
 
 						File indexDir = createIndexDir(date, host);
-						GZIPOutputStream gzos = getOutputStream(zosMap, indexDir, zipFileIdMap);
 						IndexWriter writer = getIndexWriter(analyzer, indexMap, indexDir);
-						int lastOffset = offsetMap.getOrDefault(gzos, 0);
-						int fileId = zipFileIdMap.get(indexDir);
+						int lastOffset = offsetMap.getOrDefault(zipFile, 0);
 						byte[] bs = data.getBytes(UTF8);
 						gzos.write(bs);
 						gzos.write(SPLITER_BYTES);
 
 						int allSize = bs.length + SPLITER_BYTES.length;
-						offsetMap.put(indexDir, lastOffset);
+						offsetMap.put(zipFile, lastOffset);
 						lastOffset += allSize;
 						sumBytes += allSize;
 						lineCount++;
@@ -246,9 +249,8 @@ public class MetaReadWriter implements AutoCloseable {
 				} catch (Exception e) {
 					log.error("fail to index:" + file, e);
 				} finally {
-					docCount += closeAllIndexWriter(indexMap);
-					closeAllOutputStream(zosMap);
-					handler.loadAllIndexDir();
+					Utils.close(gzos);
+					docCount = closeWriters(indexMap);
 					hasCompress.set(true);
 					boolean delete = file.delete();
 					updateMetaInfo(sumBytes, lineCount, docCount);
@@ -268,15 +270,22 @@ public class MetaReadWriter implements AutoCloseable {
 	 */
 	protected void updateMetaInfo(long sumBytes, long lineCount, long docCount) {
 		try {
+			if (sumBytes <= 0 || lineCount <= 0 || docCount <= 0) {
+				log.error("meta error: butes:{} line:{} dco:{}", sumBytes, lineCount, docCount);
+				return;
+			}
 			JSONObject meta = new JSONObject();
 			File metaFile = new File(dataDir.getParentFile(), META_FILE_NAME);
 			if (metaFile.exists() && metaFile.length() > 0) {
 				byte[] bytes = Files.readAllBytes(metaFile.toPath());
 				meta = JSONObject.parseObject(new String(bytes));
 			}
-			meta.put("lines", (long) meta.getOrDefault("line", 0) + lineCount);
-			meta.put("bytes", (long) meta.getOrDefault("bytes", 0) + sumBytes);
-			meta.put("docs", (long) meta.getOrDefault("docs", 0) + docCount);
+			Long lastLines = meta.getLong("line");
+			Long lastBytes = meta.getLong("bytes");
+			Long lastDocs = meta.getLong("docs");
+			meta.put("lines", (lastLines == null ? 0 : lastLines) + lineCount);
+			meta.put("bytes", (lastBytes == null ? 0 : lastBytes) + sumBytes);
+			meta.put("docs", (lastDocs == null ? 0 : lastDocs) + docCount);
 			Files.write(metaFile.toPath(), meta.toString().getBytes(UTF8));
 			log.info("sucess to write meta:{}", meta);
 		} catch (Exception e) {
@@ -329,7 +338,7 @@ public class MetaReadWriter implements AutoCloseable {
 		});
 	}
 
-	protected long closeAllIndexWriter(Map<File, IndexWriter> indexMap) {
+	protected long closeWriters(Map<File, IndexWriter> indexMap) {
 		long count = 0;
 		for (Entry<File, IndexWriter> entry : indexMap.entrySet()) {
 			IndexWriter value = entry.getValue();
@@ -353,36 +362,30 @@ public class MetaReadWriter implements AutoCloseable {
 		return writer;
 	}
 
-	protected GZIPOutputStream getOutputStream(Map<File, GZIPOutputStream> zosMap, File indexDir,
-			HashMap<File, Integer> zipFileIdMap) throws IOException {
-		GZIPOutputStream gzos = zosMap.get(indexDir);
-		if (gzos == null) {
-			File zipFile = getZipFile(zipDir);
-			FileOutputStream out = new FileOutputStream(zipFile);
-			gzos = new GZIPOutputStream(new BufferedOutputStream(out));
-			zipFileIdMap.put(zipDir, getFileId(zipFile));
-			zosMap.put(indexDir, gzos);
-		}
-		return gzos;
+	protected GZIPOutputStream getOutputStream(File zipFile) throws IOException {
+		FileOutputStream out = new FileOutputStream(zipFile);
+		return new GZIPOutputStream(new BufferedOutputStream(out));
 	}
 
-	protected File getZipFile(File zipDir) {
-		int num = 0;
+	protected File getCompressFile(File zipDir) {
+		int num = -1;
 		for (File file : zipDir.listFiles()) {
-			num = getFileId(file) + 1;
+			num = Math.max(num, getFileId(file));
 		}
-		return new File(String.format("%s/%s.gzip", zipDir, num));
+		num++;
+		return new File(String.format("%s/%s%s", zipDir, num, SUFFIX));
 	}
 
 	public String readLine(int fileId, int offset) {
 		long st = System.currentTimeMillis();
-		File zipFile = new File(String.format("%s/%s.gzip", zipDir, fileId));
+		File zipFile = new File(String.format("%s/%s%s", zipDir, fileId, SUFFIX));
 		try (GZIPInputStream is = new GZIPInputStream(new FileInputStream(zipFile))) {
 			is.skip(offset);
 			BufferedReader br = new BufferedReader(new InputStreamReader(is, UTF8));
 			String line = br.readLine();
 			br.close();
-			log.info("load data time:{} ms", (System.currentTimeMillis() - st));
+			long end = System.currentTimeMillis();
+			log.debug("load data time:{} ms", (end - st));
 			return line;
 		} catch (Exception e) {
 			throw new RuntimeException(e.toString(), e);

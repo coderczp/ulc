@@ -203,7 +203,7 @@ public class Utils {
 		return ByteBuffer.wrap(values).getLong();
 	}
 
-	public static FilenameFilter newFileFile(String suffix) {
+	public static FilenameFilter newFilter(String suffix) {
 		return new FilenameFilter() {
 
 			@Override

@@ -27,7 +27,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
-import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
@@ -146,9 +146,9 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 	public Document writerRAMDocument(long time, String file, String host, String line) throws IOException {
 		Document doc = new Document();
 		doc.add(new LongPoint(DocField.TIME, time));
-		doc.add(new StoredField(DocField.HOST, host));
 		doc.add(new TextField(DocField.LINE, line, Field.Store.YES));
 		doc.add(new TextField(DocField.FILE, file, Field.Store.YES));
+		doc.add(new StringField(DocField.HOST, host, Field.Store.YES));
 		ramWriter.addDocument(doc);
 		return doc;
 	}
@@ -208,7 +208,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		Query query = search.getQuery();
 		BooleanQuery.Builder builder = new BooleanQuery.Builder();
 		for (String host : search.getHosts()) {
-			builder.add(new TermQuery(new Term(DocField.HOST, host)), Occur.SHOULD);
+			builder.add(new TermQuery(new Term(DocField.HOST, host)), Occur.MUST);
 		}
 		builder.add(query, Occur.MUST);
 		BooleanQuery bQuery = builder.build();
@@ -226,7 +226,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			hasReturn.getAndDecrement();
 		}
 		ramSearcher.getIndexReader().close();
-		LOG.info("ram searcher return:{} for:{}", totalHits, bQuery);
+		LOG.info("query:{} return:{} in ram", bQuery, totalHits);
 		return allDoc;
 	}
 

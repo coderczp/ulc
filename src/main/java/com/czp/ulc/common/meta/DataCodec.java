@@ -3,9 +3,7 @@ package com.czp.ulc.common.meta;
 import java.nio.ByteBuffer;
 
 /**
- * 请添加描述
- * <li>创建人：Jeff.cao</li>
- * <li>创建时间：2017年5月11日 上午11:18:10</li>
+ * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月11日 上午11:18:10</li>
  * 
  * @version 0.0.1
  */
@@ -23,7 +21,7 @@ public class DataCodec {
 	 */
 	public static byte[] encode(byte[] data, byte[] endByte) {
 		int len = data.length + endByte.length;
-		if(len>Character.MAX_VALUE){
+		if (len > Character.MAX_VALUE) {
 			throw new RuntimeException("eacn data size must be <65535");
 		}
 		ByteBuffer buf = ByteBuffer.allocate(2 + len);
@@ -38,25 +36,46 @@ public class DataCodec {
 	 * 4字节目录编号 4字节文件编号 x字节行号(<128:1byte 65536:2byte ....)<br>
 	 * 将文件id和目录ID编码为一个long
 	 * 
-	 * @param dirId
 	 * @param fileId
-	 * @param lineNo
+	 * @param offset
 	 * @return
 	 */
-	public static byte[] encodeMetaId(int dirId, int fileId, int lineNo) {
+	public static byte[] encodeMetaId(int offset, int fileId) {
 		ByteBuffer buf = ByteBuffer.allocate(12);
-		buf.putInt(dirId);
-		buf.putInt(fileId);
-		if (lineNo < Byte.MAX_VALUE) {
-			buf.put((byte) lineNo);
-		} else if (lineNo < Character.MAX_VALUE) {
-			buf.putChar((char) lineNo);
-		} else {
-			buf.putLong(lineNo);
-		}
+		buf.putInt(offset);
+		doEncode(fileId, buf);
 		buf.flip();
-		byte[] realArr = new byte[buf.limit()];
-		System.arraycopy(buf.array(), 0, realArr, 0, buf.limit());
+		int len = buf.limit();
+		byte[] realArr = new byte[len];
+		System.arraycopy(buf.array(), 0, realArr, 0, len);
 		return realArr;
+	}
+
+	public static int[] decodeMetaId(byte[] bytes) {
+		ByteBuffer buf = ByteBuffer.wrap(bytes);
+		int offset = buf.getInt();
+		int fileId = doDecode(buf);
+		return new int[] { offset, fileId };
+	}
+
+	private static int doDecode(ByteBuffer buf) {
+		if (buf.remaining() == 1)
+			return buf.get();
+		if (buf.remaining() == 2)
+			return buf.getChar();
+		return buf.getInt();
+	}
+
+	private static byte doEncode(long num, ByteBuffer buf) {
+		if (num < Byte.MAX_VALUE) {
+			buf.put((byte) num);
+			return 1;
+		}
+		if (num < Character.MAX_VALUE) {
+			buf.putChar((char) num);
+			return 2;
+		}
+		buf.putInt((int) num);
+		return 4;
 	}
 }

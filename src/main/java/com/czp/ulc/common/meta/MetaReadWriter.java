@@ -44,7 +44,8 @@ import com.czp.ulc.collect.handler.LuceneLogHandler;
 import com.czp.ulc.common.util.Utils;
 
 /**
- * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月3日 下午12:40:14</li>
+ * 请添加描述 <li>创建人：Jeff.cao</li><br>
+ * <li>创建时间：2017年5月3日 下午12:40:14</li>
  * 
  * @version 0.0.1
  */
@@ -55,6 +56,8 @@ public class MetaReadWriter implements AutoCloseable {
 	private File dataDir;
 	private File indexBaseDir;
 	private LuceneLogHandler handler;
+
+	private volatile DataMeta meta;
 	private volatile File currentFile;
 	private volatile BufferedWriter currentWriter;
 	private AtomicLong hasWritesize = new AtomicLong();
@@ -66,26 +69,26 @@ public class MetaReadWriter implements AutoCloseable {
 	public static final String LINE_SPLITER = getLineSpliter();
 	public static final Charset UTF8 = Charset.forName("UTF-8");
 	public static byte[] SPLITER_BYTES = LINE_SPLITER.getBytes(UTF8);
-	private static final int DEFAUT_EACH_FILE_SIZE = 1024 * 1024 * 250;
+	public static final int DEFAUT_EACH_FILE_SIZE = 1024 * 1024 * 250;
 	private static final Logger log = LoggerFactory.getLogger(MetaReadWriter.class);
 
 	public MetaReadWriter(File baseDir, File zipDir, File indexBaseDir, LuceneLogHandler handler) {
 		this.zipDir = zipDir;
 		this.handler = handler;
 		this.dataDir = baseDir;
+		this.meta = loadMetaInfo();
 		this.indexBaseDir = indexBaseDir;
 		this.currentWriter = getCurrentWriter(baseDir);
 		this.checkHasUnCompressFile(baseDir);
 	}
 
 	private static String getLineSpliter() {
-		String os = System.getProperty("os.name").toLowerCase();
-		return os.contains("windows") ? "\n" : "\r";
+		return System.getProperty("os.name").toLowerCase().contains("windows") ? "\n" : "\r";
 	}
 
 	private void checkHasUnCompressFile(File baseDir) {
 		for (File file : baseDir.listFiles(Utils.newFilter(".log"))) {
-			indexUnCompressFileToRamwriter(file);
+			indexUnCompressFileToRAM(file);
 			if (file.length() >= DEFAUT_EACH_FILE_SIZE) {
 				asynCompress(file);
 			}
@@ -116,16 +119,15 @@ public class MetaReadWriter implements AutoCloseable {
 		return Integer.parseInt(name.substring(0, name.indexOf(".")));
 	}
 
-	/***
-	 * 滚动写文件,返回文件的当前行号
+	/****
+	 * 滚动写文件
 	 * 
-	 * @param line2
+	 * @param host
 	 * @param file
+	 * @param line
 	 * @param now
-	 * 
-	 * @param lines
 	 * @return
-	 * @throws IOException
+	 * @throws Exception
 	 */
 	public synchronized boolean write(String host, String file, String line, long now) throws Exception {
 		if (hasWritesize.get() >= DEFAUT_EACH_FILE_SIZE) {
@@ -171,7 +173,7 @@ public class MetaReadWriter implements AutoCloseable {
 	 * 
 	 * @throws IOException
 	 */
-	private void indexUnCompressFileToRamwriter(File unCompressFile) {
+	private void indexUnCompressFileToRAM(File unCompressFile) {
 		try (BufferedReader br = Files.newBufferedReader(unCompressFile.toPath())) {
 			String line;
 			long now = System.currentTimeMillis();
@@ -194,21 +196,21 @@ public class MetaReadWriter implements AutoCloseable {
 	}
 
 	private void asynCompress(File file) {
-		log.error("will compress file:{}", file);
+		log.error("start compress file:{}", file);
 		Path path = file.toPath();
 		worker.execute(new Runnable() {
 
 			@Override
 			public void run() {
-				log.info("start compress file:{}", file);
 				Analyzer analyzer = handler.getAnalyzer();
-				Map<File, Integer> offsetMap = new HashMap<>();
 				Map<File, IndexWriter> indexMap = new HashMap<>();
 				Date day = Utils.igroeHMSTime(System.currentTimeMillis());
 				String date = new SimpleDateFormat(LuceneLogHandler.FORMAT).format(day);
 
+				int offset = 0;
+				long docCount = 0;
+				int lineCount = 0;
 				GZIPOutputStream gzos = null;
-				long sumBytes = 0, docCount = 0, lineCount = 0;
 				try (BufferedReader br = Files.newBufferedReader(path)) {
 					String line;
 					File zipFile = getCompressFile(zipDir);
@@ -226,20 +228,17 @@ public class MetaReadWriter implements AutoCloseable {
 
 						File indexDir = createIndexDir(date, host);
 						IndexWriter writer = getIndexWriter(analyzer, indexMap, indexDir);
-						int lastOffset = offsetMap.getOrDefault(zipFile, 0);
 						byte[] bs = data.getBytes(UTF8);
 						gzos.write(bs);
 						gzos.write(SPLITER_BYTES);
 
 						int allSize = bs.length + SPLITER_BYTES.length;
-						offsetMap.put(zipFile, lastOffset);
-						lastOffset += allSize;
-						sumBytes += allSize;
+						offset += allSize;
 						lineCount++;
 
 						Document doc = new Document();
 						doc.add(new LongPoint(DocField.TIME, time));
-						doc.add(new StoredField(DocField.OFFSET, lastOffset));
+						doc.add(new StoredField(DocField.OFFSET, offset));
 						doc.add(new StoredField(DocField.META_FILE, fileId));
 						doc.add(new TextField(DocField.LINE, data, Field.Store.NO));
 						doc.add(new TextField(DocField.FILE, srcFile, Field.Store.YES));
@@ -250,11 +249,13 @@ public class MetaReadWriter implements AutoCloseable {
 					log.error("fail to index:" + file, e);
 				} finally {
 					Utils.close(gzos);
-					docCount = closeWriters(indexMap);
-					hasCompress.set(true);
 					boolean delete = file.delete();
-					updateMetaInfo(sumBytes, lineCount, docCount);
-					log.info("compress file:{} size:{} del:{}", file, file.length(), delete);
+					docCount = closeWriters(indexMap);
+
+					hasCompress.set(true);
+					handler.loadAllIndexDir();
+					updateMetaInfo(offset, lineCount, docCount);
+					log.info("compress file:{} size:{} del:{}", file, offset, delete);
 				}
 			}
 
@@ -271,26 +272,25 @@ public class MetaReadWriter implements AutoCloseable {
 	protected void updateMetaInfo(long sumBytes, long lineCount, long docCount) {
 		try {
 			if (sumBytes <= 0 || lineCount <= 0 || docCount <= 0) {
-				log.error("meta error: butes:{} line:{} dco:{}", sumBytes, lineCount, docCount);
+				log.error("error meta bytes:{} line:{} dco:{}", sumBytes, lineCount, docCount);
 				return;
 			}
-			JSONObject meta = new JSONObject();
-			File metaFile = new File(dataDir.getParentFile(), META_FILE_NAME);
-			if (metaFile.exists() && metaFile.length() > 0) {
-				byte[] bytes = Files.readAllBytes(metaFile.toPath());
-				meta = JSONObject.parseObject(new String(bytes));
-			}
-			Long lastLines = meta.getLong("line");
-			Long lastBytes = meta.getLong("bytes");
-			Long lastDocs = meta.getLong("docs");
-			meta.put("lines", (lastLines == null ? 0 : lastLines) + lineCount);
-			meta.put("bytes", (lastBytes == null ? 0 : lastBytes) + sumBytes);
-			meta.put("docs", (lastDocs == null ? 0 : lastDocs) + docCount);
-			Files.write(metaFile.toPath(), meta.toString().getBytes(UTF8));
+
+			meta.setDocs(meta.getDocs() + docCount);
+			meta.setBytes(meta.getBytes() + sumBytes);
+			meta.setLines(meta.getLines() + lineCount);
+
+			Path path = new File(dataDir.getParentFile(), META_FILE_NAME).toPath();
+			Files.write(path, JSONObject.toJSONString(meta).getBytes(UTF8));
+
 			log.info("sucess to write meta:{}", meta);
 		} catch (Exception e) {
 			log.error("updateMetaInfo error", e);
 		}
+	}
+
+	public DataMeta getMeta() {
+		return meta;
 	}
 
 	/***
@@ -298,15 +298,15 @@ public class MetaReadWriter implements AutoCloseable {
 	 * 
 	 * @return
 	 */
-	public DataMeta loadMeta() {
+	private DataMeta loadMetaInfo() {
 		try {
 			File metaFile = new File(dataDir.getParentFile(), META_FILE_NAME);
-			if (metaFile.exists() && metaFile.length() > 0) {
-				byte[] bytes = Files.readAllBytes(metaFile.toPath());
-				JSONObject meta = JSONObject.parseObject(new String(bytes));
-				return new DataMeta(meta.getLongValue("lines"), meta.getLongValue("docs"), meta.getLongValue("bytes"));
-			}
-			return DataMeta.EMPTY;
+			if (metaFile.exists() || metaFile.length() == 0)
+				return DataMeta.EMPTY;
+
+			byte[] bytes = Files.readAllBytes(metaFile.toPath());
+			JSONObject meta = JSONObject.parseObject(new String(bytes));
+			return JSONObject.toJavaObject(meta, DataMeta.class);
 		} catch (IOException e) {
 			log.error("loadMeta index", e);
 		}
@@ -333,9 +333,7 @@ public class MetaReadWriter implements AutoCloseable {
 	 * @param zosMap
 	 */
 	protected void closeAllOutputStream(Map<File, GZIPOutputStream> zosMap) {
-		zosMap.values().forEach(item -> {
-			Utils.close(item);
-		});
+		zosMap.values().forEach(item -> Utils.close(item));
 	}
 
 	protected long closeWriters(Map<File, IndexWriter> indexMap) {
@@ -363,17 +361,15 @@ public class MetaReadWriter implements AutoCloseable {
 	}
 
 	protected GZIPOutputStream getOutputStream(File zipFile) throws IOException {
-		FileOutputStream out = new FileOutputStream(zipFile);
-		return new GZIPOutputStream(new BufferedOutputStream(out));
+		return new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(zipFile)));
 	}
 
 	protected File getCompressFile(File zipDir) {
-		int num = -1;
+		int fileId = -1;
 		for (File file : zipDir.listFiles()) {
-			num = Math.max(num, getFileId(file));
+			fileId = Math.max(fileId, getFileId(file));
 		}
-		num++;
-		return new File(String.format("%s/%s%s", zipDir, num, SUFFIX));
+		return createGzipFile(fileId + 1, zipDir);
 	}
 
 	public String readLine(int fileId, int offset) {
@@ -390,6 +386,10 @@ public class MetaReadWriter implements AutoCloseable {
 		} catch (Exception e) {
 			throw new RuntimeException(e.toString(), e);
 		}
+	}
+
+	private File createGzipFile(int fileId, File baseDir) {
+		return new File(String.format("%s/%s%s", baseDir, fileId, SUFFIX));
 	}
 
 	private IndexWriter createIndexWriter(Analyzer analyzer, File file) {

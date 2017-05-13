@@ -68,7 +68,6 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 	private Analyzer analyzer = new MyAnalyzer();
 	public static final String FORMAT = "yyyyMMdd";
 
-	private DataMeta meta = DataMeta.EMPTY;
 	/*** 根目录 */
 	private static final File ROOT = new File("./log");
 	/** 已压缩文件目录 */
@@ -92,7 +91,6 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
 			readWriter = new MetaReadWriter(DATA_DIR, ZIP_DIR, INDEX_DIR, this);
-			meta = readWriter.loadMeta();
 			loadAllIndexDir();
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -132,6 +130,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 				swapRamWriterReader();
 			}
 
+			DataMeta meta = readWriter.getMeta();
 			for (String line : lines) {
 				line = line.trim();
 				if (line.isEmpty())
@@ -161,7 +160,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 
 	public long search(Searcher search, boolean loadMeta) throws Exception {
 
-		long sum = meta.getDocs();
+		long sum = readWriter.getMeta().getDocs();
 		int size = search.getSize();
 		Set<String> hosts = search.getHosts();
 		hosts = hosts == null ? indexDirMap.keySet() : hosts;
@@ -228,7 +227,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			String file = doc.get(DocField.FILE);
 			String host = doc.get(DocField.HOST);
 			String line = loadMeta ? doc.get(DocField.LINE) : null;
-			search.handle(host, file, line, totalHits, meta);
+			search.handle(host, file, line, totalHits, readWriter.getMeta());
 		}
 		LOG.info("query:{} return:{} in ram", bQuery, totalHits);
 		return allDoc;
@@ -292,7 +291,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			Document doc = searcher.doc(scoreDoc.doc);
 			String file = doc.get(DocField.FILE);
 			String data = loadDataFiled(loadMeta, doc);
-			search.handle(host, file, data, hasReturn.get(), meta);
+			search.handle(host, file, data, hasReturn.get(), readWriter.getMeta());
 		}
 		return docs.totalHits;
 	}
@@ -334,6 +333,6 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 	}
 
 	public DataMeta getMeta() {
-		return meta;
+		return readWriter.getMeta();
 	}
 }

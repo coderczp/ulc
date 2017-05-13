@@ -301,7 +301,7 @@ public class MetaReadWriter implements AutoCloseable {
 	private DataMeta loadMetaInfo() {
 		try {
 			File metaFile = new File(dataDir.getParentFile(), META_FILE_NAME);
-			if (metaFile.exists() || metaFile.length() == 0)
+			if (!metaFile.exists() || metaFile.length() == 0)
 				return DataMeta.EMPTY;
 
 			byte[] bytes = Files.readAllBytes(metaFile.toPath());

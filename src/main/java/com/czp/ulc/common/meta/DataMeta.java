@@ -11,12 +11,9 @@ public class DataMeta {
 	private long lines;
 	private long docs;
 	private long bytes;
-	public static final DataMeta EMPTY = new DataMeta(0, 0, 0);
+	public static final DataMeta EMPTY = new DataMeta();
 
-	public DataMeta(long lines, long docs, long bytes) {
-		this.lines = lines;
-		this.docs = docs;
-		this.bytes = bytes;
+	public DataMeta() {
 	}
 
 	public void setLines(long lines) {

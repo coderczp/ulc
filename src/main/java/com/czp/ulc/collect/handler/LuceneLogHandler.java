@@ -119,8 +119,8 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			LOG.debug("recive message:{}", event);
 
 			String file = event.getFile();
-			String host = event.getHost().getName();
 			List<String> lines = event.getLines();
+			String host = event.getHost().getName();
 			if (file.isEmpty()) {
 				LOG.info("file name is empty:{}", lines);
 				return false;
@@ -143,7 +143,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			LOG.debug("create index time:{}ms", (end - now));
 			return false;
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOG.error("proces message error", e);
 		}
 		return false;
 	}
@@ -160,29 +160,22 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 
 	public long search(Searcher search, boolean loadMeta) throws Exception {
 
-		long sum = readWriter.getMeta().getDocs();
 		int size = search.getSize();
-		Set<String> hosts = search.getHosts();
-		hosts = hosts == null ? indexDirMap.keySet() : hosts;
-
+		long allDocs = readWriter.getMeta().getDocs();
 		AtomicInteger hasReturn = new AtomicInteger();
-		sum += searchInRam(search, hasReturn, loadMeta);
+		long ramDocs = searchInRam(search, hasReturn, loadMeta);
 		if (hasReturn.get() >= search.getSize())
-			return sum;
+			return allDocs + ramDocs;
 
-		Map<String, Collection<File>> dirs = findMatchTimeDir(hosts, search.getBegin(), search.getEnd());
+		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
 			for (File indexDir : item.getValue()) {
-				IndexSearcher searcher = getOpenedSearcher(indexDir);
-				searchInIndex(searcher, item.getKey(), search, hasReturn, loadMeta);
-				sum += searcher.getIndexReader().numDocs();
+				searchInIndex(getCachedSearch(indexDir), item.getKey(), search, hasReturn, loadMeta);
 				if (hasReturn.get() >= size)
-					break;
+					return allDocs;
 			}
-			if (hasReturn.get() >= size)
-				break;
 		}
-		return sum;
+		return allDocs;
 	}
 
 	public void loadAllIndexDir() {
@@ -209,7 +202,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		}
 	}
 
-	private long searchInRam(Searcher search, AtomicInteger hasReturn, boolean loadMeta) throws IOException {
+	private int searchInRam(Searcher search, AtomicInteger hasReturn, boolean loadMeta) throws IOException {
 		Query query = search.getQuery();
 		BooleanQuery.Builder builder = new BooleanQuery.Builder();
 		for (String host : search.getHosts()) {
@@ -220,17 +213,16 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 
 		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
 		TopDocs docs = ramSearcher.search(bQuery, search.getSize() - hasReturn.get());
-		long allDoc = ramSearcher.getIndexReader().numDocs();
-		int totalHits = docs.totalHits;
+		hasReturn.set(docs.totalHits);
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
 			Document doc = ramSearcher.doc(scoreDoc.doc);
 			String file = doc.get(DocField.FILE);
 			String host = doc.get(DocField.HOST);
 			String line = loadMeta ? doc.get(DocField.LINE) : null;
-			search.handle(host, file, line, totalHits, readWriter.getMeta());
+			search.handle(host, file, line, hasReturn.get(), readWriter.getMeta());
 		}
-		LOG.info("query:{} return:{} in ram", bQuery, totalHits);
-		return allDoc;
+		LOG.info("query:{} return:{} in ram", bQuery, hasReturn.get());
+		return ramSearcher.getIndexReader().numDocs();
 	}
 
 	/**
@@ -241,10 +233,11 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 	 * @param end
 	 * @return
 	 */
-	public Map<String, Collection<File>> findMatchTimeDir(Set<String> hosts, long start, long end) {
-		long from = Utils.igroeHMSTime(start).getTime();
-		long to = Utils.igroeHMSTime(end).getTime();
+	public Map<String, Collection<File>> findMatchIndexDir(Searcher searcher) {
+		long from = Utils.igroeHMSTime(searcher.getBegin()).getTime();
+		long to = Utils.igroeHMSTime(searcher.getEnd()).getTime();
 		Map<String, Collection<File>> map = new HashMap<>();
+		Set<String> hosts = searcher.getHosts();
 		if (hosts != null && !hosts.isEmpty()) {
 			for (String host : hosts) {
 				TreeMap<Long, File> indexs = indexDirMap.get(host);
@@ -252,15 +245,14 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 					map.put(host, indexs.subMap(from, true, to, true).values());
 			}
 		} else {
-			Set<Entry<String, TreeMap<Long, File>>> entrySet = indexDirMap.entrySet();
-			for (Entry<String, TreeMap<Long, File>> entry : entrySet) {
+			for (Entry<String, TreeMap<Long, File>> entry : indexDirMap.entrySet()) {
 				map.put(entry.getKey(), entry.getValue().values());
 			}
 		}
 		return map;
 	}
 
-	private IndexSearcher getOpenedSearcher(File file) throws IOException {
+	private IndexSearcher getCachedSearch(File file) throws IOException {
 		IndexSearcher reader = openedDir.get(file);
 		if (reader != null && modifyMap.get(file) >= file.lastModified()) {
 			return reader;
@@ -291,9 +283,15 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			Document doc = searcher.doc(scoreDoc.doc);
 			String file = doc.get(DocField.FILE);
 			String data = loadDataFiled(loadMeta, doc);
-			search.handle(host, file, data, hasReturn.get(), readWriter.getMeta());
+			String html = hightlightResult(data);
+			search.handle(host, file, html, hasReturn.get(), readWriter.getMeta());
 		}
-		return docs.totalHits;
+		return searcher.getIndexReader().numDocs();
+	}
+
+	private String hightlightResult(String data) {
+		
+		return null;
 	}
 
 	private String loadDataFiled(boolean loadMeta, Document doc) {
@@ -307,7 +305,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		return readWriter.readLine(fileId, offset);
 	}
 
-	private void swapRamWriterReader() throws IOException {
+	private synchronized void swapRamWriterReader() throws IOException {
 		DirectoryReader lastReader = ramReader;
 		IndexWriter lastWriter = ramWriter;
 		ramWriter = createRAMIndexWriter();
@@ -317,15 +315,9 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		LOG.info("success to swap ram wirter");
 	}
 
-	private IndexWriter createRAMIndexWriter() {
-		try {
-			RAMDirectory ramd = new RAMDirectory();
-			IndexWriterConfig conf = new IndexWriterConfig(analyzer);
-			IndexWriter indexWriter = new IndexWriter(ramd, conf);
-			return indexWriter;
-		} catch (IOException e) {
-			throw new RuntimeException(e.toString(), e);
-		}
+	private IndexWriter createRAMIndexWriter() throws IOException {
+		IndexWriterConfig conf = new IndexWriterConfig(analyzer);
+		return new IndexWriter(new RAMDirectory(), conf);
 	}
 
 	public JSONObject count(String file, Set<String> hostSet, long timeEnd, long timeStart) {

@@ -78,8 +78,8 @@ public class MetaReadWriter implements AutoCloseable {
 		this.dataDir = baseDir;
 		this.meta = loadMetaInfo();
 		this.indexBaseDir = indexBaseDir;
-		this.currentWriter = getCurrentWriter(baseDir);
 		this.checkHasUnCompressFile(baseDir);
+		this.currentWriter = getCurrentWriter(baseDir);
 	}
 
 	private static String getLineSpliter() {
@@ -182,10 +182,11 @@ public class MetaReadWriter implements AutoCloseable {
 				if (decodeData == null) {
 					continue;
 				}
-				long time = Long.valueOf(decodeData[0]);
-				String srcFile = decodeData[2];
+				meta.updateRAMLines(1);
 				String host = decodeData[1];
 				String data = decodeData[3];
+				String srcFile = decodeData[2];
+				long time = Long.valueOf(decodeData[0]);
 				handler.writerRAMDocument(time, srcFile, host, data);
 			}
 			long end = System.currentTimeMillis();

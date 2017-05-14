@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport"
+	content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link href="./favicon.ico" type="image/x-icon" rel=icon>
+<link
+	href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css"
+	rel="stylesheet">
+<link
+	href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
+	rel="stylesheet">
+<link
+	href="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/css/bootstrap-datetimepicker-standalone.min.css"
+	rel="stylesheet">
+<link href="css/ulc.css" rel="stylesheet">
+<script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+<script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="http://cdn.bootcss.com/moment.js/2.18.1/moment.min.js"></script>
+<script
+	src="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/js/bootstrap-datetimepicker.min.js"></script>
+<style type="text/css">
+.lines {
+	text-overflow: ellipsis;
+	background: #993366;
+	word-spacing: 1px;
+	color: white;
+}
+
+.keyword {
+	color: #00FF33;
+	font-weight: bold;
+}
+
+code {
+	color: white;
+	background-color:#993366;
+}
+</style>
+</head>
+<body>
+	<nav class="navbar navbar-default" role="navigation">
+		<div class="navbar-header">
+			<a class="navbar-brand" href="./index.html">ULC</a>
+		</div>
+		<div>
+			<ul class="nav navbar-nav">
+				<li class="active"><a  href="./hosts.html">进程管理</a></li>
+				<li><a href="./index.html">日志搜索</a></li>
+			</ul>
+		</div>
+	</nav>
+	<div class="container-fluid">
+		<div class="panel panel-success">
+			<div class="panel-heading">
+				<div class="form-inline" role="form">
+					<div class="form-group">
+						<select id="host" class="form-control"></select>
+					</div>
+					<div class="form-group">
+						<select id="size" class="form-control">
+							<option value="30">size(30)</option>
+							<option value="50">50</option>
+							<option value="100">100</option>
+							<option value="200">200</option>
+						</select>
+					</div>
+					<div class="form-group">
+						<div class='input-group date' id='start'>
+							<input type='text' class="form-control" /> <span
+								class="input-group-addon"> <span
+								class="glyphicon glyphicon-calendar"></span>
+							</span>
+						</div>
+					</div>
+					<div class="form-group">
+						<div class='input-group date' id='end'>
+							<input type='text' class="form-control" /> <span
+								class="input-group-addon"> <span
+								class="glyphicon glyphicon-calendar"></span>
+							</span>
+						</div>
+					</div>
+					<div class="form-group">
+						<input type="text" id="proc" placeholder="进程:service_booking"
+							class="form-control">
+					</div>
+					<div class="form-group">
+						<input type="text" id="file" placeholder="文件:run.log"
+							class="form-control">
+					</div>
+					<div class="form-group">
+						<div class="input-group">
+							<input type="text" id="q" class="form-control"
+								placeholder="请您输入关键词"> <span class="input-group-btn">
+								<button class="btn btn-success btn-small" type="button"
+									onclick="doQuery()">Go!</button>
+							</span>
+						</div>
+					</div>
+					<div class="form-group">
+						<div class="checkbox">
+							<label> <input type="checkbox" id="loadLine"
+								checked="checked">加载内容
+							</label>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="panel-body">
+				<span id="time"></span>
+				<div id="result"></div>
+			</div>
+		</div>
+	</div>
+	<script type="text/javascript">
+		var date = new Date();
+		var startTime = new Date();
+		var fmt = "YYYY/MM/DD HH:mm";
+		startTime.setHours(date.getHours() - 5);
+
+		$('#start').datetimepicker({
+			format : fmt,
+			locale : moment.locale('zh-cn')
+		}).data('DateTimePicker').date(moment(startTime).format(fmt));
+
+		$('#end').datetimepicker({
+			format : fmt,
+			locale : moment.locale('zh-cn')
+		}).data('DateTimePicker').date(moment(date).format(fmt));
+
+		$.get('./host/list', function(d) {
+			var html = '<option value="">主机(All)</option>';
+			for ( var i in d) {
+				var host = d[i];
+				html += '<option value='+host.name+'>' + host.name
+						+ '</option>';
+			}
+			$('#host').html(html);
+		});
+
+		function doQuery() {
+			var json = {
+				'q' : $('#q').val(),
+				'size' : $('#size').val(),
+				'host' : $('#host').val(),
+				'proc' : $('#proc').val(),
+				'file' : $('#file').val(),
+				'end' : Date.parse($('#end').data('date')),
+				'loadLine' : $('#loadLine').is(':checked'),
+				'start' : Date.parse($('#start').data('date')),
+
+			};
+			if (!json.q) {
+				$('#q').val('eneter keyword');
+				return;
+			}
+			$('#time').html('');
+			$('#result').html('loading..........');
+			$.post('./search', {
+				'json' : JSON.stringify(json)
+			}, function(resp) {
+				var data = resp.data, q = json.q;
+				var mc = resp.matchCount, cc = resp.lineCount, t = resp.time;
+				var html = '';
+				$('#time').html(
+						'find[<b>' + mc + '</b>]in[<b>' + cc
+								+ '</b>]records,time:' + t);
+				for ( var host in data) {
+					var files = data[host];
+					html += "<b>" + host + "</b><br>";
+					for ( var file in files) {
+						html += file + '<div class="lines">';
+						var lines = files[file];
+						for ( var k in lines) {
+							var tmp = hightlight(lines[k], q);
+							html += '<code>' + tmp + '</code><br>';
+						}
+						html += '</div>';
+					}
+				}
+				if (html)
+					$('#result').html(html);
+				else
+					$('#result').html('no match result');
+			});
+		}
+
+		function hightlight(src, kw) {
+			var k1 = kw.split(" ")[0];
+			var x = new RegExp(k1, "g");
+			return src.replace(x, "<span class='keyword'>" + k1 + "</span>");
+		}
+	</script>
+</body>
+</html>

@@ -28,7 +28,6 @@ import com.czp.ulc.collect.handler.DocField;
 import com.czp.ulc.collect.handler.LuceneLogHandler;
 import com.czp.ulc.collect.handler.NumSupportQueryParser;
 import com.czp.ulc.collect.handler.Searcher;
-import com.czp.ulc.common.meta.DataMeta;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -96,9 +95,10 @@ public class SearchController {
 
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, String file, String line, long matchs, DataMeta meta) {
-				allLine.set(meta.getLines());
+			public boolean handle(String host, String file, String line, long matchs, long allLines) {
+				allLine.set(allLines);
 				matchCount.set(matchs);
+				
 				JSONObject files = data.getJSONObject(host);
 				if (files == null) {
 					files = new JSONObject();

@@ -5,12 +5,8 @@ import java.util.Set;
 
 import org.apache.lucene.search.Query;
 
-import com.czp.ulc.common.meta.DataMeta;
-
 /**
- * 请添加描述
- * <li>创建人：Jeff.cao</li>
- * <li>创建时间：2017年4月19日 上午8:58:08</li>
+ * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年4月19日 上午8:58:08</li>
  * 
  * @version 0.0.1
  */
@@ -67,5 +63,5 @@ public abstract class Searcher {
 		this.query = query;
 	}
 
-	public abstract boolean handle(String host, String file, String line, long matchCount, DataMeta meta);
+	public abstract boolean handle(String host, String file, String line, long matchCount, long allLines);
 }

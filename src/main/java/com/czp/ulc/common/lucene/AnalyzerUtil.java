@@ -28,13 +28,11 @@ public class AnalyzerUtil {
 	 */
 	public static void displayToken(String str, Analyzer analyzer) {
 		try {
-			// 将一个字符串创建成Token流
 			TokenStream stream = analyzer.tokenStream("log", new StringReader(str));
-			// 保存相应词汇
 			CharTermAttribute cta = stream.addAttribute(CharTermAttribute.class);
 			stream.reset();
 			while (stream.incrementToken()) {
-				System.out.print(cta+"->");
+				System.out.print("["+cta+"]");
 			}
 			System.out.println();
 		} catch (IOException e) {

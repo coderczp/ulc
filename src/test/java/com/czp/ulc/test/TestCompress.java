@@ -8,7 +8,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
-import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -40,28 +39,16 @@ public class TestCompress {
 		lines.close();
 		gzos.close();
 	}
+
 	
 	@Test
-	public void testRead() throws FileNotFoundException, IOException{
+	public void testRead() throws FileNotFoundException, IOException {
 		GZIPInputStream gz = new GZIPInputStream(new FileInputStream("./test.gz"));
-		gz.skip(215960);
+		gz.skip(141845765);
 		BufferedReader br = new BufferedReader(new InputStreamReader(gz));
 		System.out.println(br.readLine());
 		br.close();
 		gz.close();
 	}
-//	256--->215960
-//	257--->216142
-//	258--->216355
-//	259--->216627
-//	260--->216854
-//	261--->217020
-//	262--->217216
-//	263--->217426
-//	264--->217641
-//	265--->217880
-//	266--->218124
-//	267--->218300
-//	268--->218488
-//	269--->218672
+
 }

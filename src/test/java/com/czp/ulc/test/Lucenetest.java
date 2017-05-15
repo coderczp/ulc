@@ -8,7 +8,26 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.LongPoint;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.TieredMergePolicy;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.surround.parser.QueryParser;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.FSDirectory;
 
+import com.czp.ulc.collect.handler.DocField;
+import com.czp.ulc.collect.handler.NumSupportQueryParser;
 import com.czp.ulc.common.lucene.AnalyzerUtil;
 import com.czp.ulc.common.lucene.MyAnalyzer;
 
@@ -22,26 +41,56 @@ import com.czp.ulc.common.lucene.MyAnalyzer;
 
 public class Lucenetest {
 
-	public static void main(String[] args) throws IOException {
-		 String path = "./log/data/20170510/0.log";
-		 BufferedReader br = new BufferedReader(new FileReader(new
-		 File(path)));
-		 String temp = "";
-		 int line = 50;
-		 while (line-- > 0 && (temp = br.readLine()) != null) {
-		 Analyzer analyzer = new MyAnalyzer();
-		 AnalyzerUtil.displayToken(temp, analyzer);
-		 analyzer.close();
-		 }
-		 br.close();
-		// Analyzer analyzer2 = new StopAnalyzer(Version.LUCENE_40);
-		// Analyzer analyzer3 = new SimpleAnalyzer(Version.LUCENE_40);
-		// Analyzer analyzer4 = new WhitespaceAnalyzer(Version.LUCENE_40);
+	public static void main(String[] args) throws IOException, ParseException {
 
-//		Pattern p = Pattern.compile("([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*([a-zA-Z_$][a-zA-Z\\d_$]*)");
-//		Matcher matcher = p.matcher("com.czp.ulc.collect.RemoteLogCollector.java:48");
-//		while (matcher.find()) {
-//			System.out.println(matcher.group(matcher.groupCount()));
-//		}
+		Analyzer analyzer = new MyAnalyzer();
+		File file = new File("./index-1-unsave");
+		file.mkdirs();
+		FSDirectory open = FSDirectory.open(file.toPath());
+
+		// TieredMergePolicy mergePolicy = new TieredMergePolicy();
+		// IndexWriterConfig conf = new IndexWriterConfig(analyzer);
+		// conf.setOpenMode(OpenMode.CREATE_OR_APPEND);
+		// conf.setMergePolicy(mergePolicy);
+		// conf.setUseCompoundFile(true);
+		//
+		// IndexWriter indexWriter = new IndexWriter(open, conf);
+		//
+		// String temp = "";
+		// String path = "./3.log";
+		// long st = System.currentTimeMillis();
+		// BufferedReader br = new BufferedReader(new FileReader(new
+		// File(path)));
+		// while ((temp = br.readLine()) != null) {
+		// Document doc = new Document();
+		// doc.add(new TextField(DocField.LINE, temp, Field.Store.NO));
+		// indexWriter.addDocument(doc);
+		// }
+		// br.close();
+		// indexWriter.commit();
+		// indexWriter.close();
+		// System.out.println("---index---->" + (System.currentTimeMillis() -
+		// st) / 1000.0);
+		// IndexSearcher ramSearcher = new
+		// IndexSearcher(DirectoryReader.open(open));
+		// NumSupportQueryParser parser = new
+		// NumSupportQueryParser(DocField.ALL_FEILD, analyzer);
+		// TopDocs search =
+		// ramSearcher.search(parser.parse("l:jsonexception\\:"), 10);
+		// ScoreDoc[] scoreDocs = search.scoreDocs;
+		// for (ScoreDoc scoreDoc : scoreDocs) {
+		// Document doc = ramSearcher.doc(scoreDoc.doc);
+		// System.out.println(doc);
+		// }
+		// ramSearcher.getIndexReader().close();
+
+		String temp = "";
+		String path = "./3.log";
+		BufferedReader br = new BufferedReader(new FileReader(new File(path)));
+		while ( (temp = br.readLine()) != null) {
+			AnalyzerUtil.displayToken(temp, new MyAnalyzer());
+		}
+		br.close();
+
 	}
 }

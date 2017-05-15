@@ -362,7 +362,8 @@ public class MetaReadWriter implements AutoCloseable {
 	}
 
 	protected GZIPOutputStream getOutputStream(File zipFile) throws IOException {
-		return new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(zipFile)));
+		BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(zipFile));
+		return new GZIPOutputStream(out);
 	}
 
 	protected File getCompressFile(File zipDir) {

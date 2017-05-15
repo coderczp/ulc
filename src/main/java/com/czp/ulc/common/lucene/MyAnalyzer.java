@@ -3,17 +3,13 @@ package com.czp.ulc.common.lucene;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Arrays;
-import java.util.List;
 
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
-import org.apache.lucene.analysis.LowerCaseFilter;
-import org.apache.lucene.analysis.StopFilter;
-import org.apache.lucene.analysis.StopwordAnalyzerBase;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.WordlistLoader;
-import org.apache.lucene.analysis.standard.StandardFilter;
-import org.apache.lucene.analysis.standard.StandardTokenizer;
+import org.apache.lucene.analysis.core.StopFilter;
+import org.apache.lucene.util.IOUtils;
 
 /**
  * 请添加描述
@@ -23,92 +19,35 @@ import org.apache.lucene.analysis.standard.StandardTokenizer;
  * @version 0.0.1
  */
 
-public class MyAnalyzer extends StopwordAnalyzerBase {
+public class MyAnalyzer extends Analyzer {
 
-	/**
-	 * An unmodifiable set containing some common English words that are not
-	 * usually useful for searching.
-	 */
-	public static final CharArraySet ENGLISH_STOP_WORDS_SET;
+	private CharArraySet stopWords;
 
-	static {
-		final List<String> stopWords = Arrays.asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
-				"if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then",
-				"there", "these", "they", "this", "to", "was", "will", "with", "null", "class", "[", "]");
-		final CharArraySet stopSet = new CharArraySet(stopWords, false);
-		ENGLISH_STOP_WORDS_SET = CharArraySet.unmodifiableSet(stopSet);
-	}
-
-	/** Default maximum allowed token length */
-	public static final int DEFAULT_MAX_TOKEN_LENGTH = 255;
-
-	private int maxTokenLength = DEFAULT_MAX_TOKEN_LENGTH;
-
-	/**
-	 * An unmodifiable set containing some common English words that are usually
-	 * not useful for searching.
-	 */
-	public static final CharArraySet STOP_WORDS_SET = ENGLISH_STOP_WORDS_SET;
-
-	/**
-	 * Builds an analyzer with the given stop words.
-	 * 
-	 * @param stopWords
-	 *            stop words
-	 */
 	public MyAnalyzer(CharArraySet stopWords) {
-		super(stopWords);
+		this.stopWords = stopWords;
 	}
 
-	/**
-	 * Builds an analyzer with the default stop words ({@link #STOP_WORDS_SET}).
-	 */
-	public MyAnalyzer() {
-		this(STOP_WORDS_SET);
-	}
-
-	/**
-	 * Builds an analyzer with the stop words from the given reader.
-	 * 
-	 * @see WordlistLoader#getWordSet(Reader)
-	 * @param stopwords
-	 *            Reader to read stop words from
-	 */
 	public MyAnalyzer(Reader stopwords) throws IOException {
-		this(loadStopwordSet(stopwords));
+		try {
+			stopWords = WordlistLoader.getWordSet(stopwords);
+		} finally {
+			IOUtils.close(stopwords);
+		}
 	}
 
-	/**
-	 * Set maximum allowed token length. If a token is seen that exceeds this
-	 * length then it is discarded. This setting only takes effect the next time
-	 * tokenStream or tokenStream is called.
-	 */
-	public void setMaxTokenLength(int length) {
-		maxTokenLength = length;
-	}
-
-	/**
-	 * Returns the current maximum token length
-	 * 
-	 * @see #setMaxTokenLength
-	 */
-	public int getMaxTokenLength() {
-		return maxTokenLength;
+	public MyAnalyzer() {
+		stopWords = new CharArraySet(Arrays.asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if",
+				"in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then",
+				"there", "these", "they", "this", "to", "was", "will", "with", "null", "--", "args", "api", "info",
+				"warn", "error", "debug", ".", "method", "ms.", "rpc", "info:", "ms", "spendtime", "http:", "spend",
+				"clientip", "clientport","error:", ":", "dubbo", "client", "invoke", "serverip","serverport"), false);
 	}
 
 	@Override
 	protected TokenStreamComponents createComponents(final String fieldName) {
-		Tokenizer src = new StandardTokenizer();
-		TokenStream tok = new StopFilter(src, stopwords);
-		tok = new LogTokenFilter(tok);
-		tok = new LowerCaseFilter(tok);
-		return new TokenStreamComponents(src, tok);
+		LowerWhitespaceTokenizer source = new LowerWhitespaceTokenizer();
+		TokenStream tok = new StopFilter(source, stopWords);
+		return new TokenStreamComponents(source, new LogTokenFilter(tok));
 	}
 
-	@Override
-	protected TokenStream normalize(String fieldName, TokenStream in) {
-		TokenStream result = new StandardFilter(in);
-		result = new LowerCaseFilter(result);
-		return result;
-	}
 }

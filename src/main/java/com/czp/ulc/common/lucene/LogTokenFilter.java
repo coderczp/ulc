@@ -38,7 +38,8 @@ public class LogTokenFilter extends TokenFilter {
 		if (!Character.isLetterOrDigit(buffer[0])) {
 			start++;
 		}
-		if (!Character.isLetterOrDigit(buffer[end - 1])) {
+		char lastChar = buffer[end - 1];
+		if (!Character.isLetterOrDigit(lastChar)&&lastChar!='>') {
 			end--;
 		}
 

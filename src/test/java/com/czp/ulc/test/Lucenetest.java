@@ -84,13 +84,14 @@ public class Lucenetest {
 		// }
 		// ramSearcher.getIndexReader().close();
 
-		String temp = "";
-		String path = "./3.log";
-		BufferedReader br = new BufferedReader(new FileReader(new File(path)));
-		while ( (temp = br.readLine()) != null) {
-			AnalyzerUtil.displayToken(temp, new MyAnalyzer());
-		}
-		br.close();
+		AnalyzerUtil.displayToken("/data/work/itrip_openapi_admin/tomcat7/logs/db.log", new MyAnalyzer());
+//		String temp = "";
+//		String path = "./2.log";
+//		BufferedReader br = new BufferedReader(new FileReader(new File(path)));
+//		while ( (temp = br.readLine()) != null) {
+//			AnalyzerUtil.displayToken(temp, new MyAnalyzer());
+//		}
+//		br.close();
 
 	}
 }

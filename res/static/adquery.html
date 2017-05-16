@@ -35,7 +35,7 @@
 
 code {
 	color: white;
-	background-color:#993366;
+	background-color: #993366;
 }
 </style>
 </head>
@@ -46,8 +46,10 @@ code {
 		</div>
 		<div>
 			<ul class="nav navbar-nav">
-				<li class="active"><a  href="./hosts.html">进程管理</a></li>
+				<li class="active"><a href="./hosts.html">进程管理</a></li>
 				<li><a href="./index.html">日志搜索</a></li>
+				<li><a href="./info.html">Info</a></li>
+				<li><a href="./pv.html">PV</a></li>
 			</ul>
 		</div>
 	</nav>
@@ -83,12 +85,36 @@ code {
 						</div>
 					</div>
 					<div class="form-group">
-						<input type="text" id="proc" placeholder="进程:service_booking"
-							class="form-control">
+						<select id="proc" class="form-control">
+							<option value="all">all</option>
+							<option value="service_order">service_order</option>
+							<option value="service_product">service_product</option>
+							<option value="service_booking">service_booking</option>
+							<option value="service_b2b">service_b2b</option>
+							<option value="service_pms">service_pms</option>
+							<option value="itrip_shop">itrip_shop</option>
+							<option value="itrip_main">itrip_main</option>
+							<option value="itrip_pay">itrip_pay</option>
+							<option value="itrip_mobile">itrip_mobile</option>
+							<option value="itrip_wap">itrip_wap</option>
+							<option value="itrip_rp">itrip_rp</option>
+							<option value="itrip_openapi">itrip_openapi</option>
+							<option value="itrip_b2b_v2_b2b">itrip_b2b_v2_b2b</option>
+							<option value="itrip_openapi_b2b">itrip_openapi_b2b</option>
+						</select>
 					</div>
 					<div class="form-group">
-						<input type="text" id="file" placeholder="文件:run.log"
-							class="form-control">
+						<select id="file" class="form-control">
+							<option value="all">all</option>
+							<option value="run.log">run.log</option>
+							<option value="db.log">db.log</option>
+							<option value="dao.log">dao.log</option>
+							<option value="error.log">error.log</option>
+							<option value="request.log">request.log</option>
+							<option value="booking.log">booking.log</option>
+							<option value="dubborpc.log">dubborpc.log</option>
+							<option value="dubboclient.log">dubboclient.log</option>
+						</select>
 					</div>
 					<div class="form-group">
 						<div class="input-group">
@@ -152,6 +178,10 @@ code {
 				'start' : Date.parse($('#start').data('date')),
 
 			};
+
+			json.proc = json.proc == 'all' ? null : json.proc;
+			json.file = json.file == 'all' ? null : json.file;
+
 			if (!json.q) {
 				$('#q').val('eneter keyword');
 				return;

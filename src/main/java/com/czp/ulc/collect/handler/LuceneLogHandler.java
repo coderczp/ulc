@@ -204,14 +204,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 	}
 
 	private int searchInRam(Searcher search, AtomicInteger hasReturn, boolean loadMeta) throws IOException {
-		
-		BooleanQuery.Builder builder = new BooleanQuery.Builder();
-		for (String host : search.getHosts()) {
-			builder.add(new TermQuery(new Term(DocField.HOST, host)), Occur.MUST);
-		}
-		builder.add(search.getQuery(), Occur.MUST);
-		BooleanQuery bQuery = builder.build();
-
+		BooleanQuery bQuery = buildRamQuery(search);
 		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
 		TopDocs docs = ramSearcher.search(bQuery, search.getSize() - hasReturn.get());
 		hasReturn.set(docs.totalHits);
@@ -224,6 +217,17 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		}
 		LOG.info("query:{} return:{} in ram", bQuery, hasReturn.get());
 		return ramSearcher.getIndexReader().numDocs();
+	}
+
+	private BooleanQuery buildRamQuery(Searcher search) {
+		BooleanQuery.Builder builder = new BooleanQuery.Builder();
+		for (String host : search.getHosts()) {
+			builder.add(new TermQuery(new Term(DocField.HOST, host)), Occur.MUST);
+		}
+		builder.add(LongPoint.newRangeQuery(DocField.TIME, search.getBegin(), search.getEnd()), Occur.MUST);
+		builder.add(search.getQuery(), Occur.MUST);
+		BooleanQuery bQuery = builder.build();
+		return bQuery;
 	}
 
 	/**
@@ -315,8 +319,42 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		return new IndexWriter(new RAMDirectory(), conf);
 	}
 
-	public JSONObject count(String file, Set<String> hostSet, long timeEnd, long timeStart) {
-		return new JSONObject();
+	public JSONObject count(Searcher search) throws IOException {
+
+		long st = System.currentTimeMillis();
+		long allCount = 0;
+		JSONObject json = new JSONObject();
+		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
+		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
+			int eachCount = 0;
+			for (File indexDir : item.getValue()) {
+				IndexSearcher searcher = getCachedSearch(indexDir);
+				eachCount += searcher.count(search.getQuery());
+			}
+			allCount += eachCount;
+			json.put(item.getKey(), eachCount);
+		}
+		
+		LOG.info("count in file time:{}", (System.currentTimeMillis() - st));
+		st = System.currentTimeMillis();
+		
+		BooleanQuery bQuery = buildRamQuery(search);
+		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
+		TopDocs count = ramSearcher.search(bQuery, Integer.MAX_VALUE);
+		ScoreDoc[] dosc = count.scoreDocs;
+		for (ScoreDoc doc : dosc) {
+			String host = ramSearcher.doc(doc.doc).get(DocField.HOST);
+			Long pv = json.getLong(host);
+			if (pv == null) {
+				json.put(host, 1);
+			} else {
+				json.put(host, pv + 1);
+			}
+			allCount++;
+		}
+		json.put("all", allCount);
+		LOG.info("count in ram time:{}", (System.currentTimeMillis() - st));
+		return json;
 	}
 
 	public DataMeta getMeta() {

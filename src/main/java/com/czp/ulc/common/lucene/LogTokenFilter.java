@@ -38,12 +38,13 @@ public class LogTokenFilter extends TokenFilter {
 		if (!Character.isLetterOrDigit(buffer[0])) {
 			start++;
 		}
-		if (!Character.isLetterOrDigit(buffer[end - 1])) {
+		char lastChar = buffer[end - 1];
+		if (!Character.isLetterOrDigit(lastChar)&&lastChar!='>') {
 			end--;
 		}
 
 		// 检测是否是字符串并且包含.java:xx
-		int javaIndex = skipEndOf(buffer, start, end, java);
+		int javaIndex = endOf(buffer, start, end, java);
 		if (javaIndex != -1) {
 			end = javaIndex;
 		}
@@ -76,7 +77,7 @@ public class LogTokenFilter extends TokenFilter {
 		return k;
 	}
 
-	private int skipEndOf(char[] buffer, int start, int end, char[] target) {
+	private int endOf(char[] buffer, int start, int end, char[] target) {
 		int length = target.length;
 		for (int i = end; i >= start; i--) {
 			if (buffer[i] == ':') {

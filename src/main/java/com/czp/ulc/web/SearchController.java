@@ -47,12 +47,31 @@ public class SearchController {
 	private static final Logger LOG = LoggerFactory.getLogger(SearchController.class);
 
 	@RequestMapping("/count")
-	public JSONObject search(@RequestParam String file, String host, Long start, Long end) throws Exception {
+	public JSONObject search(@RequestParam String file, String host, String proc, Long start, Long end)
+			throws Exception {
 		long now = System.currentTimeMillis();
-		Set<String> hostSet = buildHost(host);
+		Set<String> hosts = buildHost(host);
 		long timeEnd = (end == null) ? now : end;
 		long timeStart = (start == null) ? now - MILLS : start;
-		return luceneSearch.count(file, hostSet, timeEnd, timeStart);
+		String q = String.format("%s:%s", DocField.FILE, file);
+		if (Utils.notEmpty(proc)) {
+			q = String.format("%s AND %s:%s", q, DocField.FILE, proc);
+		}
+
+		String[] fields = new String[] { DocField.FILE };
+		NumSupportQueryParser parser = new NumSupportQueryParser(fields, luceneSearch.getAnalyzer());
+		parser.addSpecFied(DocField.TIME, LongPoint.class);
+		Searcher search = new Searcher();
+		search.setQuery(parser.parse(q));
+		search.setBegin(timeStart);
+		search.setHosts(hosts);
+		search.setEnd(timeEnd);
+		JSONObject count = luceneSearch.count(search);
+		JSONObject res = new JSONObject();
+		
+		res.put("data", count);
+		res.put("time", (System.currentTimeMillis() - now) / 1000);
+		return count;
 	}
 
 	@RequestMapping("/meta")
@@ -98,7 +117,7 @@ public class SearchController {
 			public boolean handle(String host, String file, String line, long matchs, long allLines) {
 				allLine.set(allLines);
 				matchCount.set(matchs);
-				
+
 				JSONObject files = data.getJSONObject(host);
 				if (files == null) {
 					files = new JSONObject();

@@ -1,119 +1,153 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
-<meta charset="UTF-8">
-<title>ULC</title>
-<script src="//cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+<meta charset="utf-8">
+<meta name="viewport"
+	content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link href="./favicon.ico" type="image/x-icon" rel=icon>
+<link
+	href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css"
+	rel="stylesheet">
+<link
+	href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
+	rel="stylesheet">
+<link
+	href="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/css/bootstrap-datetimepicker-standalone.min.css"
+	rel="stylesheet">
+<link href="css/ulc.css" rel="stylesheet">
+<script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+<script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="http://cdn.bootcss.com/moment.js/2.18.1/moment.min.js"></script>
+<script
+	src="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/js/bootstrap-datetimepicker.min.js"></script>
 <style type="text/css">
-body {
-	
-}
-
-textarea {
-	width: 90%;
-	height: 100px;
-	overflow-y: visible;
-}
-
-#result {
-	TEXT-ALIGN: left;
-	margin-left: 50px;
-	width: 80%;
-}
-
-.search {
-	margin-left: 50px;
-}
-
-.file {
-	margin-left: 40px;
-}
-
-.lines {
-	margin-left: 40px;
-	border: 1px solid blue;
-	text-overflow: ellipsis;
-	overflow: hidden;
-	width: 90%;
-	max-width: 1024px;
-	color: white;
-	background: black;
-	word-spacing: 1px;
-	line-height: 15px;
-	word-spacing: 1px;
-}
-
-.line {
-	width: 600px;
-}
-
-.keyword {
-	color: red;
-	font: bold;
-}
 </style>
 </head>
 <body>
-	<div class="search">
-		<input type="text" id="key" placeholder="file" value="request.log"
-			size="10"> Start<input type="text" id="dTime" size="12" />
-		End<input type="text" id="dTimeEnd" size="12" /> host<select
-			id="host"></select>
-		<button id="search">Search</button>
+	<nav class="navbar navbar-default" role="navigation">
+		<div class="navbar-header">
+			<a class="navbar-brand" href="./index.html">ULC</a>
+		</div>
+		<div>
+			<ul class="nav navbar-nav">
+				<li class="active"><a href="./hosts.html">进程管理</a></li>
+				<li><a href="./index.html">日志搜索</a></li>
+				<li><a href="./pv.html">PV</a></li>
+			</ul>
+		</div>
+	</nav>
+	<div class="container-fluid">
+		<div class="panel panel-success">
+			<div class="panel-heading">
+				<div class="form-inline" role="form">
+					<div class="form-group">
+						<select id="host" class="form-control"></select>
+					</div>
+					<div class="form-group">
+						<div class='input-group date' id='start'>
+							<input type='text' class="form-control" /> <span
+								class="input-group-addon"> <span
+								class="glyphicon glyphicon-calendar"></span>
+							</span>
+						</div>
+					</div>
+					<div class="form-group">
+						<div class='input-group date' id='end'>
+							<input type='text' class="form-control" /> <span
+								class="input-group-addon"> <span
+								class="glyphicon glyphicon-calendar"></span>
+							</span>
+						</div>
+					</div>
+					<div class="form-group">
+						<select id="proc" class="form-control">
+							<option value="service_order">service_order</option>
+							<option value="service_product">service_product</option>
+							<option value="service_booking">service_booking</option>
+							<option value="service_b2b">service_b2b</option>
+							<option value="service_pms">service_pms</option>
+							<option value="itrip_shop">itrip_shop</option>
+							<option value="itrip_main">itrip_main</option>
+							<option value="itrip_pay">itrip_pay</option>
+							<option value="itrip_mobile">itrip_mobile</option>
+							<option value="itrip_wap">itrip_wap</option>
+							<option value="itrip_rp">itrip_rp</option>
+							<option value="itrip_openapi">itrip_openapi</option>
+							<option value="itrip_b2b_v2_b2b">itrip_b2b_v2_b2b</option>
+							<option value="itrip_openapi_b2b">itrip_openapi_b2b</option>
+						</select>
+					</div>
+					<div class="form-group">
+						<select id="file" class="form-control">
+							<option value="run.log">run.log</option>
+							<option value="db.log">db.log</option>
+							<option value="dao.log">dao.log</option>
+							<option value="error.log">error.log</option>
+							<option value="request.log">request.log</option>
+							<option value="booking.log">booking.log</option>
+							<option value="dubborpc.log">dubborpc.log</option>
+							<option value="dubboclient.log">dubboclient.log</option>
+						</select>
+					</div>
+					<div class="form-group">
+						<button class="btn btn-success btn-small" type="button"
+							onclick="doQuery()">Go!</button>
+					</div>
+				</div>
+			</div>
+			<div class="panel-body">
+				<span id="time"></span>
+				<div id="result"></div>
+			</div>
+		</div>
 	</div>
-	<div id="result"></div>
-</body>
-<script type="text/javascript">
-        Date.prototype.Format = function (fmt) { //author: meizz 
-        var o = {
-        "M+": this.getMonth() + 1, //月份 
-        "d+": this.getDate(), //日 
-        "H+": this.getHours(), //小时 
-        "m+": this.getMinutes(), //分 
-        "s+": this.getSeconds(), //秒 
-        "q+": Math.floor((this.getMonth() + 3) / 3), //季度 
-        "S": this.getMilliseconds() //毫秒 
-      };
-       if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
-       for (var k in o)
-           if (new RegExp("(" + k + ")").test(fmt)) fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
-       return fmt;
-    }   
+	<script type="text/javascript">
+		var date = new Date();
+		var startTime = new Date();
+		var fmt = "YYYY/MM/DD HH:mm";
+		startTime.setHours(date.getHours() - 5);
 
-	$(function() {
+		$('#start').datetimepicker({
+			format : fmt,
+			locale : moment.locale('zh-cn')
+		}).data('DateTimePicker').date(moment(startTime).format(fmt));
+
+		$('#end').datetimepicker({
+			format : fmt,
+			locale : moment.locale('zh-cn')
+		}).data('DateTimePicker').date(moment(date).format(fmt));
+
 		$.get('./host/list', function(d) {
-			var html = '<option value="">-all--</option>';
+			var html = '<option value="">主机(All)</option>';
 			for ( var i in d) {
 				var host = d[i];
-				html += '<option value='+host.name+'>' + host.name + '</option>';
+				html += '<option value='+host.name+'>' + host.name
+						+ '</option>';
 			}
 			$('#host').html(html);
 		});
-               $('#dTime').val(new Date().Format('yyyy-MM-dd 00:00:00'));
-               $('#dTimeEnd').val(new Date().Format('yyyy-MM-dd HH:mm:ss'))
-	});
 
-	$('#search').click(
-			function() {
-				var q = $('#key').val();
-				var h = $('#host').val();
-                                var st = new Date($('#dTime').val()).getTime();
-                                var et = new Date($('#dTimeEnd').val()).getTime(); 
-				if (!q) {
-					$('#key').val('eneter file');
-					return;
+		function doQuery() {
+			var q = $('#file').val();
+			var h = $('#host').val();
+			var p = $('#proc').val();
+			var et = Date.parse($('#end').data('date'));
+			var st = Date.parse($('#start').data('date'));
+			if (!q) {
+				$('#file').val('eneter file');
+				return;
+			}
+			$('#result').html('searching');
+			$.get('./count?file=' + q + '&host=' + h + '&start=' + st + '&end='
+					+ et + '&proc=' + p, function(resp) {
+				var html = "";
+				for ( var host in resp) {
+					html += '<br><span>' + host + "</span>:" + resp[host];
 				}
-				$('#result').html('searching');
-				$.get('./count?file=' + q + '&host=' + h+'&start='+st+'&end='+et, function(
-						resp) {
-					var hosts = resp.host;
-					var html = "total:"+resp.total+"<hr/>";
-					for(var host in hosts){
-					    html +='<br>'+host+":"+hosts[host];
-					}
-					$('#result').html(html);
-				});
+				$('#result').html(html);
 			});
-
-</script>
+		}
+	</script>
+</body>
 </html>
+

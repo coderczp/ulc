@@ -11,7 +11,7 @@ import org.apache.lucene.search.Query;
  * @version 0.0.1
  */
 
-public abstract class Searcher {
+public class Searcher {
 
 	private int size;
 
@@ -63,5 +63,7 @@ public abstract class Searcher {
 		this.query = query;
 	}
 
-	public abstract boolean handle(String host, String file, String line, long matchCount, long allLines);
+	public boolean handle(String host, String file, String line, long matchCount, long allLines) {
+		return false;
+	}
 }

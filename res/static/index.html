@@ -35,17 +35,32 @@
 </style>
 </head>
 <body>
-	<nav class="navbar navbar-default" role="navigation">
-		<div>
-			<ul class="nav navbar-nav">
-				<li class="active"><a href="./adquery.html">高级搜索</a></li>
-				<li><a href="./hosts.html">进程管理</a></li>
-				<li><a href="./info.html">Info</a></li>
-				<li><a href="./pv.html">PV</a></li>
-			</ul>
+	<!--导航-->
+	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
+		<div class="container">
+			<div class="navbar-header nav-title ">
+				<button type="button" class="navbar-toggle" data-toggle="collapse"
+					data-target=".navbar-collapse">
+					<span class="sr-only">Toggle navigation</span> <span
+						class="icon-bar"></span> <span class="icon-bar"></span> <span
+						class="icon-bar"></span>
+				</button>
+				<a class="navbar-brand " href="index.html">ULC</a>
+			</div>
+			<div class="collapse navbar-collapse navbar-right is-collapse">
+				<ul class="nav navbar-nav">
+					<li class="active"><a href="./hosts.html">进程管理</a></li>
+					<li><a href="./index.html">日志搜索</a></li>
+					<li><a href="./info.html">Info</a></li>
+					<li><a href="./pv.html">PV</a></li>
+				</ul>
+			</div>
+			<!-- /.nav-collapse -->
 		</div>
-	</nav>
-	<div class="container">
+		<!-- /.container -->
+	</div>
+	<!--导航-->
+	<div class="container" style="margin-top: 50px">
 		<div class="row">
 			<div class="gallery col-lg-12 col-md-12 col-sm-12 col-xs-12">
 				<h1 class="gallery-title">Fuck Bug</h1>
@@ -67,9 +82,9 @@
 		</div>
 	</div>
 	<script type="text/javascript">
-	   function gotoSearch(){
-	    location.href="./adquery.html";
-	   }
+		function gotoSearch() {
+			location.href = "./adquery.html";
+		}
 	</script>
 </body>
 </html>

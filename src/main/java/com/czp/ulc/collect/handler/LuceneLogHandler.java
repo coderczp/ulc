@@ -321,6 +321,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 
 	public JSONObject count(Searcher search) throws IOException {
 
+		long st = System.currentTimeMillis();
 		long allCount = 0;
 		JSONObject json = new JSONObject();
 		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
@@ -333,7 +334,10 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			allCount += eachCount;
 			json.put(item.getKey(), eachCount);
 		}
-
+		
+		LOG.info("count in file time:{}", (System.currentTimeMillis() - st));
+		st = System.currentTimeMillis();
+		
 		BooleanQuery bQuery = buildRamQuery(search);
 		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
 		TopDocs count = ramSearcher.search(bQuery, Integer.MAX_VALUE);
@@ -349,6 +353,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			allCount++;
 		}
 		json.put("all", allCount);
+		LOG.info("count in ram time:{}", (System.currentTimeMillis() - st));
 		return json;
 	}
 

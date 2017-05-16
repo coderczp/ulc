@@ -40,7 +40,7 @@ code {
 </style>
 </head>
 <body>
-<!--导航-->
+	<!--导航-->
 	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
 		<div class="container">
 			<div class="navbar-header nav-title ">
@@ -156,7 +156,13 @@ code {
 		var date = new Date();
 		var startTime = new Date();
 		var fmt = "YYYY/MM/DD HH:mm";
-		startTime.setHours(date.getHours() - 5);
+		startTime.setHours(date.getHours() - 2);
+
+		var str = location.href;
+		var num = str.indexOf("?")
+		if (num > -1) {
+			$('#q').val(str.substr(num + 1));
+		}
 
 		$('#start').datetimepicker({
 			format : fmt,
@@ -185,8 +191,8 @@ code {
 				'host' : $('#host').val(),
 				'proc' : $('#proc').val(),
 				'file' : $('#file').val(),
-				'end' : Date.parse($('#end').data('date')),
 				'loadLine' : $('#loadLine').is(':checked'),
+				'end' : Date.parse($('#end').data('date')),
 				'start' : Date.parse($('#start').data('date')),
 
 			};
@@ -230,9 +236,14 @@ code {
 		}
 
 		function hightlight(src, kw) {
-			var k1 = kw.split(" ")[0];
+			var k1 = kw.split(" ");
 			var x = new RegExp(k1, "g");
 			return src.replace(x, "<span class='keyword'>" + k1 + "</span>");
+		}
+
+		var q = $('#q').val();
+		if (q) {
+			doQuery();
 		}
 	</script>
 </body>

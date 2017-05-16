@@ -15,6 +15,7 @@
 	href="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/css/bootstrap-datetimepicker-standalone.min.css"
 	rel="stylesheet">
 <link href="css/ulc.css" rel="stylesheet">
+<script src="https://cdn.bootcss.com/Chart.js/2.5.0/Chart.min.js"></script>
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="http://cdn.bootcss.com/moment.js/2.18.1/moment.min.js"></script>
@@ -24,19 +25,32 @@
 </style>
 </head>
 <body>
-	<nav class="navbar navbar-default" role="navigation">
-		<div class="navbar-header">
-			<a class="navbar-brand" href="./index.html">ULC</a>
+	<!--导航-->
+	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
+		<div class="container">
+			<div class="navbar-header nav-title ">
+				<button type="button" class="navbar-toggle" data-toggle="collapse"
+					data-target=".navbar-collapse">
+					<span class="sr-only">Toggle navigation</span> <span
+						class="icon-bar"></span> <span class="icon-bar"></span> <span
+						class="icon-bar"></span>
+				</button>
+				<a class="navbar-brand " href="index.html">ULC</a>
+			</div>
+			<div class="collapse navbar-collapse navbar-right is-collapse">
+				<ul class="nav navbar-nav">
+					<li class="active"><a href="./hosts.html">进程管理</a></li>
+					<li><a href="./index.html">日志搜索</a></li>
+					<li><a href="./info.html">Info</a></li>
+					<li><a href="./pv.html">PV</a></li>
+				</ul>
+			</div>
+			<!-- /.nav-collapse -->
 		</div>
-		<div>
-			<ul class="nav navbar-nav">
-				<li class="active"><a href="./hosts.html">进程管理</a></li>
-				<li><a href="./index.html">日志搜索</a></li>
-				<li><a href="./pv.html">PV</a></li>
-			</ul>
-		</div>
-	</nav>
-	<div class="container-fluid">
+		<!-- /.container -->
+	</div>
+	<!--导航-->
+	<div class="container-fluid" style="margin-top: 50px">
 		<div class="panel panel-success">
 			<div class="panel-heading">
 				<div class="form-inline" role="form">
@@ -97,7 +111,7 @@
 			</div>
 			<div class="panel-body">
 				<span id="time"></span>
-				<div id="result"></div>
+				<canvas id="result" width="400" height="400"></canvas>
 			</div>
 		</div>
 	</div>
@@ -106,6 +120,9 @@
 		var startTime = new Date();
 		var fmt = "YYYY/MM/DD HH:mm";
 		startTime.setHours(date.getHours() - 5);
+		
+		var options = {scaleFontSize: 13, scaleFontColor: "#ffa45e"};
+		var ctx = new Chart(document.getElementById("result").getContext("2d"));
 
 		$('#start').datetimepicker({
 			format : fmt,
@@ -137,14 +154,32 @@
 				$('#file').val('eneter file');
 				return;
 			}
-			$('#result').html('searching');
+			//$('#result').html('searching');
 			$.get('./count?file=' + q + '&host=' + h + '&start=' + st + '&end='
 					+ et + '&proc=' + p, function(resp) {
-				var html = "";
+				/* var html = "";
 				for ( var host in resp) {
 					html += '<br><span>' + host + "</span>:" + resp[host];
 				}
-				$('#result').html(html);
+				$('#result').html(html); */
+
+				var lbs = [];
+				var val = [];
+				for ( var key in resp) {
+					lbs.push(key);
+					val.push(resp[key]);
+				}
+				var data = {
+					labels : lbs,
+					datasets : [ {
+						fillColor : "rgba(220,220,220,0.5)",
+						strokeColor : "rgba(220,220,220,1)",
+						pointColor : "rgba(220,220,220,1)",
+						pointStrokeColor : "#fff",
+						data : val
+					} ]
+				};
+				ctx.Bar(data,options);
 			});
 		}
 	</script>

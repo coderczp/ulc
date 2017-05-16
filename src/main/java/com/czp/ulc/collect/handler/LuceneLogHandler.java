@@ -344,7 +344,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			if (pv == null) {
 				json.put(host, 1);
 			} else {
-				json.put(host, host + 1);
+				json.put(host, pv + 1);
 			}
 			allCount++;
 		}

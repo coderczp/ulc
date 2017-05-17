@@ -224,10 +224,9 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		for (String host : search.getHosts()) {
 			builder.add(new TermQuery(new Term(DocField.HOST, host)), Occur.MUST);
 		}
-		builder.add(LongPoint.newRangeQuery(DocField.TIME, search.getBegin(), search.getEnd()), Occur.MUST);
 		builder.add(search.getQuery(), Occur.MUST);
-		BooleanQuery bQuery = builder.build();
-		return bQuery;
+		builder.add(LongPoint.newRangeQuery(DocField.TIME, search.getBegin(), search.getEnd()), Occur.MUST);
+		return builder.build();
 	}
 
 	/**
@@ -334,10 +333,10 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			allCount += eachCount;
 			json.put(item.getKey(), eachCount);
 		}
-		
+
 		LOG.info("count in file time:{}", (System.currentTimeMillis() - st));
 		st = System.currentTimeMillis();
-		
+
 		BooleanQuery bQuery = buildRamQuery(search);
 		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
 		TopDocs count = ramSearcher.search(bQuery, Integer.MAX_VALUE);

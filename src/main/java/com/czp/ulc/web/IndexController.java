@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.czp.ulc.collect.ConnectManager;
-import com.czp.ulc.common.ShutdownManager;
+import com.czp.ulc.common.shutdown.ShutdownManager;
 
 /**
  * Function:配置首页

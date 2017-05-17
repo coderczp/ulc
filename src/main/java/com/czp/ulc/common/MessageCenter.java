@@ -20,6 +20,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.czp.ulc.common.shutdown.ShutdownCallback;
+import com.czp.ulc.common.shutdown.ShutdownManager;
 import com.czp.ulc.common.util.Utils;
 
 /**

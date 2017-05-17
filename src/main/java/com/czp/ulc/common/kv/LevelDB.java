@@ -4,9 +4,6 @@ import static org.iq80.leveldb.impl.Iq80DBFactory.factory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,9 +14,7 @@ import org.iq80.leveldb.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.common.ShutdownCallback;
-import com.czp.ulc.common.util.Utils;
+import com.czp.ulc.common.shutdown.ShutdownCallback;
 
 /**
  * Function:KVDB,需要记录每一步的耗时,方便排问题,考虑性能,不采用动态代理

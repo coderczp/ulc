@@ -212,4 +212,9 @@ public class Utils {
 			}
 		};
 	}
+
+	public static int getFileId(File file) {
+		String name = file.getName();
+		return Integer.parseInt(name.substring(0, name.indexOf(".")));
+	}
 }

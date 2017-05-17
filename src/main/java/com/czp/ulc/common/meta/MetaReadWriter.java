@@ -2,11 +2,9 @@ package com.czp.ulc.common.meta;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
@@ -20,7 +18,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -50,7 +47,7 @@ import com.czp.ulc.common.util.Utils;
  * @version 0.0.1
  */
 
-public class MetaReadWriter implements AutoCloseable {
+public class MetaReadWriter implements AutoCloseable, FileChangeListener {
 
 	private File zipDir;
 	private File dataDir;
@@ -58,9 +55,7 @@ public class MetaReadWriter implements AutoCloseable {
 	private LuceneLogHandler handler;
 
 	private volatile DataMeta meta;
-	private volatile File currentFile;
-	private volatile BufferedWriter currentWriter;
-	private AtomicLong hasWritesize = new AtomicLong();
+	private SyncAppendWriter appendWriter;
 	private AtomicBoolean hasCompress = new AtomicBoolean();
 	private ExecutorService worker = Executors.newSingleThreadExecutor();
 
@@ -69,7 +64,6 @@ public class MetaReadWriter implements AutoCloseable {
 	public static final String LINE_SPLITER = getLineSpliter();
 	public static final Charset UTF8 = Charset.forName("UTF-8");
 	public static byte[] SPLITER_BYTES = LINE_SPLITER.getBytes(UTF8);
-	public static final int DEFAUT_EACH_FILE_SIZE = 1024 * 1024 * 250;
 	private static final Logger log = LoggerFactory.getLogger(MetaReadWriter.class);
 
 	public MetaReadWriter(File baseDir, File zipDir, File indexBaseDir, LuceneLogHandler handler) {
@@ -79,7 +73,7 @@ public class MetaReadWriter implements AutoCloseable {
 		this.meta = loadMetaInfo();
 		this.indexBaseDir = indexBaseDir;
 		this.checkHasUnCompressFile(baseDir);
-		this.currentWriter = getCurrentWriter(baseDir);
+		this.appendWriter = new SyncAppendWriter(dataDir, this);
 	}
 
 	private static String getLineSpliter() {
@@ -87,36 +81,13 @@ public class MetaReadWriter implements AutoCloseable {
 	}
 
 	private void checkHasUnCompressFile(File baseDir) {
-		for (File file : baseDir.listFiles(Utils.newFilter(".log"))) {
-			indexUnCompressFileToRAM(file);
-			if (file.length() >= DEFAUT_EACH_FILE_SIZE) {
+		for (File file : appendWriter.getAllFiles()) {
+			if (appendWriter.isHistoryFile(file)) {
 				asynCompress(file);
+			} else {
+				indexUnCompressFileToRAM(file);
 			}
 		}
-	}
-
-	private BufferedWriter getCurrentWriter(File baseDir) {
-		try {
-			int num = 0;
-			for (File file : baseDir.listFiles(Utils.newFilter(".log"))) {
-				num = Math.max(num, getFileId(file));
-				if (file.length() >= DEFAUT_EACH_FILE_SIZE)
-					num++;
-			}
-			File file = new File(baseDir, String.format("%s.log", num));
-			BufferedWriter writer = new BufferedWriter(new FileWriter(file, true));
-			currentFile = file;
-			currentWriter = writer;
-			hasWritesize.set(file.length());
-			return writer;
-		} catch (IOException e) {
-			throw new RuntimeException(e.toString(), e);
-		}
-	}
-
-	public static int getFileId(File file) {
-		String name = file.getName();
-		return Integer.parseInt(name.substring(0, name.indexOf(".")));
 	}
 
 	/****
@@ -129,16 +100,9 @@ public class MetaReadWriter implements AutoCloseable {
 	 * @return
 	 * @throws Exception
 	 */
-	public synchronized boolean write(String host, String file, String line, long now) throws Exception {
-		if (hasWritesize.get() >= DEFAUT_EACH_FILE_SIZE) {
-			Utils.close(currentWriter);
-			asynCompress(currentFile);
-			currentWriter = getCurrentWriter(dataDir);
-		}
+	public boolean write(String host, String file, String line, long now) throws Exception {
 		String string = encodeData(host, file, line, now);
-		hasWritesize.getAndAdd(string.length() + 1);
-		currentWriter.write(string);
-		currentWriter.newLine();
+		appendWriter.append(string.getBytes(UTF8));
 		return true;
 	}
 
@@ -148,9 +112,8 @@ public class MetaReadWriter implements AutoCloseable {
 		sb.append(now).append("#");
 		sb.append(host).append("*");
 		sb.append(file).append("@");
-		sb.append(line);
-		String string = sb.toString();
-		return string;
+		sb.append(line).append(LINE_SPLITER);
+		return sb.toString();
 	}
 
 	private String[] decodeData(String line) {
@@ -215,7 +178,7 @@ public class MetaReadWriter implements AutoCloseable {
 				try (BufferedReader br = Files.newBufferedReader(path)) {
 					String line;
 					File zipFile = getCompressFile(zipDir);
-					int fileId = getFileId(zipFile);
+					int fileId = Utils.getFileId(zipFile);
 					gzos = getOutputStream(zipFile);
 					while ((line = br.readLine()) != null) {
 						String[] decodeData = decodeData(line);
@@ -369,7 +332,7 @@ public class MetaReadWriter implements AutoCloseable {
 	protected File getCompressFile(File zipDir) {
 		int fileId = -1;
 		for (File file : zipDir.listFiles()) {
-			fileId = Math.max(fileId, getFileId(file));
+			fileId = Math.max(fileId, Utils.getFileId(file));
 		}
 		return createGzipFile(fileId + 1, zipDir);
 	}
@@ -409,7 +372,7 @@ public class MetaReadWriter implements AutoCloseable {
 
 	@Override
 	public void close() throws Exception {
-		Utils.close(currentWriter);
+		appendWriter.close();
 		worker.shutdown();
 	}
 
@@ -421,6 +384,11 @@ public class MetaReadWriter implements AutoCloseable {
 	 */
 	public boolean checkHasCompress() {
 		return hasCompress.getAndSet(false);
+	}
+
+	@Override
+	public void onFileChange(File currentFile) {
+		asynCompress(currentFile);
 	}
 
 }

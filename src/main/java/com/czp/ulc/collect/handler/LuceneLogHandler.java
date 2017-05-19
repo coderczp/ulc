@@ -49,8 +49,8 @@ import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.ReadResult;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.lucene.MyAnalyzer;
-import com.czp.ulc.common.meta.DataMeta;
-import com.czp.ulc.common.meta.MetaReadWriter;
+import com.czp.ulc.common.meta.CompressMeta;
+import com.czp.ulc.common.meta.CompressManager;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -63,7 +63,7 @@ import com.czp.ulc.common.util.Utils;
 public class LuceneLogHandler implements MessageListener<ReadResult> {
 
 	private DirectoryReader ramReader;
-	private MetaReadWriter readWriter;
+	private CompressManager readWriter;
 	private volatile IndexWriter ramWriter;
 	private Analyzer analyzer = new MyAnalyzer();
 	private AtomicLong nowLines = new AtomicLong();
@@ -92,7 +92,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			ZIP_DIR.mkdirs();
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
-			readWriter = new MetaReadWriter(DATA_DIR, ZIP_DIR, INDEX_DIR, this);
+			readWriter = new CompressManager(DATA_DIR, ZIP_DIR, INDEX_DIR, this);
 			nowLines.set(readWriter.getMeta().getLines());
 			loadAllIndexDir();
 		} catch (Exception e) {
@@ -356,7 +356,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		return json;
 	}
 
-	public DataMeta getMeta() {
+	public CompressMeta getMeta() {
 		return readWriter.getMeta();
 	}
 }

@@ -7,13 +7,12 @@ import java.nio.file.Files;
 
 import org.junit.Test;
 
-import com.czp.ulc.common.meta.AnsyAppendWriter;
-import com.czp.ulc.common.meta.AppendWriter;
+import com.czp.ulc.common.meta.AnsyWriter;
+import com.czp.ulc.common.meta.RollingWriter;
+import com.czp.ulc.common.meta.SyncWriter;
 
 /**
- * 请添加描述
- * <li>创建人：Jeff.cao</li>
- * <li>创建时间：2017年5月17日 上午10:43:26</li>
+ * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月17日 上午10:43:26</li>
  * 
  * @version 0.0.1
  */
@@ -23,7 +22,7 @@ public class AnsyAppendWriterTest {
 	@Test
 	public void testAysnWrite() throws IOException {
 		long st = System.currentTimeMillis();
-		AnsyAppendWriter writer = new AnsyAppendWriter(new File("log"));
+		AnsyWriter writer = new AnsyWriter(new File("log"), null);
 		BufferedReader lines = Files.newBufferedReader(new File("./3.log").toPath());
 		String line = null;
 		while ((line = lines.readLine()) != null) {
@@ -36,13 +35,13 @@ public class AnsyAppendWriterTest {
 	}
 
 	@Test
-	public void testSyncWrite() throws IOException {
+	public void testSyncWrite() throws Exception {
 		long st = System.currentTimeMillis();
-		AppendWriter writer = new AppendWriter(new File("log"));
+		RollingWriter writer = new SyncWriter(new File("log"), null);
 		BufferedReader lines = Files.newBufferedReader(new File("./3.log").toPath());
 		String line = null;
 		while ((line = lines.readLine()) != null) {
-			writer.append(line);
+			writer.append(line.getBytes());
 		}
 		lines.close();
 		writer.close();

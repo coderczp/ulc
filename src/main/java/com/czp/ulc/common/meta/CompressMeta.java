@@ -1,19 +1,21 @@
 package com.czp.ulc.common.meta;
 
 /**
- * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月13日 下午5:18:51</li>
+ * 请添加描述
+ * <li>创建人：Jeff.cao</li>
+ * <li>创建时间：2017年5月13日 下午5:18:51</li>
  * 
  * @version 0.0.1
  */
 
-public class DataMeta {
+public class CompressMeta {
 
 	private long lines;
 	private long docs;
 	private long bytes;
-	public static final DataMeta EMPTY = new DataMeta();
+	public static final CompressMeta EMPTY = new CompressMeta();
 
-	public DataMeta() {
+	public CompressMeta() {
 	}
 
 	public void setLines(long lines) {

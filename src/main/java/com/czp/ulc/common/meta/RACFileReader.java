@@ -9,10 +9,12 @@
  */
 package com.czp.ulc.common.meta;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 import com.czp.ulc.common.util.Utils;
 
@@ -26,24 +28,24 @@ import com.czp.ulc.common.util.Utils;
 public class RACFileReader {
 
 	private FileInputStream fis;
+	private byte[] infBuffer = new byte[1024];
 
 	public RACFileReader(File racFile) throws IOException {
 		this.fis = new FileInputStream(racFile);
 	}
 
-	public int readBlock(int blockOffet, byte[] buf) throws Exception {
+	public int readBlock(int blockOffet, ByteArrayOutputStream bos) throws Exception {
 		fis.skip(blockOffet);
 		byte[] blockLen = new byte[4];
 		fis.read(blockLen);
-		int len = Utils.bytesToInt(blockLen);
-		byte[] data = new byte[len];
-		fis.read(data);
-		Inflater in = new Inflater();
-		in.setInput(data);
-		in.finished();
-		int inflate = in.inflate(buf);
-		in.end();
-		return inflate;
+		// int len = Utils.bytesToInt(blockLen);
+		InflaterInputStream is = new InflaterInputStream(fis);
+		int count = 0;
+		while ((count = is.read(infBuffer)) != -1) {
+			bos.write(infBuffer, 0, count);
+		}
+		is.close();
+		return 0;
 	}
 
 	public void close() {

@@ -60,7 +60,6 @@ public class RACFileWriter {
 			buf.reset();
 			writeCompressBlockLenPlacholder();
 			dos = new DeflaterOutputStream(buf);
-
 		}
 	}
 
@@ -68,6 +67,7 @@ public class RACFileWriter {
 		int size = buf.size();
 		if (size >= 0) {
 			dos.close();
+			buf.orrvide(0, Utils.intToBytes(size));
 			buf.writeTo(out);
 			out.close();
 		}

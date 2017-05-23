@@ -41,8 +41,7 @@ import com.czp.ulc.collect.handler.LuceneLogHandler;
 import com.czp.ulc.common.util.Utils;
 
 /**
- * 请添加描述
- * <li>创建人：Jeff.cao</li><br>
+ * 请添加描述 <li>创建人：Jeff.cao</li><br>
  * <li>创建时间：2017年5月3日 下午12:40:14</li>
  * 
  * @version 0.0.1
@@ -52,6 +51,7 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 
 	private File zipDir;
 	private File dataDir;
+	private File buffDir;
 	private File indexBaseDir;
 	private LuceneLogHandler handler;
 
@@ -73,8 +73,10 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 		this.dataDir = baseDir;
 		this.meta = loadMetaInfo();
 		this.indexBaseDir = indexBaseDir;
-		this.checkHasUnCompressFile(baseDir);
 		this.writer = new SyncWriter(dataDir, this);
+		this.checkHasUnCompressFile(baseDir);
+		this.buffDir = new File(zipDir.getParentFile(), "cache");
+		this.buffDir.mkdirs();
 	}
 
 	private static String getLineSpliter() {
@@ -338,10 +340,13 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 		return createGzipFile(fileId + 1, zipDir);
 	}
 
-	public String readLine(int fileId, int offset) {
+	public synchronized String readLine(int fileId, int offset) {
 		long st = System.currentTimeMillis();
-		File zipFile = new File(String.format("%s/%s%s", zipDir, fileId, SUFFIX));
-		try (GZIPInputStream is = new GZIPInputStream(new FileInputStream(zipFile))) {
+		File logFile = new File(String.format("%s/%s%s", buffDir, fileId, ".log"));
+		if (!logFile.exists()) {
+			deCompressFile(fileId, logFile);
+		}
+		try (FileInputStream is = new FileInputStream(logFile)) {
 			is.skip(offset);
 			BufferedReader br = new BufferedReader(new InputStreamReader(is, UTF8));
 			String line = br.readLine();
@@ -350,6 +355,21 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 			log.debug("load data time:{} ms", (end - st));
 			return line;
 		} catch (Exception e) {
+			throw new RuntimeException(e.toString(), e);
+		}
+	}
+
+	private void deCompressFile(int fileId, File logFile) {
+		File zipFile = new File(String.format("%s/%s%s", zipDir, fileId, SUFFIX));
+		try (GZIPInputStream is = new GZIPInputStream(new FileInputStream(zipFile))) {
+			try (FileOutputStream fis = new FileOutputStream(logFile)) {
+				byte[] buf = new byte[1024 * 8];
+				int n = -1;
+				while ((n = is.read(buf)) != -1) {
+					fis.write(buf, 0, n);
+				}
+			}
+		} catch (IOException e) {
 			throw new RuntimeException(e.toString(), e);
 		}
 	}

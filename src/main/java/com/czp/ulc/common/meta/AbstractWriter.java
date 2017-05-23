@@ -26,7 +26,7 @@ public abstract class AbstractWriter implements RollingWriter {
 	protected AtomicLong postion = new AtomicLong();
 
 	public static final String SUFFX = ".log";
-	public static final int EACH_FILE_SIZE = 1024 * 1024 * 250;
+	public static final int EACH_FILE_SIZE = 1024 * 1024 * 200;
 	public static final FilenameFilter FILTER = Utils.newFilter(SUFFX);
 	protected static final Logger LOG = LoggerFactory.getLogger(SyncWriter.class);
 

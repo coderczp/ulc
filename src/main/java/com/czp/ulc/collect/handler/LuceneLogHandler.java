@@ -49,8 +49,8 @@ import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.ReadResult;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.lucene.MyAnalyzer;
-import com.czp.ulc.common.meta.CompressMeta;
 import com.czp.ulc.common.meta.CompressManager;
+import com.czp.ulc.common.meta.CompressMeta;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -96,6 +96,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			nowLines.set(readWriter.getMeta().getLines());
 			loadAllIndexDir();
 		} catch (Exception e) {
+			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
 	}
@@ -164,7 +165,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 
 		AtomicInteger hasReturn = new AtomicInteger();
 		long fileDocs = readWriter.getMeta().getDocs();
-		long ramDocs = searchInRam(search, hasReturn, loadMeta);
+		long ramDocs = 0;// searchInRam(search, hasReturn, loadMeta);
 		if (hasReturn.get() >= search.getSize())
 			return fileDocs + ramDocs;
 

@@ -9,14 +9,13 @@
  */
 package com.czp.ulc.common.meta;
 
-import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.zip.Inflater;
+import java.nio.ByteBuffer;
+import java.util.TreeMap;
 import java.util.zip.InflaterInputStream;
-
-import com.czp.ulc.common.util.Utils;
 
 /**
  * Function:RandomAccessCompres读取rac文件
@@ -25,7 +24,7 @@ import com.czp.ulc.common.util.Utils;
  * @Author:jeff.cao@aoliday.com
  * @version:1.0
  */
-public class RACFileReader {
+public class RACFileReader implements AutoCloseable {
 
 	private FileInputStream fis;
 	private byte[] infBuffer = new byte[1024];
@@ -34,21 +33,44 @@ public class RACFileReader {
 		this.fis = new FileInputStream(racFile);
 	}
 
-	public int readBlock(int blockOffet, ByteArrayOutputStream bos) throws Exception {
-		fis.skip(blockOffet);
-		byte[] blockLen = new byte[4];
-		fis.read(blockLen);
-		// int len = Utils.bytesToInt(blockLen);
-		InflaterInputStream is = new InflaterInputStream(fis);
-		int count = 0;
-		while ((count = is.read(infBuffer)) != -1) {
-			bos.write(infBuffer, 0, count);
+	public TreeMap<Integer, byte[]> readLines(int blockOffset, TreeMap<Integer, Integer> lineOffset) throws Exception {
+		MemOutStream out = readBlock(blockOffset);
+		TreeMap<Integer, byte[]> datas = new TreeMap<>();
+		ByteArrayInputStream bis = new ByteArrayInputStream(out.getBuf(), 0, out.size());
+		for (Integer integer : lineOffset.keySet()) {
+			bis.skip(integer);
+			byte[] b = new byte[lineOffset.get(integer)];
+			bis.read(b);
+			datas.put(integer, b);
+			bis.reset();
 		}
-		is.close();
-		return 0;
+		return datas;
 	}
 
-	public void close() {
-		Utils.close(fis);
+	public MemOutStream readBlock(int blockOffset) throws IOException {
+		if (blockOffset > 0)
+			fis.skip(blockOffset);
+
+		fis.read(infBuffer, 0, 8);
+		ByteBuffer wrap = ByteBuffer.wrap(infBuffer);
+		int count = 0, readSize = 0, unCompressLen = 0;
+		wrap.getInt();// 压缩块的大小
+		unCompressLen = wrap.getInt();
+
+		MemOutStream out = new MemOutStream(unCompressLen);
+		InflaterInputStream is = new InflaterInputStream(fis);
+		while ((count = is.read(infBuffer)) != -1 && readSize < unCompressLen) {
+			out.write(infBuffer, 0, count);
+			readSize += count;
+		}
+		is.close();
+		out.close();
+		fis.close();
+		return out;
+	}
+
+	public void close() throws IOException {
+		if (fis != null)
+			fis.close();
 	}
 }

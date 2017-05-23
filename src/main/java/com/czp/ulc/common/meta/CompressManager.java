@@ -1,6 +1,5 @@
 package com.czp.ulc.common.meta;
 
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -41,8 +40,7 @@ import com.czp.ulc.collect.handler.LuceneLogHandler;
 import com.czp.ulc.common.util.Utils;
 
 /**
- * 请添加描述
- * <li>创建人：Jeff.cao</li><br>
+ * 请添加描述 <li>创建人：Jeff.cao</li><br>
  * <li>创建时间：2017年5月3日 下午12:40:14</li>
  * 
  * @version 0.0.1
@@ -60,11 +58,10 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 	private AtomicBoolean hasCompress = new AtomicBoolean();
 	private ExecutorService worker = Executors.newSingleThreadExecutor();
 
-	public static final String SUFFIX = ".gz";
+	public static final String SUFFIX = ".rac";
 	public static final String META_FILE_NAME = "meta.json";
 	public static final String LINE_SPLITER = getLineSpliter();
 	public static final Charset UTF8 = Charset.forName("UTF-8");
-	public static byte[] SPLITER_BYTES = LINE_SPLITER.getBytes(UTF8);
 	private static final Logger log = LoggerFactory.getLogger(CompressManager.class);
 
 	public CompressManager(File baseDir, File zipDir, File indexBaseDir, LuceneLogHandler handler) {
@@ -73,8 +70,8 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 		this.dataDir = baseDir;
 		this.meta = loadMetaInfo();
 		this.indexBaseDir = indexBaseDir;
-		this.checkHasUnCompressFile(baseDir);
 		this.writer = new SyncWriter(dataDir, this);
+		this.checkHasUnCompressFile(baseDir);
 	}
 
 	private static String getLineSpliter() {
@@ -175,12 +172,13 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 				int offset = 0;
 				long docCount = 0;
 				int lineCount = 0;
-				GZIPOutputStream gzos = null;
+				RACFileWriter gzos = null;
 				try (BufferedReader br = Files.newBufferedReader(path)) {
 					String line;
 					File zipFile = getCompressFile(zipDir);
 					int fileId = Utils.getFileId(zipFile);
 					gzos = getOutputStream(zipFile);
+					int lastBlock = 0;
 					while ((line = br.readLine()) != null) {
 						String[] decodeData = decodeData(line);
 						if (decodeData == null) {
@@ -194,26 +192,33 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 						File indexDir = createIndexDir(date, host);
 						IndexWriter writer = getIndexWriter(analyzer, indexMap, indexDir);
 						byte[] bs = data.getBytes(UTF8);
-						gzos.write(bs);
-						gzos.write(SPLITER_BYTES);
-
-						int allSize = bs.length + SPLITER_BYTES.length;
-						offset += allSize;
+						int size = bs.length;
+						int block = gzos.writeAndReturnBlock(bs);
+						if (lastBlock != block) {
+							// 每个block切换offset
+							offset = 0;
+							lastBlock = block;
+						}
+						offset += size;
 						lineCount++;
 
 						Document doc = new Document();
 						doc.add(new LongPoint(DocField.TIME, time));
 						doc.add(new StoredField(DocField.OFFSET, offset));
+						doc.add(new StoredField(DocField.LINE_SIZE, size));
+						doc.add(new StoredField(DocField.lINE_BLOCK, block));
 						doc.add(new StoredField(DocField.META_FILE, fileId));
 						doc.add(new TextField(DocField.LINE, data, Field.Store.NO));
 						doc.add(new TextField(DocField.FILE, srcFile, Field.Store.YES));
 						writer.addDocument(doc);
-
 					}
+					int block = gzos.closeAndReturnBlock();
+					log.info("last block:{} now block:{}", lastBlock, block);
 				} catch (Exception e) {
 					log.error("fail to index:" + file, e);
+					if (gzos != null)
+						gzos.closeAndReturnBlock();
 				} finally {
-					Utils.close(gzos);
 					boolean delete = file.delete();
 					docCount = closeWriters(indexMap);
 
@@ -325,9 +330,8 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 		return writer;
 	}
 
-	protected GZIPOutputStream getOutputStream(File zipFile) throws IOException {
-		BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(zipFile));
-		return new GZIPOutputStream(out);
+	protected RACFileWriter getOutputStream(File zipFile) throws IOException {
+		return new RACFileWriter(new FileOutputStream(zipFile));
 	}
 
 	protected File getCompressFile(File zipDir) {
@@ -341,6 +345,7 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 	public String readLine(int fileId, int offset) {
 		long st = System.currentTimeMillis();
 		File zipFile = new File(String.format("%s/%s%s", zipDir, fileId, SUFFIX));
+		
 		try (GZIPInputStream is = new GZIPInputStream(new FileInputStream(zipFile))) {
 			is.skip(offset);
 			BufferedReader br = new BufferedReader(new InputStreamReader(is, UTF8));

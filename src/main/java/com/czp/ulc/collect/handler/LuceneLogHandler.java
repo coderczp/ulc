@@ -96,6 +96,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			nowLines.set(readWriter.getMeta().getLines());
 			loadAllIndexDir();
 		} catch (Exception e) {
+			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
 	}
@@ -164,7 +165,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 
 		AtomicInteger hasReturn = new AtomicInteger();
 		long fileDocs = readWriter.getMeta().getDocs();
-		long ramDocs = searchInRam(search, hasReturn, loadMeta);
+		long ramDocs =0;// searchInRam(search, hasReturn, loadMeta);
 		if (hasReturn.get() >= search.getSize())
 			return fileDocs + ramDocs;
 
@@ -283,12 +284,16 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 			boolean loadMeta) throws Exception {
 		TopDocs docs = searcher.search(search.getQuery(), search.getSize() - hasReturn.get());
 		hasReturn.addAndGet(docs.totalHits);
+		//file->block->
+		Map<String,TreeMap<Integer,Document>> map = new HashMap<>();
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
 			Document doc = searcher.doc(scoreDoc.doc);
+			System.out.println(doc);
 			String file = doc.get(DocField.FILE);
-			String data = loadDataFiled(loadMeta, doc);
-			search.handle(host, file, data, hasReturn.get(), nowLines.get());
+			search.handle(host, file, "", hasReturn.get(), nowLines.get());
+			//String data = loadDataFiled(loadMeta, doc);
 		}
+		//search.handle(host, file, data, hasReturn.get(), nowLines.get());
 		return searcher.getIndexReader().numDocs();
 	}
 

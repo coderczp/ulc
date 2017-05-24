@@ -48,9 +48,10 @@ import org.slf4j.LoggerFactory;
 import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.ReadResult;
 import com.czp.ulc.common.MessageListener;
-import com.czp.ulc.common.lucene.MyAnalyzer;
-import com.czp.ulc.common.meta.CompressManager;
-import com.czp.ulc.common.meta.CompressMeta;
+import com.czp.ulc.common.lucene.DocField;
+import com.czp.ulc.common.lucene.LogAnalyzer;
+import com.czp.ulc.common.meta.AsynIndexManager;
+import com.czp.ulc.common.meta.IndexMeta;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -60,20 +61,18 @@ import com.czp.ulc.common.util.Utils;
  * @Author:jeff.cao@aoliday.com
  * @version:1.0
  */
-public class LuceneLogHandler implements MessageListener<ReadResult> {
+public class LogIndexHandler implements MessageListener<ReadResult> {
 
 	private DirectoryReader ramReader;
-	private CompressManager readWriter;
+	private AsynIndexManager readWriter;
 	private volatile IndexWriter ramWriter;
-	private Analyzer analyzer = new MyAnalyzer();
+	private Analyzer analyzer = new LogAnalyzer();
 	private AtomicLong nowLines = new AtomicLong();
 
 	/** 索引文件目录日期格式 */
 	public static final String FORMAT = "yyyyMMdd";
 	/*** 根目录 */
 	private static final File ROOT = new File("./log");
-	/** 已压缩文件目录 */
-	private static final File ZIP_DIR = new File(ROOT, "zip");
 	/** 未压缩文件目录 */
 	private static final File DATA_DIR = new File(ROOT, "data");
 	/** 索引根目录 */
@@ -83,20 +82,18 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 	private ConcurrentHashMap<File, IndexSearcher> openedDir = new ConcurrentHashMap<>();
 	private ConcurrentHashMap<String, TreeMap<Long, File>> indexDirMap = new ConcurrentHashMap<>();
 
-	private static final Logger LOG = LoggerFactory.getLogger(LuceneLogHandler.class);
+	private static final Logger LOG = LoggerFactory.getLogger(LogIndexHandler.class);
 
-	public LuceneLogHandler() {
+	public LogIndexHandler() {
 		try {
 			DATA_DIR.mkdirs();
 			INDEX_DIR.mkdirs();
-			ZIP_DIR.mkdirs();
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
-			readWriter = new CompressManager(DATA_DIR, ZIP_DIR, INDEX_DIR, this);
+			readWriter = new AsynIndexManager(DATA_DIR, INDEX_DIR, this);
 			nowLines.set(readWriter.getMeta().getLines());
 			loadAllIndexDir();
 		} catch (Exception e) {
-			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
 	}
@@ -161,11 +158,11 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		return doc;
 	}
 
-	public long search(Searcher search, boolean loadMeta) throws Exception {
+	public long search(SearchCallback search) throws Exception {
 
 		AtomicInteger hasReturn = new AtomicInteger();
 		long fileDocs = readWriter.getMeta().getDocs();
-		long ramDocs = 0;// searchInRam(search, hasReturn, loadMeta);
+		long ramDocs = searchInRam(search, hasReturn);
 		if (hasReturn.get() >= search.getSize())
 			return fileDocs + ramDocs;
 
@@ -173,7 +170,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
 			for (File indexDir : item.getValue()) {
-				searchInIndex(getCachedSearch(indexDir), item.getKey(), search, hasReturn, loadMeta);
+				searchInIndex(getCachedSearch(indexDir), item.getKey(), search, hasReturn);
 				if (hasReturn.get() >= search.getSize())
 					return fileDocs;
 			}
@@ -204,23 +201,23 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		}
 	}
 
-	private int searchInRam(Searcher search, AtomicInteger hasReturn, boolean loadMeta) throws IOException {
+	private int searchInRam(SearchCallback search, AtomicInteger hasReturn) throws IOException {
 		BooleanQuery bQuery = buildRamQuery(search);
 		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
 		TopDocs docs = ramSearcher.search(bQuery, search.getSize() - hasReturn.get());
 		hasReturn.set(docs.totalHits);
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
-			Document doc = ramSearcher.doc(scoreDoc.doc);
+			Document doc = ramSearcher.doc(scoreDoc.doc, search.getFeilds());
 			String file = doc.get(DocField.FILE);
 			String host = doc.get(DocField.HOST);
-			String line = loadMeta ? doc.get(DocField.LINE) : null;
+			String line = doc.get(DocField.LINE);
 			search.handle(host, file, line, hasReturn.get(), nowLines.get());
 		}
 		LOG.info("query:{} return:{} in ram", bQuery, hasReturn.get());
 		return ramSearcher.getIndexReader().numDocs();
 	}
 
-	private BooleanQuery buildRamQuery(Searcher search) {
+	private BooleanQuery buildRamQuery(SearchCallback search) {
 		BooleanQuery.Builder builder = new BooleanQuery.Builder();
 		for (String host : search.getHosts()) {
 			builder.add(new TermQuery(new Term(DocField.HOST, host)), Occur.MUST);
@@ -238,7 +235,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 	 * @param end
 	 * @return
 	 */
-	public Map<String, Collection<File>> findMatchIndexDir(Searcher searcher) {
+	public Map<String, Collection<File>> findMatchIndexDir(SearchCallback searcher) {
 		long from = Utils.igroeHMSTime(searcher.getBegin()).getTime();
 		long to = Utils.igroeHMSTime(searcher.getEnd()).getTime();
 		Map<String, Collection<File>> map = new HashMap<>();
@@ -280,28 +277,17 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		}
 	}
 
-	private int searchInIndex(IndexSearcher searcher, String host, Searcher search, AtomicInteger hasReturn,
-			boolean loadMeta) throws Exception {
+	private int searchInIndex(IndexSearcher searcher, String host, SearchCallback search, AtomicInteger hasReturn)
+			throws Exception {
 		TopDocs docs = searcher.search(search.getQuery(), search.getSize() - hasReturn.get());
 		hasReturn.addAndGet(docs.totalHits);
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
-			Document doc = searcher.doc(scoreDoc.doc);
+			Document doc = searcher.doc(scoreDoc.doc, search.getFeilds());
 			String file = doc.get(DocField.FILE);
-			String data = loadDataFiled(loadMeta, doc);
+			String data = doc.get(DocField.LINE);
 			search.handle(host, file, data, hasReturn.get(), nowLines.get());
 		}
 		return searcher.getIndexReader().numDocs();
-	}
-
-	private String loadDataFiled(boolean loadMeta, Document doc) {
-		if (loadMeta == false)
-			return null;
-		String data = doc.get(DocField.LINE);
-		if (data != null)
-			return data;
-		int offset = Integer.valueOf(doc.get(DocField.OFFSET));
-		int fileId = Integer.valueOf(doc.get(DocField.META_FILE));
-		return readWriter.readLine(fileId, offset);
 	}
 
 	private synchronized void swapRamWriterReader() throws IOException {
@@ -319,10 +305,10 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		return new IndexWriter(new RAMDirectory(), conf);
 	}
 
-	public JSONObject count(Searcher search) throws IOException {
+	public JSONObject count(SearchCallback search) throws IOException {
 
-		long st = System.currentTimeMillis();
 		long allCount = 0;
+		long st = System.currentTimeMillis();
 		JSONObject json = new JSONObject();
 		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
@@ -357,7 +343,7 @@ public class LuceneLogHandler implements MessageListener<ReadResult> {
 		return json;
 	}
 
-	public CompressMeta getMeta() {
+	public IndexMeta getMeta() {
 		return readWriter.getMeta();
 	}
 }

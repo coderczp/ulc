@@ -1,12 +1,8 @@
 package com.czp.ulc.common.meta;
 
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,14 +14,13 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.codecs.lucene50.Lucene50StoredFieldsFormat.Mode;
+import org.apache.lucene.codecs.lucene62.Lucene62Codec;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
-import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -36,8 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.collect.handler.DocField;
-import com.czp.ulc.collect.handler.LuceneLogHandler;
+import com.czp.ulc.collect.handler.LogIndexHandler;
+import com.czp.ulc.common.lucene.DocField;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -47,36 +42,29 @@ import com.czp.ulc.common.util.Utils;
  * @version 0.0.1
  */
 
-public class CompressManager implements AutoCloseable, FileChangeListener {
+public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 
-	private File zipDir;
 	private File dataDir;
-	private File buffDir;
 	private File indexBaseDir;
-	private LuceneLogHandler handler;
+	private LogIndexHandler handler;
 
 	private RollingWriter writer;
-	private volatile CompressMeta meta;
+	private volatile IndexMeta meta;
 	private AtomicBoolean hasCompress = new AtomicBoolean();
 	private ExecutorService worker = Executors.newSingleThreadExecutor();
 
-	public static final String SUFFIX = ".gz";
 	public static final String META_FILE_NAME = "meta.json";
 	public static final String LINE_SPLITER = getLineSpliter();
 	public static final Charset UTF8 = Charset.forName("UTF-8");
-	public static byte[] SPLITER_BYTES = LINE_SPLITER.getBytes(UTF8);
-	private static final Logger log = LoggerFactory.getLogger(CompressManager.class);
+	private static final Logger log = LoggerFactory.getLogger(AsynIndexManager.class);
 
-	public CompressManager(File baseDir, File zipDir, File indexBaseDir, LuceneLogHandler handler) {
-		this.zipDir = zipDir;
+	public AsynIndexManager(File baseDir, File indexBaseDir, LogIndexHandler handler) {
 		this.handler = handler;
 		this.dataDir = baseDir;
 		this.meta = loadMetaInfo();
 		this.indexBaseDir = indexBaseDir;
 		this.writer = new SyncWriter(dataDir, this);
 		this.checkHasUnCompressFile(baseDir);
-		this.buffDir = new File(zipDir.getParentFile(), "cache");
-		this.buffDir.mkdirs();
 	}
 
 	private static String getLineSpliter() {
@@ -163,26 +151,22 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 	}
 
 	private void asynCompress(File file) {
-		log.error("start compress file:{}", file);
 		Path path = file.toPath();
 		worker.execute(new Runnable() {
 
 			@Override
 			public void run() {
+				log.info("start index file:{}", file);
 				Analyzer analyzer = handler.getAnalyzer();
 				Map<File, IndexWriter> indexMap = new HashMap<>();
 				Date day = Utils.igroeHMSTime(System.currentTimeMillis());
-				String date = new SimpleDateFormat(LuceneLogHandler.FORMAT).format(day);
+				String date = new SimpleDateFormat(LogIndexHandler.FORMAT).format(day);
 
-				int offset = 0;
-				long docCount = 0;
 				int lineCount = 0;
-				GZIPOutputStream gzos = null;
+				long docCount = 0;
+				long offset = 0;
 				try (BufferedReader br = Files.newBufferedReader(path)) {
 					String line;
-					File zipFile = getCompressFile(zipDir);
-					int fileId = Utils.getFileId(zipFile);
-					gzos = getOutputStream(zipFile);
 					while ((line = br.readLine()) != null) {
 						String[] decodeData = decodeData(line);
 						if (decodeData == null) {
@@ -195,34 +179,24 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 
 						File indexDir = createIndexDir(date, host);
 						IndexWriter writer = getIndexWriter(analyzer, indexMap, indexDir);
-						byte[] bs = data.getBytes(UTF8);
-						gzos.write(bs);
-						gzos.write(SPLITER_BYTES);
-
-						int allSize = bs.length + SPLITER_BYTES.length;
-						offset += allSize;
+						offset += data.length();
 						lineCount++;
 
 						Document doc = new Document();
 						doc.add(new LongPoint(DocField.TIME, time));
-						doc.add(new StoredField(DocField.OFFSET, offset));
-						doc.add(new StoredField(DocField.META_FILE, fileId));
-						doc.add(new TextField(DocField.LINE, data, Field.Store.NO));
+						doc.add(new TextField(DocField.LINE, data, Field.Store.YES));
 						doc.add(new TextField(DocField.FILE, srcFile, Field.Store.YES));
 						writer.addDocument(doc);
-
 					}
 				} catch (Exception e) {
 					log.error("fail to index:" + file, e);
 				} finally {
-					Utils.close(gzos);
-					boolean delete = file.delete();
 					docCount = closeWriters(indexMap);
-
+					boolean srcDelete = file.delete();
 					hasCompress.set(true);
 					handler.loadAllIndexDir();
 					updateMetaInfo(offset, lineCount, docCount);
-					log.info("compress file:{} size:{} del:{}", file, offset, delete);
+					log.info("index file:{} size:{} del:{}", file, offset, srcDelete);
 				}
 			}
 
@@ -239,7 +213,7 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 	protected void updateMetaInfo(long sumBytes, long lineCount, long docCount) {
 		try {
 			if (sumBytes <= 0 || lineCount <= 0 || docCount <= 0) {
-				log.error("error meta bytes:{} line:{} dco:{}", sumBytes, lineCount, docCount);
+				log.error("error meta bytes:{} line:{} docs:{}", sumBytes, lineCount, docCount);
 				return;
 			}
 
@@ -256,7 +230,7 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 		}
 	}
 
-	public CompressMeta getMeta() {
+	public IndexMeta getMeta() {
 		return meta;
 	}
 
@@ -265,20 +239,23 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 	 * 
 	 * @return
 	 */
-	private CompressMeta loadMetaInfo() {
+	private IndexMeta loadMetaInfo() {
 		try {
 			File metaFile = new File(dataDir.getParentFile(), META_FILE_NAME);
 			if (!metaFile.exists() || metaFile.length() == 0)
-				return CompressMeta.EMPTY;
+				return IndexMeta.EMPTY;
 
 			byte[] bytes = Files.readAllBytes(metaFile.toPath());
-			JSONObject meta = JSONObject.parseObject(new String(bytes));
-			return JSONObject.toJavaObject(meta, CompressMeta.class);
+			return JSONObject.parseObject(new String(bytes), IndexMeta.class);
 		} catch (IOException e) {
 			log.error("loadMeta index", e);
 		}
-		return CompressMeta.EMPTY;
+		return IndexMeta.EMPTY;
 
+	}
+
+	public long getFolderBytes(Path path) throws IOException {
+		return Files.walk(path).map(f -> f.toFile()).filter(f -> f.isFile()).mapToLong(f -> f.length()).sum();
 	}
 
 	/***
@@ -292,15 +269,6 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 		File indexDir = new File(indexBaseDir, String.format("%s/%s", host, date));
 		indexDir.mkdirs();
 		return indexDir;
-	}
-
-	/***
-	 * 关闭压缩文件流
-	 * 
-	 * @param zosMap
-	 */
-	protected void closeAllOutputStream(Map<File, GZIPOutputStream> zosMap) {
-		zosMap.values().forEach(item -> Utils.close(item));
 	}
 
 	protected long closeWriters(Map<File, IndexWriter> indexMap) {
@@ -327,61 +295,11 @@ public class CompressManager implements AutoCloseable, FileChangeListener {
 		return writer;
 	}
 
-	protected GZIPOutputStream getOutputStream(File zipFile) throws IOException {
-		BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(zipFile));
-		return new GZIPOutputStream(out);
-	}
-
-	protected File getCompressFile(File zipDir) {
-		int fileId = -1;
-		for (File file : zipDir.listFiles()) {
-			fileId = Math.max(fileId, Utils.getFileId(file));
-		}
-		return createGzipFile(fileId + 1, zipDir);
-	}
-
-	public synchronized String readLine(int fileId, int offset) {
-		long st = System.currentTimeMillis();
-		File logFile = new File(String.format("%s/%s%s", buffDir, fileId, ".log"));
-		if (!logFile.exists()) {
-			deCompressFile(fileId, logFile);
-		}
-		try (FileInputStream is = new FileInputStream(logFile)) {
-			is.skip(offset);
-			BufferedReader br = new BufferedReader(new InputStreamReader(is, UTF8));
-			String line = br.readLine();
-			br.close();
-			long end = System.currentTimeMillis();
-			log.debug("load data time:{} ms", (end - st));
-			return line;
-		} catch (Exception e) {
-			throw new RuntimeException(e.toString(), e);
-		}
-	}
-
-	private void deCompressFile(int fileId, File logFile) {
-		File zipFile = new File(String.format("%s/%s%s", zipDir, fileId, SUFFIX));
-		try (GZIPInputStream is = new GZIPInputStream(new FileInputStream(zipFile))) {
-			try (FileOutputStream fis = new FileOutputStream(logFile)) {
-				byte[] buf = new byte[1024 * 8];
-				int n = -1;
-				while ((n = is.read(buf)) != -1) {
-					fis.write(buf, 0, n);
-				}
-			}
-		} catch (IOException e) {
-			throw new RuntimeException(e.toString(), e);
-		}
-	}
-
-	private File createGzipFile(int fileId, File baseDir) {
-		return new File(String.format("%s/%s%s", baseDir, fileId, SUFFIX));
-	}
-
 	private IndexWriter createIndexWriter(Analyzer analyzer, File file) {
 		try {
 			TieredMergePolicy mergePolicy = new TieredMergePolicy();
 			IndexWriterConfig conf = new IndexWriterConfig(analyzer);
+			conf.setCodec(new Lucene62Codec(Mode.BEST_COMPRESSION));
 			conf.setOpenMode(OpenMode.CREATE_OR_APPEND);
 			conf.setMergePolicy(mergePolicy);
 			conf.setUseCompoundFile(true);

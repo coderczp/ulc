@@ -19,15 +19,15 @@ import org.apache.lucene.util.IOUtils;
  * @version 0.0.1
  */
 
-public class MyAnalyzer extends Analyzer {
+public class LogAnalyzer extends Analyzer {
 
 	private CharArraySet stopWords;
 
-	public MyAnalyzer(CharArraySet stopWords) {
+	public LogAnalyzer(CharArraySet stopWords) {
 		this.stopWords = stopWords;
 	}
 
-	public MyAnalyzer(Reader stopwords) throws IOException {
+	public LogAnalyzer(Reader stopwords) throws IOException {
 		try {
 			stopWords = WordlistLoader.getWordSet(stopwords);
 		} finally {
@@ -35,7 +35,7 @@ public class MyAnalyzer extends Analyzer {
 		}
 	}
 
-	public MyAnalyzer() {
+	public LogAnalyzer() {
 		stopWords = new CharArraySet(Arrays.asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if",
 				"in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then",
 				"there", "these", "they", "this", "to", "was", "will", "with", "null", "--", "args", "api", "info",

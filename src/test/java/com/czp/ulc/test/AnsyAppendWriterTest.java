@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import org.junit.Test;
 
 import com.czp.ulc.common.meta.AnsyWriter;
+import com.czp.ulc.common.meta.FileChangeListener;
 import com.czp.ulc.common.meta.RollingWriter;
 import com.czp.ulc.common.meta.SyncWriter;
 
@@ -37,7 +38,13 @@ public class AnsyAppendWriterTest {
 	@Test
 	public void testSyncWrite() throws Exception {
 		long st = System.currentTimeMillis();
-		RollingWriter writer = new SyncWriter(new File("log"), null);
+		RollingWriter writer = new SyncWriter(new File("log"), new FileChangeListener() {
+
+			@Override
+			public void onFileChange(File currentFile) {
+				System.out.println(currentFile);
+			}
+		});
 		BufferedReader lines = Files.newBufferedReader(new File("./3.log").toPath());
 		String line = null;
 		while ((line = lines.readLine()) != null) {

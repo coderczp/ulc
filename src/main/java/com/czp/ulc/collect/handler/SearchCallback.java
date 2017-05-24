@@ -11,17 +11,19 @@ import org.apache.lucene.search.Query;
  * @version 0.0.1
  */
 
-public class Searcher {
+public class SearchCallback {
 
 	private int size;
 
-	private long begin;
-
 	private long end;
+
+	private long begin;
 
 	private Query query;
 
 	private Set<String> hosts = new HashSet<>();
+
+	private Set<String> feilds = new HashSet<String>();
 
 	public Set<String> getHosts() {
 		return hosts;
@@ -61,6 +63,14 @@ public class Searcher {
 
 	public void setQuery(Query query) {
 		this.query = query;
+	}
+
+	public Set<String> getFeilds() {
+		return feilds;
+	}
+
+	public void addFeild(String feild) {
+		feilds.add(feild);
 	}
 
 	public boolean handle(String host, String file, String line, long matchCount, long allLines) {

@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.lucene.document.LongPoint;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,10 +25,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.collect.handler.DocField;
-import com.czp.ulc.collect.handler.LuceneLogHandler;
-import com.czp.ulc.collect.handler.NumSupportQueryParser;
-import com.czp.ulc.collect.handler.Searcher;
+import com.czp.ulc.collect.handler.LogIndexHandler;
+import com.czp.ulc.collect.handler.SearchCallback;
+import com.czp.ulc.common.lucene.DocField;
+import com.czp.ulc.common.lucene.RangeQueryParser;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -43,7 +44,7 @@ public class SearchController {
 	private static final long MILLS = 60 * 60 * 1000;
 
 	@Autowired
-	private LuceneLogHandler luceneSearch;
+	private LogIndexHandler luceneSearch;
 	private static final Logger LOG = LoggerFactory.getLogger(SearchController.class);
 
 	@RequestMapping("/count")
@@ -59,16 +60,16 @@ public class SearchController {
 		}
 
 		String[] fields = new String[] { DocField.FILE };
-		NumSupportQueryParser parser = new NumSupportQueryParser(fields, luceneSearch.getAnalyzer());
+		RangeQueryParser parser = new RangeQueryParser(fields, luceneSearch.getAnalyzer());
 		parser.addSpecFied(DocField.TIME, LongPoint.class);
-		Searcher search = new Searcher();
+		SearchCallback search = new SearchCallback();
 		search.setQuery(parser.parse(q));
 		search.setBegin(timeStart);
 		search.setHosts(hosts);
 		search.setEnd(timeEnd);
 		JSONObject count = luceneSearch.count(search);
 		JSONObject res = new JSONObject();
-		
+
 		res.put("data", count);
 		res.put("time", (System.currentTimeMillis() - now) / 1000);
 		return count;
@@ -102,15 +103,16 @@ public class SearchController {
 		if (Utils.notEmpty(file)) {
 			q = String.format("%s AND %s:%s", q, DocField.FILE, file);
 		}
+		q = escape(q, DocField.ALL_FEILD);
 		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
 
-		NumSupportQueryParser parser = new NumSupportQueryParser(DocField.ALL_FEILD, luceneSearch.getAnalyzer());
+		RangeQueryParser parser = new RangeQueryParser(DocField.ALL_FEILD, luceneSearch.getAnalyzer());
 		parser.addSpecFied(DocField.TIME, LongPoint.class);
 
 		AtomicLong allLine = new AtomicLong();
 		AtomicLong matchCount = new AtomicLong();
 		JSONObject data = new JSONObject();
-		Searcher search = new Searcher() {
+		SearchCallback search = new SearchCallback() {
 
 			@Override
 			@SuppressWarnings({ "unchecked" })
@@ -136,13 +138,20 @@ public class SearchController {
 			}
 		};
 
+		search.addFeild(DocField.FILE);
+		search.addFeild(DocField.TIME);
+		search.addFeild(DocField.HOST);
+
+		if (Boolean.TRUE.equals(loadLine))
+			search.addFeild(DocField.LINE);
+
 		search.setQuery(parser.parse(q));
 		search.setBegin(timeStart);
 		search.setHosts(hosts);
 		search.setEnd(timeEnd);
 		search.setSize(size);
 
-		long allDocs = luceneSearch.search(search, Boolean.TRUE.equals(loadLine));
+		long allDocs = luceneSearch.search(search);
 		double cost = (System.currentTimeMillis() - now) / 1000.0;
 
 		JSONObject res = new JSONObject();
@@ -153,6 +162,28 @@ public class SearchController {
 		res.put("matchCount", matchCount.get());
 		LOG.info("query:[{}] time:{}s", q, cost);
 		return res;
+	}
+
+	private String escape(String q, String[] allFeild) {
+		// 先把所有DocField.ALL_FEILD开通的替换如: 空白l:error->空白l#error
+		for (String string : allFeild) {
+			if (q.startsWith(string)) {
+				q = q.replaceAll(String.format("%s:", string), String.format(" %s#", string));
+			} else {
+				q = q.replaceAll(String.format(" %s:", string), String.format(" %s#", string));
+			}
+		}
+		// 将查询转义
+		q = QueryParser.escape(q);
+		// 恢复域字段
+		for (String string : allFeild) {
+			if (q.startsWith(string)) {
+				q = q.replaceAll(String.format("%s#", string), String.format(" %s:", string));
+			} else {
+				q = q.replaceAll(String.format(" %s#", string), String.format(" %s:", string));
+			}
+		}
+		return q;
 	}
 
 	private Set<String> buildHost(String host) {

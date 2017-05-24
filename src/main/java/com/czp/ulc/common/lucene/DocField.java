@@ -1,4 +1,4 @@
-package com.czp.ulc.collect.handler;
+package com.czp.ulc.common.lucene;
 
 /**
  * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月13日 下午3:28:59</li>
@@ -11,9 +11,5 @@ public interface DocField {
 	String FILE = "f";
 	String LINE = "l";
 	String HOST = "h";
-	String OFFSET = "o";
-	String META_FILE = "k";
-	String LINE_SIZE = "s";
-	String lINE_BLOCK = "b";
-	String[] ALL_FEILD = { TIME, FILE, LINE, OFFSET, HOST, META_FILE, LINE_SIZE, lINE_BLOCK };
+	String[] ALL_FEILD = { TIME, FILE, LINE, HOST };
 }

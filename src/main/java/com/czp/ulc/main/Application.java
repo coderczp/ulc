@@ -37,7 +37,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter
 import com.czp.ulc.collect.ConnectManager;
 import com.czp.ulc.collect.RemoteLogCollector;
 import com.czp.ulc.collect.handler.ErrorLogHandler;
-import com.czp.ulc.collect.handler.LuceneLogHandler;
+import com.czp.ulc.collect.handler.LogIndexHandler;
 import com.czp.ulc.common.MessageCenter;
 import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.dao.HostDao;
@@ -60,7 +60,7 @@ public class Application extends WebMvcConfigurerAdapter
 
 	private static Logger LOG = LoggerFactory.getLogger(Application.class);
 	private MessageCenter dispatch = MessageCenter.getInstance();
-	private LuceneLogHandler listener = new LuceneLogHandler();
+	private LogIndexHandler listener = new LogIndexHandler();
 	private ConfigurableListableBeanFactory context;
 	private Environment envBean;
 

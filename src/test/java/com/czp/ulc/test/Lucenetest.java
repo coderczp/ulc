@@ -26,10 +26,10 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
 
-import com.czp.ulc.collect.handler.DocField;
-import com.czp.ulc.collect.handler.NumSupportQueryParser;
 import com.czp.ulc.common.lucene.AnalyzerUtil;
-import com.czp.ulc.common.lucene.MyAnalyzer;
+import com.czp.ulc.common.lucene.DocField;
+import com.czp.ulc.common.lucene.LogAnalyzer;
+import com.czp.ulc.common.lucene.RangeQueryParser;
 
 /**
  * 请添加描述
@@ -43,7 +43,7 @@ public class Lucenetest {
 
 	public static void main(String[] args) throws IOException, ParseException {
 
-		Analyzer analyzer = new MyAnalyzer();
+		Analyzer analyzer = new LogAnalyzer();
 		File file = new File("./index-1-unsave");
 		file.mkdirs();
 		FSDirectory open = FSDirectory.open(file.toPath());
@@ -84,7 +84,7 @@ public class Lucenetest {
 		// }
 		// ramSearcher.getIndexReader().close();
 
-		AnalyzerUtil.displayToken("/data/work/itrip_openapi_admin/tomcat7/logs/db.log", new MyAnalyzer());
+		AnalyzerUtil.displayToken("/data/work/itrip_openapi_admin/tomcat7/logs/db.log", new LogAnalyzer());
 //		String temp = "";
 //		String path = "./2.log";
 //		BufferedReader br = new BufferedReader(new FileReader(new File(path)));

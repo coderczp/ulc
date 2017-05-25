@@ -35,8 +35,8 @@ public class SyncWriter extends AbstractWriter {
 		if (postion.get() >= EACH_FILE_SIZE) {
 			synchronized (this) {
 				if (postion.get() >= EACH_FILE_SIZE) {
-					fileChangeListener.onFileChange(currentFile);
 					stream.close();
+					fileChangeListener.onFileChange(currentFile);
 					stream = getCurrentStream();
 				}
 			}

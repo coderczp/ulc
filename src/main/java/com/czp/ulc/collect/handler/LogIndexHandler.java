@@ -15,7 +15,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -120,27 +119,23 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			LOG.debug("recive message:{}", event);
 
 			String file = event.getFile();
-			List<String> lines = event.getLines();
+			String line = event.getLine().trim();
 			String host = event.getHost().getName();
-			if (file.isEmpty()) {
-				LOG.info("file name is empty:{}", lines);
+			if (file.isEmpty() || line.isEmpty()) {
+				LOG.info("erro file:[{}] line:[{}]", file, event.getLine());
 				return false;
 			}
 
-			if (readWriter.checkHasCompress()) {
+			if (readWriter.checkHasFlush()) {
 				swapRamWriterReader();
 			}
 
-			for (String line : lines) {
-				line = line.trim();
-				if (line.isEmpty())
-					continue;
-				writerRAMDocument(now, file, host, line);
-				readWriter.write(host, file, line, now);
-				nowLines.getAndIncrement();
-			}
+			nowLines.getAndIncrement();
+			writerRAMDocument(now, file, host, line);
+			readWriter.write(host, file, line, now);
 			long end = now = System.currentTimeMillis();
 			LOG.debug("create index time:{}ms", (end - now));
+
 			return false;
 		} catch (Exception e) {
 			LOG.error("proces message error", e);

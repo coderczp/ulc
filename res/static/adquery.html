@@ -74,36 +74,20 @@ code {
 					</div>
 					<div class="form-group">
 						<select id="size" class="form-control">
-							<option value="30">size(30)</option>
-							<option value="50">50</option>
-							<option value="100">100</option>
-							<option value="200">200</option>
+							<option value="1">最近1小时</option>
+							<option value="8">最近8小时</option>
+							<option value="24">最近一天</option>
 						</select>
 					</div>
 					<div class="form-group">
-						<div class='input-group date' id='start'>
-							<input type='text' class="form-control" /> <span
-								class="input-group-addon"> <span
-								class="glyphicon glyphicon-calendar"></span>
-							</span>
-						</div>
-					</div>
-					<div class="form-group">
-						<div class='input-group date' id='end'>
-							<input type='text' class="form-control" /> <span
-								class="input-group-addon"> <span
-								class="glyphicon glyphicon-calendar"></span>
-							</span>
-						</div>
-					</div>
-					<div class="form-group">
 						<select id="proc" class="form-control">
-							<option value="all">all</option>
+							<option value="all">所有进程</option>
 							<option value="service_order">service_order</option>
 							<option value="service_product">service_product</option>
 							<option value="service_booking">service_booking</option>
 							<option value="service_b2b">service_b2b</option>
 							<option value="service_pms">service_pms</option>
+							<option value="itrip_wms">itrip_wms</option>
 							<option value="itrip_shop">itrip_shop</option>
 							<option value="itrip_main">itrip_main</option>
 							<option value="itrip_pay">itrip_pay</option>
@@ -116,7 +100,31 @@ code {
 						</select>
 					</div>
 					<div class="form-group">
-						<select id="file" class="form-control">
+						<div class="input-group">
+							<input type="text" id="q" class="form-control"
+								placeholder="请您输入关键词"> <span class="input-group-btn">
+								<button class="btn btn-success btn-small" type="button"
+									onclick="doQuery()">Go!</button>
+							</span>
+						</div>
+						<a href="#more-cdt" class="btn btn-success btn-small"
+							data-toggle="collapse">More</a>
+					</div>
+					<div class="form-group">
+						<div class="checkbox">
+							<label> <input type="checkbox" id="loadLine"
+								checked="checked">加载内容
+							</label>
+						</div>
+					</div>
+
+					<div class="collapse" style="height: 0px;" id="more-cdt">
+						<select id="size" class="form-control">
+							<option value="30">size(30)</option>
+							<option value="50">50</option>
+							<option value="100">100</option>
+							<option value="200">200</option>
+						</select> <select id="file" class="form-control">
 							<option value="all">all</option>
 							<option value="run.log">run.log</option>
 							<option value="db.log">db.log</option>
@@ -127,23 +135,20 @@ code {
 							<option value="dubborpc.log">dubborpc.log</option>
 							<option value="dubboclient.log">dubboclient.log</option>
 						</select>
-					</div>
-					<div class="form-group">
-						<div class="input-group">
-							<input type="text" id="q" class="form-control"
-								placeholder="请您输入关键词"> <span class="input-group-btn">
-								<button class="btn btn-success btn-small" type="button"
-									onclick="doQuery()">Go!</button>
+						<div class='input-group date' id='start'>
+							<input type='text' class="form-control" /> <span
+								class="input-group-addon"> <span
+								class="glyphicon glyphicon-calendar"></span>
+							</span>
+						</div>
+						<div class='input-group date' id='end'>
+							<input type='text' class="form-control" /> <span
+								class="input-group-addon"> <span
+								class="glyphicon glyphicon-calendar"></span>
 							</span>
 						</div>
 					</div>
-					<div class="form-group">
-						<div class="checkbox">
-							<label> <input type="checkbox" id="loadLine"
-								checked="checked">加载内容
-							</label>
-						</div>
-					</div>
+
 				</div>
 			</div>
 			<div class="panel-body">
@@ -173,7 +178,7 @@ code {
 			format : fmt,
 			locale : moment.locale('zh-cn')
 		}).data('DateTimePicker').date(moment(date).format(fmt));
-
+		
 		$.get('./host/list', function(d) {
 			var html = '<option value="">主机(All)</option>';
 			for ( var i in d) {

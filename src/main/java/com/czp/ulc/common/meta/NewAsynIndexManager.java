@@ -142,13 +142,10 @@ public class NewAsynIndexManager implements AutoCloseable, FileChangeListener {
 
 				File indexDir = createIndexDir(sp.format(day), host);
 				IndexWriter writer = getIndexWriter(analyzer, indexMap, indexDir);
-
-				synchronized (writer) {
-					if (!writer.isOpen()) {// 防止被flush线程关闭
-						writer = getIndexWriter(analyzer, indexMap, indexDir);
-					}
-					writer.addDocument(doc);
+				if (!writer.isOpen()) {// 防止被flush线程关闭
+					writer = getIndexWriter(analyzer, indexMap, indexDir);
 				}
+				writer.addDocument(doc);
 			} catch (Exception e) {
 				log.error("add documnet error", e);
 			}
@@ -192,9 +189,10 @@ public class NewAsynIndexManager implements AutoCloseable, FileChangeListener {
 	 */
 	protected void updateMetaInfo(long sumBytes, long lineCount, long docCount) {
 		try {
+			long l = docCount - meta.getDocs();
 			meta.setBytes(meta.getBytes() + sumBytes);
 			meta.setLines(meta.getLines() + lineCount);
-			meta.setDocs(meta.getDocs() + (docCount - meta.getDocs()));
+			meta.setDocs(meta.getDocs() + Math.max(0, l));
 
 			Path path = new File(dataDir.getParentFile(), META_FILE_NAME).toPath();
 			Files.write(path, JSONObject.toJSONString(meta).getBytes(UTF8));
@@ -248,20 +246,16 @@ public class NewAsynIndexManager implements AutoCloseable, FileChangeListener {
 
 	protected long flushIndex(Map<File, IndexWriter> indexMap) {
 		long count = 0;
+		log.info("start index:{}", indexMap.size());
 		for (Entry<File, IndexWriter> entry : indexMap.entrySet()) {
 			IndexWriter value = entry.getValue();
 			try {
 				long st = System.currentTimeMillis();
-				if (value.hasUncommittedChanges()) {
-					value.commit();
-					value.flush();
-				}
+				value.commit();
 				count += value.numDocs();
-				synchronized (value) {
-					indexMap.remove(entry.getKey());
-					value.close();
-				}
-				log.info("flush index time:{}", (System.currentTimeMillis() - st));
+				indexMap.remove(entry.getKey());
+				value.close();
+				log.info("commit index time:{}", (System.currentTimeMillis() - st));
 			} catch (Exception e) {
 				log.error("fail to close index writer:" + value, e);
 			}
@@ -306,7 +300,7 @@ public class NewAsynIndexManager implements AutoCloseable, FileChangeListener {
 	 * @param b
 	 * @return
 	 */
-	public boolean checkHasCompress() {
+	public boolean checkHasFlush() {
 		return hasCompress.getAndSet(false);
 	}
 

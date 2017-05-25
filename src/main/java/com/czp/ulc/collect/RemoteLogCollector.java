@@ -17,7 +17,6 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -97,23 +96,29 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 
 			sendCommad(srcSend, tailCmd);
 
+			int lineLen = 0;
 			String line = null;
-			String lastFile = "";
-			LinkedList<String> lines = new LinkedList<String>();
+			String nowFile = "";
+			int prefuxSize = " ==>".length();
 			BufferedReader bufRead = new BufferedReader(new InputStreamReader(readResp));
 			while (isRunning && (line = bufRead.readLine()) != null) {
-				String nowFile = isNewFile(line, lastFile);
-				if (isExcludeFile(nowFile, excludeFiles, map)) {
-					LOG.debug("skip:{}{}", server.getName(), lastFile);
+				lineLen = line.trim().length();
+				if (lineLen == 0) {
+					LOG.debug("read empty line:{}", line);
 					continue;
 				}
-				if (!nowFile.equals(lastFile)) {
-					messageCenter.push(new Message(new ReadResult(server, lastFile, lines)));
-					lines = new LinkedList<String>();
-					lastFile = nowFile;
-				} else {
-					lines.add(line);
+
+				if (line.startsWith("==>")) {
+					nowFile = line.substring(prefuxSize, lineLen - prefuxSize).trim();
+					LOG.debug("read file name line:{}", line);
+					continue;
 				}
+
+				if (isExcludeFile(nowFile, excludeFiles, map)) {
+					LOG.debug("skip:{}{}{}", server.getName(), nowFile,line);
+					continue;
+				}
+				messageCenter.push(new Message(new ReadResult(server, nowFile, line)));
 			}
 			monitorHosts.remove(server.getId());
 			bufRead.close();
@@ -211,16 +216,18 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 		return mfdao.list(arg);
 	}
 
-	// tail: /xxx/xxx/gc.log: file truncated
-	// tail: `/var/logs/error.log' has appeared; following end of new file
-	private String isNewFile(String line, String lastFile) {
-		int splitSize = " ==>".length();
-		if (line.startsWith("==>") || (line.startsWith("tail:")
-				&& (line.endsWith("file truncated") || line.endsWith("following end of new file")))) {
-			lastFile = line.substring(splitSize, line.length() - splitSize).trim().toLowerCase();
-		}
-		return lastFile;
-	}
+	// // tail: /xxx/xxx/gc.log: file truncated
+	// // tail: `/var/logs/error.log' has appeared; following end of new file
+	// private String isNewFile(String line, String lastFile) {
+	// int splitSize = " ==>".length();
+	// if (line.startsWith("==>")
+	// || (line.startsWith("tail:") && (line.endsWith("file truncated") || line
+	// .endsWith("following end of new file")))) {
+	// lastFile = line.substring(splitSize, line.length() -
+	// splitSize).trim().toLowerCase();
+	// }
+	// return lastFile;
+	// }
 
 	/***
 	 * 网络断开后自动重连

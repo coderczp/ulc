@@ -9,10 +9,6 @@
  */
 package com.czp.ulc.collect;
 
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-
 import com.czp.ulc.common.bean.HostBean;
 
 /**
@@ -25,39 +21,33 @@ import com.czp.ulc.common.bean.HostBean;
 public class ReadResult {
 
 	private HostBean host;
-	
+
 	private String file;
 
-	private List<String> lines = new LinkedList<String>();
+	private String line;
 
-	public ReadResult(HostBean host,String file, List<String> lines) {
+	public ReadResult(HostBean host, String file, String line) {
 		this.file = file;
 		this.host = host;
-		this.lines = lines;
+		this.line = line;
 	}
 
 	public String getFile() {
 		return file;
 	}
 
-	public List<String> getLines() {
-		//Collections.unmodifiableList(lines);
-		return lines;
-	}
-	
-
 	public HostBean getHost() {
 		return host;
 	}
 
+	public String getLine() {
+		return line;
+	}
+
 	@Override
 	public String toString() {
-		Iterator<String> iterator = lines.iterator();
 		StringBuffer sb = new StringBuffer();
-		sb.append(file).append("\n");
-		while (iterator.hasNext()) {
-			sb.append("  ").append(iterator.next()).append("\n");
-		}
+		sb.append(file).append("->").append(line);
 		return sb.toString();
 	}
 

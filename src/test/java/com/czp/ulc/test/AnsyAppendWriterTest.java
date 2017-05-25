@@ -18,12 +18,13 @@ import com.czp.ulc.common.meta.SyncWriter;
  * @version 0.0.1
  */
 
-public class AnsyAppendWriterTest {
+public class AnsyAppendWriterTest implements FileChangeListener {
+
 
 	@Test
 	public void testAysnWrite() throws IOException {
 		long st = System.currentTimeMillis();
-		AnsyWriter writer = new AnsyWriter(new File("log"), null);
+		AnsyWriter writer = new AnsyWriter(new File("log"), new AnsyAppendWriterTest());
 		BufferedReader lines = Files.newBufferedReader(new File("./3.log").toPath());
 		String line = null;
 		while ((line = lines.readLine()) != null) {
@@ -38,13 +39,7 @@ public class AnsyAppendWriterTest {
 	@Test
 	public void testSyncWrite() throws Exception {
 		long st = System.currentTimeMillis();
-		RollingWriter writer = new SyncWriter(new File("log"), new FileChangeListener() {
-
-			@Override
-			public void onFileChange(File currentFile) {
-				System.out.println(currentFile);
-			}
-		});
+		RollingWriter writer = new SyncWriter(new File("log"), new AnsyAppendWriterTest());
 		BufferedReader lines = Files.newBufferedReader(new File("./3.log").toPath());
 		String line = null;
 		while ((line = lines.readLine()) != null) {
@@ -53,5 +48,11 @@ public class AnsyAppendWriterTest {
 		lines.close();
 		writer.close();
 		System.out.println("nio:" + (System.currentTimeMillis() - st));
+	}
+
+	@Override
+	public void onFileChange(File currentFile) {
+		System.out.println(currentFile);
+
 	}
 }

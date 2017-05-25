@@ -50,8 +50,8 @@ import com.czp.ulc.collect.ReadResult;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.lucene.DocField;
 import com.czp.ulc.common.lucene.LogAnalyzer;
-import com.czp.ulc.common.meta.AsynIndexManager;
 import com.czp.ulc.common.meta.IndexMeta;
+import com.czp.ulc.common.meta.NewAsynIndexManager;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -64,7 +64,7 @@ import com.czp.ulc.common.util.Utils;
 public class LogIndexHandler implements MessageListener<ReadResult> {
 
 	private DirectoryReader ramReader;
-	private AsynIndexManager readWriter;
+	private NewAsynIndexManager readWriter;
 	private volatile IndexWriter ramWriter;
 	private Analyzer analyzer = new LogAnalyzer();
 	private AtomicLong nowLines = new AtomicLong();
@@ -90,7 +90,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			INDEX_DIR.mkdirs();
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
-			readWriter = new AsynIndexManager(DATA_DIR, INDEX_DIR, this);
+			readWriter = new NewAsynIndexManager(DATA_DIR, INDEX_DIR, this);
 			nowLines.set(readWriter.getMeta().getLines());
 			loadAllIndexDir();
 		} catch (Exception e) {

@@ -301,7 +301,6 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	}
 
 	public JSONObject count(SearchCallback search) throws IOException {
-
 		long allCount = 0;
 		long st = System.currentTimeMillis();
 		JSONObject json = new JSONObject();

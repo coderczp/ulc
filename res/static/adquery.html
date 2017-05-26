@@ -253,8 +253,9 @@ code {
 			var json = getCdt();
 			json.host = host;
 			json.file = file;
-			
-			window.open("/getFile?json='" + JSON.stringify(json)+"'");
+			json.size = 500;
+			var str = encodeURIComponent(JSON.stringify(json));
+			window.open("/getFile?json=" + str);
 		}
 
 		function hightlight(src, kw) {

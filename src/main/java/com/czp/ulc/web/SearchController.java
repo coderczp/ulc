@@ -9,11 +9,15 @@
  */
 package com.czp.ulc.web;
 
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -81,8 +85,49 @@ public class SearchController {
 	}
 
 	@RequestMapping("/getFile")
-	public String getFile(String json) throws Exception {
-		return json;
+	public void getFile(@RequestParam String json, HttpServletResponse out) throws Exception {
+		long now = System.currentTimeMillis();
+		JSONObject obj = JSONObject.parseObject(json);
+
+		String q = obj.getString("q");
+		int size = obj.getIntValue("size");
+		String file = obj.getString("file");
+		Set<String> hosts = buildHost(obj.getString("host"));
+		long timeEnd = obj.containsKey("end") ? obj.getLongValue("end") : now;
+		long timeStart = obj.containsKey("start") ? obj.getLongValue("start") : now;
+
+		q = String.format("%s:%s", DocField.LINE, q);
+		q = String.format("%s AND %s:%s", q, DocField.FILE, file);
+		q = escape(q, DocField.ALL_FEILD);
+		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
+
+		RangeQueryParser parser = new RangeQueryParser(DocField.ALL_FEILD, luceneSearch.getAnalyzer());
+		parser.addSpecFied(DocField.TIME, LongPoint.class);
+
+		out.setContentType("text/plain");
+		PrintWriter writer = out.getWriter();
+		SearchCallback search = new SearchCallback() {
+
+			@Override
+			public boolean handle(String host, String file, String line, long matchs, long allLines) {
+				writer.println(line);
+				return true;
+			}
+		};
+
+		search.addFeild(DocField.FILE);
+		search.addFeild(DocField.TIME);
+		search.addFeild(DocField.HOST);
+		search.addFeild(DocField.LINE);
+		search.setQuery(parser.parse(q));
+
+		search.setBegin(timeStart);
+		search.setHosts(hosts);
+		search.setEnd(timeEnd);
+		search.setSize(Math.min(1000, size));
+
+		luceneSearch.search(search);
+		out.getWriter().close();
 	}
 
 	@RequestMapping("/search")

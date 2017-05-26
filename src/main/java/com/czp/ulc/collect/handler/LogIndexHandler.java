@@ -122,7 +122,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			String line = event.getLine().trim();
 			String host = event.getHost().getName();
 			if (file.isEmpty() || line.isEmpty()) {
-				LOG.info("erro file:[{}] line:[{}]", file, event.getLine());
+				LOG.info("empty file:[{}] line:[{}]", file, event.getLine());
 				return false;
 			}
 

@@ -48,6 +48,8 @@ public class ConfigBean implements Serializable {
 		this.value = value;
 	}
 
+	
+	
 	public String getType() {
 		return type;
 	}

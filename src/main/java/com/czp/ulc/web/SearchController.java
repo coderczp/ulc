@@ -80,6 +80,11 @@ public class SearchController {
 		return (JSONObject) JSONObject.toJSON(luceneSearch.getMeta());
 	}
 
+	@RequestMapping("/getFile")
+	public String getFile(String json) throws Exception {
+		return json;
+	}
+
 	@RequestMapping("/search")
 	public JSONObject search(@RequestParam String json) throws Exception {
 		long now = System.currentTimeMillis();

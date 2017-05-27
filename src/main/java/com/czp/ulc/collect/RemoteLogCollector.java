@@ -99,10 +99,11 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 			int lineLen = 0;
 			String line = null;
 			String nowFile = "";
-			int prefuxSize = " ==>".length();
+			int prefuxSize = "==>".length();
 			BufferedReader bufRead = new BufferedReader(new InputStreamReader(readResp));
 			while (isRunning && (line = bufRead.readLine()) != null) {
-				lineLen = line.trim().length();
+				line = line.trim();
+				lineLen = line.length();
 				if (lineLen == 0) {
 					LOG.debug("read empty line:{}", line);
 					continue;
@@ -115,7 +116,7 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 				}
 
 				if (isExcludeFile(nowFile, excludeFiles, map)) {
-					LOG.debug("skip:{}{}{}", server.getName(), nowFile,line);
+					LOG.debug("skip:{}{}{}", server.getName(), nowFile, line);
 					continue;
 				}
 				messageCenter.push(new Message(new ReadResult(server, nowFile, line)));

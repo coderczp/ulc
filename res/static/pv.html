@@ -15,7 +15,6 @@
 	href="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/css/bootstrap-datetimepicker-standalone.min.css"
 	rel="stylesheet">
 <link href="css/ulc.css" rel="stylesheet">
-<script src="https://cdn.bootcss.com/Chart.js/2.5.0/Chart.min.js"></script>
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="http://cdn.bootcss.com/moment.js/2.18.1/moment.min.js"></script>
@@ -110,8 +109,7 @@
 				</div>
 			</div>
 			<div class="panel-body">
-				<span id="time"></span>
-				<canvas id="result" width="400" height="400"></canvas>
+				<div id="result"></div>
 			</div>
 		</div>
 	</div>
@@ -120,9 +118,6 @@
 		var startTime = new Date();
 		var fmt = "YYYY/MM/DD HH:mm";
 		startTime.setHours(date.getHours() - 5);
-		
-		var options = {scaleFontSize: 13, scaleFontColor: "#ffa45e"};
-		var ctx = new Chart(document.getElementById("result").getContext("2d"));
 
 		$('#start').datetimepicker({
 			format : fmt,
@@ -154,32 +149,14 @@
 				$('#file').val('eneter file');
 				return;
 			}
-			//$('#result').html('searching');
+			$('#result').html('searching');
 			$.get('./count?file=' + q + '&host=' + h + '&start=' + st + '&end='
 					+ et + '&proc=' + p, function(resp) {
-				/* var html = "";
+				var html = "";
 				for ( var host in resp) {
 					html += '<br><span>' + host + "</span>:" + resp[host];
 				}
-				$('#result').html(html); */
-
-				var lbs = [];
-				var val = [];
-				for ( var key in resp) {
-					lbs.push(key);
-					val.push(resp[key]);
-				}
-				var data = {
-					labels : lbs,
-					datasets : [ {
-						fillColor : "rgba(220,220,220,0.5)",
-						strokeColor : "rgba(220,220,220,1)",
-						pointColor : "rgba(220,220,220,1)",
-						pointStrokeColor : "#fff",
-						data : val
-					} ]
-				};
-				ctx.Bar(data,options);
+				$('#result').html(html);
 			});
 		}
 	</script>

@@ -9,7 +9,6 @@
  */
 package com.czp.ulc.web;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -62,6 +61,7 @@ public class SearchController {
 		if (Utils.notEmpty(proc)) {
 			q = String.format("%s AND %s:%s", q, DocField.FILE, proc);
 		}
+		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
 
 		String[] fields = new String[] { DocField.FILE };
 		RangeQueryParser parser = new RangeQueryParser(fields, luceneSearch.getAnalyzer());
@@ -92,11 +92,11 @@ public class SearchController {
 		String q = obj.getString("q");
 		int size = obj.getIntValue("size");
 		String file = obj.getString("file");
-		Set<String> hosts = buildHost(obj.getString("host"));
+		String host = obj.getString("host");
+		Set<String> hosts = buildHost(host);
 		long timeEnd = obj.containsKey("end") ? obj.getLongValue("end") : now;
 		long timeStart = obj.containsKey("start") ? obj.getLongValue("start") : now;
 
-		q = String.format("%s:%s", DocField.LINE, q);
 		q = String.format("%s AND %s:%s", q, DocField.FILE, file);
 		q = escape(q, DocField.ALL_FEILD);
 		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
@@ -105,7 +105,9 @@ public class SearchController {
 		parser.addSpecFied(DocField.TIME, LongPoint.class);
 
 		out.setContentType("text/plain");
+		out.setCharacterEncoding("utf-8");
 		PrintWriter writer = out.getWriter();
+		writer.println(String.format("%s:%s", host, file));
 		SearchCallback search = new SearchCallback() {
 
 			@Override
@@ -159,17 +161,24 @@ public class SearchController {
 		RangeQueryParser parser = new RangeQueryParser(DocField.ALL_FEILD, luceneSearch.getAnalyzer());
 		parser.addSpecFied(DocField.TIME, LongPoint.class);
 
-		AtomicLong allLine = new AtomicLong();
+		AtomicLong hasAdd = new AtomicLong();
+		AtomicLong allDocs = new AtomicLong();
 		AtomicLong matchCount = new AtomicLong();
+
 		JSONObject data = new JSONObject();
 		SearchCallback search = new SearchCallback() {
 
+			private long lastMatch;
+
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, String file, String line, long matchs, long allLines) {
-				allLine.set(allLines);
-				matchCount.set(matchs);
-
+			public boolean handle(String host, String file, String line, long matchs, long docCount) {
+				if (lastMatch != matchs) {
+					lastMatch = matchs;
+					matchCount.getAndAdd(matchs);
+				}
+				allDocs.set(docCount);
+				hasAdd.getAndIncrement();
 				JSONObject files = data.getJSONObject(host);
 				if (files == null) {
 					files = new JSONObject();
@@ -184,7 +193,7 @@ public class SearchController {
 				if (line != null)
 					lines.add(line);
 
-				return true;
+				return hasAdd.get() <= size;
 			}
 		};
 
@@ -201,14 +210,14 @@ public class SearchController {
 		search.setEnd(timeEnd);
 		search.setSize(size);
 
-		long allDocs = luceneSearch.search(search);
+		luceneSearch.search(search);
 		double cost = (System.currentTimeMillis() - now) / 1000.0;
 
 		JSONObject res = new JSONObject();
 		res.put("data", data);
 		res.put("time", cost);
 		res.put("docCount", allDocs);
-		res.put("lineCount", allLine.get());
+		res.put("lineCount", allDocs);
 		res.put("matchCount", matchCount.get());
 		LOG.info("query:[{}] time:{}s", q, cost);
 		return res;

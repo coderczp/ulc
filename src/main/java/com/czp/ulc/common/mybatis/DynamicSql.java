@@ -15,6 +15,7 @@ import org.apache.ibatis.jdbc.SQL;
 import org.springframework.util.Assert;
 
 import com.czp.ulc.common.bean.HostBean;
+import com.czp.ulc.common.bean.IndexMeta;
 import com.czp.ulc.common.bean.KeywordRule;
 import com.czp.ulc.common.bean.MonitorFile;
 import com.czp.ulc.common.util.Utils;
@@ -27,6 +28,29 @@ import com.czp.ulc.common.util.Utils;
  * @version:1.0
  */
 public class DynamicSql {
+
+	public String addIndexMeta(IndexMeta meta) {
+		String update = String.format(
+				"UPDATE index_meta set bytes=bytes+%s,`lines`=+`lines`+%s,docs=docs+%s where id=0;", meta.getBytes(),
+				meta.getLines(), meta.getDocs());
+		return String.format("INSERT INTO index_meta (bytes,`lines`,docs,shard_id) VALUES(%s,%s,%s,%s);%s",
+				meta.getBytes(), meta.getLines(), meta.getDocs(), meta.getShardId(), update);
+
+	}
+
+	/***
+	 * 查询指定分片的indexMeta总数
+	 * 
+	 * @param shardId
+	 * @return
+	 */
+	public String countIndexMeta(Integer shardId) {
+		// 第0行是汇总行,mysql定时汇总
+		if (shardId == null)
+			return "select bytes,`lines`,docs from index_meta where id=0";
+		return "select sum(bytes) as bytes,sum(`lines`) as `lines`,sum(docs) as docs from index_meta where id>0 and shardId="
+				+ shardId;
+	}
 
 	/***
 	 * 查询主机信息

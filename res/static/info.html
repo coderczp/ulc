@@ -58,8 +58,17 @@
 	</div>
 	<script type="text/javascript">
 		$.get('./meta', function(resp) {
-			var mbSize = resp.bytes / 1024 / 1024;
-			var html = "<br>日志大小(mb):" + parseInt(mbSize);
+			var html = "";
+			var mb = 1024 * 1024;
+			var bytes = resp.bytes;
+			var mbSize = 0, gbSize = 0;
+			if (bytes <= 1024) {
+				html = "日志大小(KB):" + bytes;
+			} else if ((mbSize = bytes / mb) <= 1024) {
+				html = "日志大小(MB):" + parseInt(mbSize);
+			} else {
+				html = "日志大小(GB):" + parseInt(mbSize / 1024);
+			}
 			html += "<br>日志行数:" + (resp.lines);
 			html += "<br>文档总数:" + (resp.docs);
 			$('#result').html(html);

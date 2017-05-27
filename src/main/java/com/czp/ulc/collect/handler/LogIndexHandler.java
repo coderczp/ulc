@@ -13,14 +13,15 @@ import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -47,11 +48,15 @@ import org.slf4j.LoggerFactory;
 import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.ReadResult;
 import com.czp.ulc.common.MessageListener;
+import com.czp.ulc.common.bean.IndexMeta;
+import com.czp.ulc.common.dao.IndexMetaDao;
+import com.czp.ulc.common.lucene.ConcurrentSearch;
 import com.czp.ulc.common.lucene.DocField;
 import com.czp.ulc.common.lucene.LogAnalyzer;
-import com.czp.ulc.common.meta.IndexMeta;
-import com.czp.ulc.common.meta.NewAsynIndexManager;
+import com.czp.ulc.common.lucene.SearchParam;
+import com.czp.ulc.common.meta.AsynIndexManager;
 import com.czp.ulc.common.util.Utils;
+import com.czp.ulc.main.Application;
 
 /**
  * Function:创建log索引,支持实时搜索
@@ -63,8 +68,9 @@ import com.czp.ulc.common.util.Utils;
 public class LogIndexHandler implements MessageListener<ReadResult> {
 
 	private DirectoryReader ramReader;
-	private NewAsynIndexManager readWriter;
+	private AsynIndexManager logWriter;
 	private volatile IndexWriter ramWriter;
+	private ConcurrentSearch concurrentSearch;
 	private Analyzer analyzer = new LogAnalyzer();
 	private AtomicLong nowLines = new AtomicLong();
 
@@ -89,8 +95,8 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			INDEX_DIR.mkdirs();
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
-			readWriter = new NewAsynIndexManager(DATA_DIR, INDEX_DIR, this);
-			nowLines.set(readWriter.getMeta().getLines());
+			logWriter = new AsynIndexManager(DATA_DIR, INDEX_DIR, this);
+			concurrentSearch = new ConcurrentSearch(Runtime.getRuntime().availableProcessors());
 			loadAllIndexDir();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -109,7 +115,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	@Override
 	public void onExit() {
 		Utils.close(ramWriter);
-		Utils.close(readWriter);
+		Utils.close(logWriter);
 	}
 
 	@Override
@@ -126,16 +132,15 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 				return false;
 			}
 
-			if (readWriter.checkHasFlush()) {
+			if (logWriter.checkHasFlush()) {
 				swapRamWriterReader();
 			}
 
 			nowLines.getAndIncrement();
-			writerRAMDocument(now, file, host, line);
-			readWriter.write(host, file, line, now);
+			addMemoryIndex(now, file, host, line);
+			logWriter.write(host, file, line, now);
 			long end = now = System.currentTimeMillis();
 			LOG.debug("create index time:{}ms", (end - now));
-
 			return false;
 		} catch (Exception e) {
 			LOG.error("proces message error", e);
@@ -143,34 +148,31 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		return false;
 	}
 
-	public Document writerRAMDocument(long time, String file, String host, String line) throws IOException {
+	public void addMemoryIndex(long time, String file, String host, String line) throws IOException {
 		Document doc = new Document();
 		doc.add(new LongPoint(DocField.TIME, time));
 		doc.add(new TextField(DocField.LINE, line, Field.Store.YES));
 		doc.add(new TextField(DocField.FILE, file, Field.Store.YES));
 		doc.add(new StringField(DocField.HOST, host, Field.Store.YES));
 		ramWriter.addDocument(doc);
-		return doc;
 	}
 
-	public long search(SearchCallback search) throws Exception {
+	public void search(SearchCallback search) throws Exception {
 
-		AtomicInteger hasReturn = new AtomicInteger();
-		long fileDocs = readWriter.getMeta().getDocs();
-		long ramDocs = searchInRam(search, hasReturn);
-		if (hasReturn.get() >= search.getSize())
-			return fileDocs + ramDocs;
+		long fileDocs = getMeta().getDocs() + ramReader.numDocs();
+		if (searchInRam(search, fileDocs))
+			return;
 
-		fileDocs += ramDocs;
+		List<SearchParam> searchs = new ArrayList<SearchParam>();
 		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
 			for (File indexDir : item.getValue()) {
-				searchInIndex(getCachedSearch(indexDir), item.getKey(), search, hasReturn);
-				if (hasReturn.get() >= search.getSize())
-					return fileDocs;
+				String host = item.getKey();
+				IndexSearcher searcher = getCachedSearch(indexDir);
+				searchs.add(new SearchParam(fileDocs, host, searcher, search));
 			}
 		}
-		return fileDocs;
+		concurrentSearch.search(searchs);
 	}
 
 	public void loadAllIndexDir() {
@@ -196,20 +198,23 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		}
 	}
 
-	private int searchInRam(SearchCallback search, AtomicInteger hasReturn) throws IOException {
+	private boolean searchInRam(SearchCallback search, long docCount) throws IOException {
+		boolean stop = false;
 		BooleanQuery bQuery = buildRamQuery(search);
 		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
-		TopDocs docs = ramSearcher.search(bQuery, search.getSize() - hasReturn.get());
-		hasReturn.set(docs.totalHits);
+		TopDocs docs = ramSearcher.search(bQuery, search.getSize());
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
 			Document doc = ramSearcher.doc(scoreDoc.doc, search.getFeilds());
 			String file = doc.get(DocField.FILE);
 			String host = doc.get(DocField.HOST);
 			String line = doc.get(DocField.LINE);
-			search.handle(host, file, line, hasReturn.get(), nowLines.get());
+			if (!search.handle(host, file, line, docs.totalHits, docCount)) {
+				stop = true;
+				break;
+			}
 		}
-		LOG.info("query:{} return:{} in ram", bQuery, hasReturn.get());
-		return ramSearcher.getIndexReader().numDocs();
+		LOG.info("query:{} return:{} in ram", bQuery, docs.totalHits);
+		return stop;
 	}
 
 	private BooleanQuery buildRamQuery(SearchCallback search) {
@@ -272,19 +277,6 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		}
 	}
 
-	private int searchInIndex(IndexSearcher searcher, String host, SearchCallback search, AtomicInteger hasReturn)
-			throws Exception {
-		TopDocs docs = searcher.search(search.getQuery(), search.getSize() - hasReturn.get());
-		hasReturn.addAndGet(docs.totalHits);
-		for (ScoreDoc scoreDoc : docs.scoreDocs) {
-			Document doc = searcher.doc(scoreDoc.doc, search.getFeilds());
-			String file = doc.get(DocField.FILE);
-			String data = doc.get(DocField.LINE);
-			search.handle(host, file, data, hasReturn.get(), nowLines.get());
-		}
-		return searcher.getIndexReader().numDocs();
-	}
-
 	private synchronized void swapRamWriterReader() throws IOException {
 		DirectoryReader lastReader = ramReader;
 		IndexWriter lastWriter = ramWriter;
@@ -314,8 +306,8 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			allCount += eachCount;
 			json.put(item.getKey(), eachCount);
 		}
-
-		LOG.info("count in file time:{}", (System.currentTimeMillis() - st));
+		long end = System.currentTimeMillis();
+		LOG.info("count in file time:{}", (end - st));
 		st = System.currentTimeMillis();
 
 		BooleanQuery bQuery = buildRamQuery(search);
@@ -333,11 +325,14 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			allCount++;
 		}
 		json.put("all", allCount);
-		LOG.info("count in ram time:{}", (System.currentTimeMillis() - st));
+		end = System.currentTimeMillis();
+		LOG.info("count in ram time:{}", (end - st));
 		return json;
 	}
 
 	public IndexMeta getMeta() {
-		return readWriter.getMeta();
+		IndexMeta meta = Application.getBean(IndexMetaDao.class).count(null);
+		nowLines.getAndAdd(meta.getLines());
+		return meta;
 	}
 }

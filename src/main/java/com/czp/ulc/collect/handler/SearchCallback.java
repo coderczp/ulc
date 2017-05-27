@@ -73,7 +73,7 @@ public class SearchCallback {
 		feilds.add(feild);
 	}
 
-	public boolean handle(String host, String file, String line, long matchCount, long allLines) {
+	public boolean handle(String host, String file, String line, long matchCount, long total) {
 		return false;
 	}
 }

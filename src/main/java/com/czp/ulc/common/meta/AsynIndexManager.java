@@ -5,15 +5,15 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.codecs.lucene50.Lucene50StoredFieldsFormat.Mode;
@@ -30,10 +30,12 @@ import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.handler.LogIndexHandler;
+import com.czp.ulc.common.bean.IndexMeta;
+import com.czp.ulc.common.dao.IndexMetaDao;
 import com.czp.ulc.common.lucene.DocField;
 import com.czp.ulc.common.util.Utils;
+import com.czp.ulc.main.Application;
 
 /**
  * 请添加描述 <li>创建人：Jeff.cao</li><br>
@@ -49,9 +51,10 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	private LogIndexHandler handler;
 
 	private RollingWriter writer;
-	private volatile IndexMeta meta;
+	private AtomicLong lineCount = new AtomicLong();
 	private AtomicBoolean hasCompress = new AtomicBoolean();
 	private ExecutorService worker = Executors.newSingleThreadExecutor();
+	private ConcurrentHashMap<File, IndexWriter> indexMap = new ConcurrentHashMap<>();
 
 	public static final String META_FILE_NAME = "meta.json";
 	public static final String LINE_SPLITER = getLineSpliter();
@@ -61,22 +64,21 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	public AsynIndexManager(File baseDir, File indexBaseDir, LogIndexHandler handler) {
 		this.handler = handler;
 		this.dataDir = baseDir;
-		this.meta = loadMetaInfo();
 		this.indexBaseDir = indexBaseDir;
 		this.writer = new SyncWriter(dataDir, this);
-		this.checkHasUnCompressFile(baseDir);
+		this.checkHasUnFlushFile(baseDir);
 	}
 
 	private static String getLineSpliter() {
 		return System.getProperty("os.name").toLowerCase().contains("windows") ? "\n" : "\r";
 	}
 
-	private void checkHasUnCompressFile(File baseDir) {
+	private void checkHasUnFlushFile(File baseDir) {
 		for (File file : writer.getAllFiles()) {
 			if (writer.isHistoryFile(file)) {
-				asynCompress(file);
+				onFileChange(file);
 			} else {
-				indexUnCompressFileToRAM(file);
+				indexUnFlushFileToRAM(file);
 			}
 		}
 	}
@@ -94,6 +96,7 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	public boolean write(String host, String file, String line, long now) throws Exception {
 		String string = encodeData(host, file, line, now);
 		writer.append(string.getBytes(UTF8));
+		asynAddDoc(host, file, line, now);
 		return true;
 	}
 
@@ -122,12 +125,38 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 		return new String[] { time, host, srcFile, data };
 	}
 
+	// 异步添加document
+	private void asynAddDoc(String host, String file, String line, long now) {
+		worker.execute(() -> {
+			try {
+				lineCount.getAndIncrement();
+				Date day = Utils.igroeHMSTime(now);
+				Analyzer analyzer = handler.getAnalyzer();
+				SimpleDateFormat sp = new SimpleDateFormat(LogIndexHandler.FORMAT);
+
+				Document doc = new Document();
+				doc.add(new LongPoint(DocField.TIME, now));
+				doc.add(new TextField(DocField.LINE, line, Field.Store.YES));
+				doc.add(new TextField(DocField.FILE, file, Field.Store.YES));
+
+				File indexDir = createIndexDir(sp.format(day), host);
+				IndexWriter writer = getIndexWriter(analyzer, indexMap, indexDir);
+				if (!writer.isOpen()) {// 防止被flush线程关闭
+					writer = getIndexWriter(analyzer, indexMap, indexDir);
+				}
+				writer.addDocument(doc);
+			} catch (Exception e) {
+				log.error("add documnet error", e);
+			}
+		});
+	}
+
 	/**
 	 * 进程意外退出时内存索引丢失,所以需要reload一次
 	 * 
 	 * @throws IOException
 	 */
-	private void indexUnCompressFileToRAM(File unCompressFile) {
+	private void indexUnFlushFileToRAM(File unCompressFile) {
 		try (BufferedReader br = Files.newBufferedReader(unCompressFile.toPath())) {
 			String line;
 			long now = System.currentTimeMillis();
@@ -136,12 +165,11 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 				if (decodeData == null) {
 					continue;
 				}
-				meta.updateRAMLines(1);
 				String host = decodeData[1];
 				String data = decodeData[3];
 				String srcFile = decodeData[2];
 				long time = Long.valueOf(decodeData[0]);
-				handler.writerRAMDocument(time, srcFile, host, data);
+				handler.addMemoryIndex(time, srcFile, host, data);
 			}
 			long end = System.currentTimeMillis();
 			log.info("index:{} bytes time:{} ms", unCompressFile.length(), (end - now));
@@ -150,112 +178,24 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 		}
 	}
 
-	private void asynCompress(File file) {
-		Path path = file.toPath();
-		worker.execute(new Runnable() {
-
-			@Override
-			public void run() {
-				log.info("start index file:{}", file);
-				Analyzer analyzer = handler.getAnalyzer();
-				Map<File, IndexWriter> indexMap = new HashMap<>();
-				Date day = Utils.igroeHMSTime(System.currentTimeMillis());
-				String date = new SimpleDateFormat(LogIndexHandler.FORMAT).format(day);
-
-				int lineCount = 0;
-				long docCount = 0;
-				long offset = 0;
-				try (BufferedReader br = Files.newBufferedReader(path)) {
-					String line;
-					while ((line = br.readLine()) != null) {
-						String[] decodeData = decodeData(line);
-						if (decodeData == null) {
-							continue;
-						}
-						String host = decodeData[1];
-						String data = decodeData[3];
-						String srcFile = decodeData[2];
-						long time = Long.valueOf(decodeData[0]);
-
-						File indexDir = createIndexDir(date, host);
-						IndexWriter writer = getIndexWriter(analyzer, indexMap, indexDir);
-						offset += data.length();
-						lineCount++;
-
-						Document doc = new Document();
-						doc.add(new LongPoint(DocField.TIME, time));
-						doc.add(new TextField(DocField.LINE, data, Field.Store.YES));
-						doc.add(new TextField(DocField.FILE, srcFile, Field.Store.YES));
-						writer.addDocument(doc);
-					}
-				} catch (Exception e) {
-					log.error("fail to index:" + file, e);
-				} finally {
-					docCount = closeWriters(indexMap);
-					boolean srcDelete = file.delete();
-					hasCompress.set(true);
-					handler.loadAllIndexDir();
-					updateMetaInfo(offset, lineCount, docCount);
-					log.info("index file:{} size:{} del:{}", file, offset, srcDelete);
-				}
-			}
-
-		});
-	}
-
 	/***
 	 * 更新统计信息:行数 原始字节数
 	 * 
-	 * @param sumBytes
+	 * @param bytes
 	 * @param lineCount
 	 * @throws IOException
 	 */
-	protected void updateMetaInfo(long sumBytes, long lineCount, long docCount) {
+	protected void updateMetaInfo(long bytes, long lineCount, long docCount) {
 		try {
-			if (sumBytes <= 0 || lineCount <= 0 || docCount <= 0) {
-				log.error("error meta bytes:{} line:{} docs:{}", sumBytes, lineCount, docCount);
-				return;
-			}
-
-			meta.setDocs(meta.getDocs() + docCount);
-			meta.setBytes(meta.getBytes() + sumBytes);
-			meta.setLines(meta.getLines() + lineCount);
-
-			Path path = new File(dataDir.getParentFile(), META_FILE_NAME).toPath();
-			Files.write(path, JSONObject.toJSONString(meta).getBytes(UTF8));
-
+			IndexMeta meta = new IndexMeta();
+			meta.setBytes(bytes);
+			meta.setDocs(docCount);
+			meta.setLines(lineCount);
+			Application.getBean(IndexMetaDao.class).add(meta);
 			log.info("sucess to write meta:{}", meta);
 		} catch (Exception e) {
 			log.error("updateMetaInfo error", e);
 		}
-	}
-
-	public IndexMeta getMeta() {
-		return meta;
-	}
-
-	/***
-	 * 加载meta信息
-	 * 
-	 * @return
-	 */
-	private IndexMeta loadMetaInfo() {
-		try {
-			File metaFile = new File(dataDir.getParentFile(), META_FILE_NAME);
-			if (!metaFile.exists() || metaFile.length() == 0)
-				return IndexMeta.EMPTY;
-
-			byte[] bytes = Files.readAllBytes(metaFile.toPath());
-			return JSONObject.parseObject(new String(bytes), IndexMeta.class);
-		} catch (IOException e) {
-			log.error("loadMeta index", e);
-		}
-		return IndexMeta.EMPTY;
-
-	}
-
-	public long getFolderBytes(Path path) throws IOException {
-		return Files.walk(path).map(f -> f.toFile()).filter(f -> f.isFile()).mapToLong(f -> f.length()).sum();
 	}
 
 	/***
@@ -271,14 +211,18 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 		return indexDir;
 	}
 
-	protected long closeWriters(Map<File, IndexWriter> indexMap) {
+	protected long flushIndex(Map<File, IndexWriter> indexMap) {
 		long count = 0;
+		log.info("start flush index:{}", indexMap.size());
 		for (Entry<File, IndexWriter> entry : indexMap.entrySet()) {
 			IndexWriter value = entry.getValue();
 			try {
+				long st = System.currentTimeMillis();
 				value.commit();
 				count += value.numDocs();
-				value.close();
+				indexMap.remove(entry.getKey()).close();
+				long end = System.currentTimeMillis();
+				log.info("commit index time:{}", (end - st));
 			} catch (Exception e) {
 				log.error("fail to close index writer:" + value, e);
 			}
@@ -313,6 +257,8 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	public void close() throws Exception {
 		writer.close();
 		worker.shutdown();
+		long docCount = flushIndex(indexMap);
+		updateMetaInfo(0, lineCount.getAndSet(0), docCount);
 	}
 
 	/**
@@ -321,13 +267,25 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	 * @param b
 	 * @return
 	 */
-	public boolean checkHasCompress() {
+	public boolean checkHasFlush() {
 		return hasCompress.getAndSet(false);
 	}
 
 	@Override
-	public void onFileChange(File currentFile) {
-		asynCompress(currentFile);
+	public void onFileChange(File file) {
+		worker.execute(() -> {
+			try {
+				long length = file.length();
+				long docCount = flushIndex(indexMap);
+				boolean srcDelete = file.delete();
+				hasCompress.set(true);
+				handler.loadAllIndexDir();
+				updateMetaInfo(length, lineCount.getAndSet(0), docCount);
+				log.info("index file:{} size:{} del:{}", file, length, srcDelete);
+			} catch (Exception e) {
+				log.error(e.toString(), e);
+			}
+		});
 	}
 
 }

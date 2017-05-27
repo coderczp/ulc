@@ -55,13 +55,13 @@ import com.czp.ulc.rule.AlarmSender;
 
 @EnableAutoConfiguration
 @ComponentScan(value = { "com.czp.ulc" })
-public class Application extends WebMvcConfigurerAdapter
-		implements BeanDefinitionRegistryPostProcessor, ApplicationListener<ContextRefreshedEvent> {
+public class Application extends WebMvcConfigurerAdapter implements BeanDefinitionRegistryPostProcessor,
+		ApplicationListener<ContextRefreshedEvent> {
 
 	private static Logger LOG = LoggerFactory.getLogger(Application.class);
 	private MessageCenter dispatch = MessageCenter.getInstance();
 	private LogIndexHandler listener = new LogIndexHandler();
-	private ConfigurableListableBeanFactory context;
+	private static ConfigurableListableBeanFactory context;
 	private Environment envBean;
 
 	@Override
@@ -79,7 +79,11 @@ public class Application extends WebMvcConfigurerAdapter
 		arg0.registerSingleton("messageCenter", dispatch);
 		envBean = arg0.getBean(Environment.class);
 		mergeProperties(envBean);
-		this.context = arg0;
+		context = arg0;
+	}
+
+	public static <T> T getBean(Class<T> cls) {
+		return context.getBean(cls);
 	}
 
 	/**

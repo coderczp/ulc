@@ -58,7 +58,7 @@ public class ConcurrentSearch implements ShutdownCallback {
 		ShutdownManager.getInstance().addCallback(this);
 	}
 
-	private void doSearch(AtomicBoolean isStop, SearchCallback callBack, IndexSearcher searcher, String host, long total) {
+	private void doSearch(AtomicBoolean isStop, SearchCallback callBack, IndexSearcher searcher, String host, long total, CountDownLatch lock) {
 		try {
 			Set<String> feilds = callBack.getFeilds();
 			Query query = callBack.getQuery();
@@ -72,6 +72,7 @@ public class ConcurrentSearch implements ShutdownCallback {
 					break;
 				}
 			}
+			lock.countDown();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -85,6 +86,7 @@ public class ConcurrentSearch implements ShutdownCallback {
 	public void search(SearchCallback search, ConcurrentHashMap<String, TreeMap<Long, File>> indexDirMap, long fileDocs) {
 		AtomicBoolean isStop = new AtomicBoolean();
 		Map<String, Collection<File>> dirs = findMatchIndexDir(search, indexDirMap);
+		CountDownLatch lock = new CountDownLatch(dirs.size());
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
 			if (isStop.get())
 				return;
@@ -96,14 +98,19 @@ public class ConcurrentSearch implements ShutdownCallback {
 				String host = item.getKey();
 				IndexSearcher reader = openedDir.get(indexDir);
 				if (reader != null && modifyMap.get(indexDir) >= indexDir.lastModified()) {
-					worker.execute(() -> doSearch(isStop, search, reader, host, fileDocs));
+					worker.execute(() -> doSearch(isStop, search, reader, host, fileDocs,lock));
 				} else {
 					worker.execute(() -> {
 						IndexSearcher searcher = getCachedSearch(indexDir, host);
-						doSearch(isStop, search, searcher, host, fileDocs);
+						doSearch(isStop, search, searcher, host, fileDocs,lock);
 					});
 				}
 			}
+		}
+		try {
+			lock.await();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 
 	}

@@ -13,10 +13,8 @@ import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -40,7 +38,6 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +50,6 @@ import com.czp.ulc.common.dao.IndexMetaDao;
 import com.czp.ulc.common.lucene.ConcurrentSearch;
 import com.czp.ulc.common.lucene.DocField;
 import com.czp.ulc.common.lucene.LogAnalyzer;
-import com.czp.ulc.common.lucene.SearchParam;
 import com.czp.ulc.common.meta.AsynIndexManager;
 import com.czp.ulc.common.util.Utils;
 import com.czp.ulc.main.Application;
@@ -83,8 +79,6 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	/** 索引根目录 */
 	private static final File INDEX_DIR = new File(ROOT, "index");
 
-	private ConcurrentHashMap<File, Long> modifyMap = new ConcurrentHashMap<>();
-	private ConcurrentHashMap<File, IndexSearcher> openedDir = new ConcurrentHashMap<>();
 	private ConcurrentHashMap<String, TreeMap<Long, File>> indexDirMap = new ConcurrentHashMap<>();
 
 	private static final Logger LOG = LoggerFactory.getLogger(LogIndexHandler.class);
@@ -162,17 +156,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		long fileDocs = getMeta().getDocs() + ramReader.numDocs();
 		if (searchInRam(search, fileDocs))
 			return;
-
-		List<SearchParam> searchs = new ArrayList<SearchParam>();
-		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
-		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
-			for (File indexDir : item.getValue()) {
-				String host = item.getKey();
-				IndexSearcher searcher = getCachedSearch(indexDir);
-				searchs.add(new SearchParam(fileDocs, host, searcher, search));
-			}
-		}
-		concurrentSearch.search(searchs);
+		concurrentSearch.search(search, indexDirMap, fileDocs);
 	}
 
 	public void loadAllIndexDir() {
@@ -254,29 +238,6 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		return map;
 	}
 
-	private IndexSearcher getCachedSearch(File file) throws IOException {
-		IndexSearcher reader = openedDir.get(file);
-		if (reader != null && modifyMap.get(file) >= file.lastModified()) {
-			return reader;
-		}
-		// 锁住目录
-		synchronized (file) {
-			// 关闭过期目录
-			if (reader != null) {
-				openedDir.remove(file).getIndexReader().close();
-			}
-			if (!openedDir.containsKey(file)) {
-				LOG.info("start open index:{}", file);
-				FSDirectory open = FSDirectory.open(file.toPath());
-				DirectoryReader newReader = DirectoryReader.open(open);
-				openedDir.put(file, new IndexSearcher(newReader));
-				modifyMap.put(file, file.lastModified());
-				LOG.info("sucess to open index:{}", file);
-			}
-			return openedDir.get(file);
-		}
-	}
-
 	private synchronized void swapRamWriterReader() throws IOException {
 		DirectoryReader lastReader = ramReader;
 		IndexWriter lastWriter = ramWriter;
@@ -295,39 +256,26 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	public JSONObject count(SearchCallback search) throws IOException {
 		long allCount = 0;
 		long st = System.currentTimeMillis();
-		JSONObject json = new JSONObject();
-		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
-		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
-			int eachCount = 0;
-			for (File indexDir : item.getValue()) {
-				IndexSearcher searcher = getCachedSearch(indexDir);
-				eachCount += searcher.count(search.getQuery());
-			}
-			allCount += eachCount;
-			json.put(item.getKey(), eachCount);
-		}
-		long end = System.currentTimeMillis();
-		LOG.info("count in file time:{}", (end - st));
-		st = System.currentTimeMillis();
-
+		ConcurrentHashMap<String, Object> json = new ConcurrentHashMap<String, Object>();
 		BooleanQuery bQuery = buildRamQuery(search);
 		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
 		TopDocs count = ramSearcher.search(bQuery, Integer.MAX_VALUE);
 		ScoreDoc[] dosc = count.scoreDocs;
 		for (ScoreDoc doc : dosc) {
 			String host = ramSearcher.doc(doc.doc).get(DocField.HOST);
-			Long pv = json.getLong(host);
+			Long pv = (Long) json.get(host);
 			if (pv == null) {
-				json.put(host, 1);
+				json.put(host, 1l);
 			} else {
 				json.put(host, pv + 1);
 			}
 			allCount++;
 		}
+		allCount += concurrentSearch.count(search,json,indexDirMap);
 		json.put("all", allCount);
-		end = System.currentTimeMillis();
+		long end = System.currentTimeMillis();
 		LOG.info("count in ram time:{}", (end - st));
-		return json;
+		return (JSONObject) JSONObject.toJSON(json);
 	}
 
 	public IndexMeta getMeta() {

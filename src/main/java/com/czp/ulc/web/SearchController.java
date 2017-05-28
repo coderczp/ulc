@@ -13,7 +13,9 @@ import java.io.PrintWriter;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.http.HttpServletResponse;
@@ -44,22 +46,28 @@ import com.czp.ulc.common.util.Utils;
 @RestController
 public class SearchController {
 
-	private static final long MILLS = 60 * 60 * 1000;
-
 	@Autowired
 	private LogIndexHandler luceneSearch;
+
 	private static final Logger LOG = LoggerFactory.getLogger(SearchController.class);
 
 	@RequestMapping("/count")
-	public JSONObject search(@RequestParam String file, String host, String proc, Long start, Long end)
-			throws Exception {
+	public JSONObject count(@RequestParam String json) throws Exception {
 		long now = System.currentTimeMillis();
+		JSONObject obj = JSONObject.parseObject(json);
+		String file = obj.getString("file");
+		String host = obj.getString("host");
 		Set<String> hosts = buildHost(host);
-		long timeEnd = (end == null) ? now : end;
-		long timeStart = (start == null) ? now - MILLS : start;
-		String q = String.format("%s:%s", DocField.FILE, file);
+		String proc = obj.getString("proc");
+		String q = (String) obj.getOrDefault("q", "");
+		long timeEnd = obj.containsKey("end") ? obj.getLongValue("end") : now;
+		long timeStart = obj.containsKey("start") ? obj.getLongValue("start") : now;
+
 		if (Utils.notEmpty(proc)) {
 			q = String.format("%s AND %s:%s", q, DocField.FILE, proc);
+		}
+		if (Utils.notEmpty(file)) {
+			q = String.format("%s:%s", DocField.FILE, file);
 		}
 		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
 
@@ -71,12 +79,10 @@ public class SearchController {
 		search.setBegin(timeStart);
 		search.setHosts(hosts);
 		search.setEnd(timeEnd);
-		JSONObject count = luceneSearch.count(search);
-		JSONObject res = new JSONObject();
-
-		res.put("data", count);
+		Map<String, Long> res = luceneSearch.count(search);
 		res.put("time", (System.currentTimeMillis() - now) / 1000);
-		return count;
+
+		return (JSONObject) JSONObject.toJSON(res);
 	}
 
 	@RequestMapping("/meta")
@@ -111,7 +117,7 @@ public class SearchController {
 		SearchCallback search = new SearchCallback() {
 
 			@Override
-			public boolean handle(String host, String file, String line, long matchs, long allLines) {
+			public boolean handle(String host, String file, String line) {
 				writer.println(line);
 				return true;
 			}
@@ -164,20 +170,14 @@ public class SearchController {
 		AtomicLong hasAdd = new AtomicLong();
 		AtomicLong allDocs = new AtomicLong();
 		AtomicLong matchCount = new AtomicLong();
+		CountDownLatch lock = new CountDownLatch(1);
 
 		JSONObject data = new JSONObject();
 		SearchCallback search = new SearchCallback() {
 
-			private long lastMatch;
-
 			@Override
 			@SuppressWarnings({ "unchecked" })
-			public boolean handle(String host, String file, String line, long matchs, long docCount) {
-				if (lastMatch != matchs) {
-					lastMatch = matchs;
-					matchCount.getAndAdd(matchs);
-				}
-				allDocs.set(docCount);
+			public boolean handle(String host, String file, String line) {
 				hasAdd.getAndIncrement();
 				JSONObject files = data.getJSONObject(host);
 				if (files == null) {
@@ -195,6 +195,14 @@ public class SearchController {
 
 				return hasAdd.get() <= size;
 			}
+
+			@Override
+			public void onFinish(long allDoc, long allMatch) {
+				matchCount.set(allMatch);
+				allDocs.set(allDoc);
+				lock.countDown();
+			}
+
 		};
 
 		search.addFeild(DocField.FILE);
@@ -211,7 +219,10 @@ public class SearchController {
 		search.setSize(size);
 
 		luceneSearch.search(search);
-		double cost = (System.currentTimeMillis() - now) / 1000.0;
+		lock.await();
+
+		long end = System.currentTimeMillis();
+		double cost = (end - now) / 1000.0;
 
 		JSONObject res = new JSONObject();
 		res.put("data", data);

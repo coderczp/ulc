@@ -186,14 +186,15 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	 * @throws IOException
 	 */
 	protected void updateMetaInfo(long bytes, long lineCount, long docCount) {
+		IndexMeta meta = new IndexMeta();
 		try {
-			IndexMeta meta = new IndexMeta();
 			meta.setBytes(bytes);
 			meta.setDocs(docCount);
 			meta.setLines(lineCount);
 			Application.getBean(IndexMetaDao.class).add(meta);
 			log.info("sucess to write meta:{}", meta);
 		} catch (Exception e) {
+			log.info("fail to write meta:{}", meta);
 			log.error("updateMetaInfo error", e);
 		}
 	}

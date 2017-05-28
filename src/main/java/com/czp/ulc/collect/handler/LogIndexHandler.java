@@ -11,16 +11,9 @@ package com.czp.ulc.collect.handler;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -42,7 +35,6 @@ import org.apache.lucene.store.RAMDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.ReadResult;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.bean.IndexMeta;
@@ -68,7 +60,6 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	private volatile IndexWriter ramWriter;
 	private ConcurrentSearch concurrentSearch;
 	private Analyzer analyzer = new LogAnalyzer();
-	private AtomicLong nowLines = new AtomicLong();
 
 	/** 索引文件目录日期格式 */
 	public static final String FORMAT = "yyyyMMdd";
@@ -79,8 +70,6 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	/** 索引根目录 */
 	private static final File INDEX_DIR = new File(ROOT, "index");
 
-	private ConcurrentHashMap<String, TreeMap<Long, File>> indexDirMap = new ConcurrentHashMap<>();
-
 	private static final Logger LOG = LoggerFactory.getLogger(LogIndexHandler.class);
 
 	public LogIndexHandler() {
@@ -89,8 +78,9 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			INDEX_DIR.mkdirs();
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
+			int cores = Runtime.getRuntime().availableProcessors();
 			logWriter = new AsynIndexManager(DATA_DIR, INDEX_DIR, this);
-			concurrentSearch = new ConcurrentSearch(Runtime.getRuntime().availableProcessors());
+			concurrentSearch = new ConcurrentSearch(cores, INDEX_DIR);
 			loadAllIndexDir();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -122,7 +112,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			String line = event.getLine().trim();
 			String host = event.getHost().getName();
 			if (file.isEmpty() || line.isEmpty()) {
-				LOG.info("empty file:[{}] line:[{}]", file, event.getLine());
+				LOG.info("empty file:[{}] line:[{}]", file, line);
 				return false;
 			}
 
@@ -130,7 +120,6 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 				swapRamWriterReader();
 			}
 
-			nowLines.getAndIncrement();
 			addMemoryIndex(now, file, host, line);
 			logWriter.write(host, file, line, now);
 			long end = now = System.currentTimeMillis();
@@ -152,53 +141,39 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	}
 
 	public void search(SearchCallback search) throws Exception {
-
-		long fileDocs = getMeta().getDocs() + ramReader.numDocs();
-		if (searchInRam(search, fileDocs))
-			return;
-		concurrentSearch.search(search, indexDirMap, fileDocs);
-	}
-
-	public void loadAllIndexDir() {
-		try {
-			SimpleDateFormat sp = new SimpleDateFormat(FORMAT);
-			for (File file : INDEX_DIR.listFiles()) {
-				String host = file.getName();
-				TreeMap<Long, File> indexMap = indexDirMap.get(host);
-				if (indexMap == null) {
-					indexMap = new TreeMap<>();
-					indexDirMap.put(host, indexMap);
-				}
-				// 第二层为时间目录 包含索引和数据目录
-				for (File index : file.listFiles()) {
-					if (!index.isDirectory())
-						continue;
-					indexMap.put(sp.parse(index.getName()).getTime(), index);
-				}
-			}
-			LOG.info("load all index");
-		} catch (ParseException e) {
-			LOG.error("ParseException error", e);
+		long allDocs = getMeta().getDocs() + ramReader.numDocs();
+		int memMatch = searchInRam(search, allDocs);
+		if (memMatch >= search.getSize()) {
+			search.onFinish(allDocs, memMatch);
+		} else {
+			concurrentSearch.search(search, allDocs);
 		}
 	}
 
-	private boolean searchInRam(SearchCallback search, long docCount) throws IOException {
-		boolean stop = false;
+	public void loadAllIndexDir() {
+		concurrentSearch.loadAllIndexDir();
+	}
+
+	private int searchInRam(SearchCallback search, long docCount) throws IOException {
 		BooleanQuery bQuery = buildRamQuery(search);
-		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
+		IndexSearcher ramSearcher = getRamSearcher();
 		TopDocs docs = ramSearcher.search(bQuery, search.getSize());
+		Set<String> feilds = search.getFeilds();
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
-			Document doc = ramSearcher.doc(scoreDoc.doc, search.getFeilds());
+			Document doc = ramSearcher.doc(scoreDoc.doc, feilds);
 			String file = doc.get(DocField.FILE);
 			String host = doc.get(DocField.HOST);
 			String line = doc.get(DocField.LINE);
-			if (!search.handle(host, file, line, docs.totalHits, docCount)) {
-				stop = true;
+			if (!search.handle(host, file, line)) {
 				break;
 			}
 		}
 		LOG.info("query:{} return:{} in ram", bQuery, docs.totalHits);
-		return stop;
+		return docs.totalHits;
+	}
+
+	private IndexSearcher getRamSearcher() throws IOException {
+		return new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
 	}
 
 	private BooleanQuery buildRamQuery(SearchCallback search) {
@@ -207,35 +182,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			builder.add(new TermQuery(new Term(DocField.HOST, host)), Occur.MUST);
 		}
 		builder.add(search.getQuery(), Occur.MUST);
-		builder.add(LongPoint.newRangeQuery(DocField.TIME, search.getBegin(), search.getEnd()), Occur.MUST);
 		return builder.build();
-	}
-
-	/**
-	 * 找到匹配时间点的索引目录
-	 * 
-	 * @param hosts
-	 * @param start
-	 * @param end
-	 * @return
-	 */
-	public Map<String, Collection<File>> findMatchIndexDir(SearchCallback searcher) {
-		long from = Utils.igroeHMSTime(searcher.getBegin()).getTime();
-		long to = Utils.igroeHMSTime(searcher.getEnd()).getTime();
-		Map<String, Collection<File>> map = new HashMap<>();
-		Set<String> hosts = searcher.getHosts();
-		if (hosts != null && !hosts.isEmpty()) {
-			for (String host : hosts) {
-				TreeMap<Long, File> indexs = indexDirMap.get(host);
-				if (indexs != null)
-					map.put(host, indexs.subMap(from, true, to, true).values());
-			}
-		} else {
-			for (Entry<String, TreeMap<Long, File>> entry : indexDirMap.entrySet()) {
-				map.put(entry.getKey(), entry.getValue().values());
-			}
-		}
-		return map;
 	}
 
 	private synchronized void swapRamWriterReader() throws IOException {
@@ -253,15 +200,14 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		return new IndexWriter(new RAMDirectory(), conf);
 	}
 
-	public JSONObject count(SearchCallback search) throws IOException {
+	public Map<String, Long> count(SearchCallback search) throws IOException {
 		long allCount = 0;
 		long st = System.currentTimeMillis();
-		ConcurrentHashMap<String, Object> json = new ConcurrentHashMap<String, Object>();
 		BooleanQuery bQuery = buildRamQuery(search);
-		IndexSearcher ramSearcher = new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
+		IndexSearcher ramSearcher = getRamSearcher();
 		TopDocs count = ramSearcher.search(bQuery, Integer.MAX_VALUE);
-		ScoreDoc[] dosc = count.scoreDocs;
-		for (ScoreDoc doc : dosc) {
+		ConcurrentHashMap<String, Long> json = new ConcurrentHashMap<>();
+		for (ScoreDoc doc : count.scoreDocs) {
 			String host = ramSearcher.doc(doc.doc).get(DocField.HOST);
 			Long pv = (Long) json.get(host);
 			if (pv == null) {
@@ -271,16 +217,14 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			}
 			allCount++;
 		}
-		allCount += concurrentSearch.count(search,json,indexDirMap);
-		json.put("all", allCount);
+		long fileCount = concurrentSearch.count(search, json);
+		json.put("count", allCount + fileCount);
 		long end = System.currentTimeMillis();
 		LOG.info("count in ram time:{}", (end - st));
-		return (JSONObject) JSONObject.toJSON(json);
+		return json;
 	}
 
 	public IndexMeta getMeta() {
-		IndexMeta meta = Application.getBean(IndexMetaDao.class).count(null);
-		nowLines.getAndAdd(meta.getLines());
-		return meta;
+		return Application.getBean(IndexMetaDao.class).count(null);
 	}
 }

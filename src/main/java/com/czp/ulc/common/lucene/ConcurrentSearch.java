@@ -10,9 +10,11 @@
 package com.czp.ulc.common.lucene;
 
 import java.io.File;
-import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -26,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
@@ -34,6 +37,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.czp.ulc.collect.handler.LogIndexHandler;
 import com.czp.ulc.collect.handler.SearchCallback;
 import com.czp.ulc.common.shutdown.ShutdownCallback;
 import com.czp.ulc.common.shutdown.ShutdownManager;
@@ -48,31 +52,60 @@ import com.czp.ulc.common.util.Utils;
  */
 public class ConcurrentSearch implements ShutdownCallback {
 
+	private File indexDir;
 	private ExecutorService worker;
 	private ConcurrentHashMap<File, Long> modifyMap = new ConcurrentHashMap<>();
 	private ConcurrentHashMap<File, IndexSearcher> openedDir = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<String, TreeMap<Long, File>> indexDirMap = new ConcurrentHashMap<>();
+
 	private static final Logger LOG = LoggerFactory.getLogger(ConcurrentSearch.class);
 
-	public ConcurrentSearch(int threadSize) {
+	public ConcurrentSearch(int threadSize, File indexDir) {
+		this.indexDir = indexDir;
 		this.worker = Executors.newFixedThreadPool(threadSize);
 		ShutdownManager.getInstance().addCallback(this);
 	}
 
-	private void doSearch(AtomicBoolean isStop, SearchCallback callBack, IndexSearcher searcher, String host, long total, CountDownLatch lock) {
+	public void loadAllIndexDir() {
 		try {
-			Set<String> feilds = callBack.getFeilds();
+			SimpleDateFormat sp = new SimpleDateFormat(LogIndexHandler.FORMAT);
+			for (File file : indexDir.listFiles()) {
+				String host = file.getName();
+				TreeMap<Long, File> indexMap = indexDirMap.get(host);
+				if (indexMap == null) {
+					indexMap = new TreeMap<>();
+					indexDirMap.put(host, indexMap);
+				}
+				// 第二层为时间目录 包含索引和数据目录
+				for (File index : file.listFiles()) {
+					if (!index.isDirectory())
+						continue;
+					indexMap.put(sp.parse(index.getName()).getTime(), index);
+				}
+			}
+			LOG.info("load all index");
+		} catch (ParseException e) {
+			LOG.error("ParseException error", e);
+		}
+	}
+
+	private void doSearch(AtomicBoolean isFinish, AtomicLong matchs, SearchCallback callBack, IndexSearcher searcher,
+			String host, long total) {
+		try {
 			Query query = callBack.getQuery();
+			Set<String> feilds = callBack.getFeilds();
 			TopDocs docs = searcher.search(query, callBack.getSize());
 			for (ScoreDoc scoreDoc : docs.scoreDocs) {
 				Document doc = searcher.doc(scoreDoc.doc, feilds);
 				String file = doc.get(DocField.FILE);
 				String line = doc.get(DocField.LINE);
-				if (!callBack.handle(host, file, line, docs.totalHits, total)) {
-					isStop.set(true);
+				if (!callBack.handle(host, file, line)) {
+					isFinish.set(true);
 					break;
 				}
 			}
-			lock.countDown();
+			if (isFinish.get())
+				callBack.onFinish(total, matchs.get());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -83,54 +116,46 @@ public class ConcurrentSearch implements ShutdownCallback {
 		worker.shutdownNow();
 	}
 
-	public void search(SearchCallback search, ConcurrentHashMap<String, TreeMap<Long, File>> indexDirMap, long fileDocs) {
-		AtomicBoolean isStop = new AtomicBoolean();
-		Map<String, Collection<File>> dirs = findMatchIndexDir(search, indexDirMap);
-		CountDownLatch lock = new CountDownLatch(dirs.size());
+	public void search(SearchCallback search, long fileDocs) {
+		AtomicLong matchCount = new AtomicLong();
+		AtomicBoolean finish = new AtomicBoolean();
+		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
-			if (isStop.get())
-				return;
+			if (finish.get())
+				break;
 
 			for (File indexDir : item.getValue()) {
-				if (isStop.get())
-					return;
+				if (finish.get())
+					break;
 
-				String host = item.getKey();
-				IndexSearcher reader = openedDir.get(indexDir);
-				if (reader != null && modifyMap.get(indexDir) >= indexDir.lastModified()) {
-					worker.execute(() -> doSearch(isStop, search, reader, host, fileDocs,lock));
-				} else {
-					worker.execute(() -> {
-						IndexSearcher searcher = getCachedSearch(indexDir, host);
-						doSearch(isStop, search, searcher, host, fileDocs,lock);
-					});
-				}
+				worker.execute(() -> {
+					String host = item.getKey();
+					IndexSearcher searcher = getCachedSearch(indexDir, host);
+					doSearch(finish, matchCount, search, searcher, host, fileDocs);
+				});
 			}
 		}
-		try {
-			lock.await();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
 
+		if (finish.get() || dirs.isEmpty())
+			search.onFinish(fileDocs, matchCount.get());
 	}
 
 	private IndexSearcher getCachedSearch(File file, String host) {
 		try {
-			IndexSearcher reader = openedDir.get(file);
-			if (reader != null && modifyMap.get(file) >= file.lastModified()) {
-				return reader;
+			IndexSearcher searcher = openedDir.get(file);
+			if (searcher != null && modifyMap.get(file) >= file.lastModified()) {
+				return searcher;
 			}
 			// 锁住目录
 			synchronized (file) {
 				// 关闭过期目录
-				if (reader != null) {
+				if (searcher != null) {
 					openedDir.remove(file).getIndexReader().close();
 				}
 				if (!openedDir.containsKey(file)) {
 					LOG.info("start open index:{}", file);
-					FSDirectory open = FSDirectory.open(file.toPath());
-					DirectoryReader newReader = DirectoryReader.open(open);
+					FSDirectory index = FSDirectory.open(file.toPath());
+					DirectoryReader newReader = DirectoryReader.open(index);
 					openedDir.put(file, new IndexSearcher(newReader));
 					modifyMap.put(file, file.lastModified());
 					LOG.info("sucess to open index:{}", file);
@@ -138,7 +163,7 @@ public class ConcurrentSearch implements ShutdownCallback {
 				return openedDir.get(file);
 			}
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new RuntimeException(e.toString(), e.getCause());
 		}
 	}
 
@@ -150,8 +175,7 @@ public class ConcurrentSearch implements ShutdownCallback {
 	 * @param end
 	 * @return
 	 */
-	public Map<String, Collection<File>> findMatchIndexDir(SearchCallback searcher,
-			ConcurrentHashMap<String, TreeMap<Long, File>> indexDirMap) {
+	public Map<String, Collection<File>> findMatchIndexDir(SearchCallback searcher) {
 		long from = Utils.igroeHMSTime(searcher.getBegin()).getTime();
 		long to = Utils.igroeHMSTime(searcher.getEnd()).getTime();
 		Map<String, Collection<File>> map = new HashMap<>();
@@ -159,47 +183,62 @@ public class ConcurrentSearch implements ShutdownCallback {
 		if (hosts != null && !hosts.isEmpty()) {
 			for (String host : hosts) {
 				TreeMap<Long, File> indexs = indexDirMap.get(host);
-				if (indexs != null)
-					map.put(host, indexs.subMap(from, true, to, true).values());
+				if (indexs != null) {
+					Collection<File> values = indexs.subMap(from, true, to, true).values();
+					removeNotIndexDir(values);
+					if (values.size() > 0)
+						map.put(host, values);
+				}
 			}
 		} else {
 			for (Entry<String, TreeMap<Long, File>> entry : indexDirMap.entrySet()) {
-				map.put(entry.getKey(), entry.getValue().values());
+				Collection<File> values = entry.getValue().values();
+				removeNotIndexDir(values);
+				if (values.size() > 0)
+					map.put(entry.getKey(), values);
 			}
 		}
 		return map;
 	}
 
-	public long count(SearchCallback search,ConcurrentHashMap<String, Object> json,ConcurrentHashMap<String, TreeMap<Long, File>> indexDirMap) {
+	// @link DirectoryReader.indexExists
+	private void removeNotIndexDir(Collection<File> next) {
+		String prefix = IndexFileNames.SEGMENTS + "_";
+		Iterator<File> it = next.iterator();
+		while (it.hasNext()) {
+			boolean find = false;
+			File dir = it.next();
+			for (String file : dir.list()) {
+				if (file.startsWith(prefix)) {
+					find = true;
+					break;
+				}
+			}
+			if (find == false)
+				it.remove();
+		}
+	}
+
+	public long count(SearchCallback search, ConcurrentHashMap<String, Long> json) {
 		AtomicLong count = new AtomicLong();
-		Map<String, Collection<File>> dirs = findMatchIndexDir(search, indexDirMap);
+		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
+		if (dirs.isEmpty())
+			return 0;
 		CountDownLatch lock = new CountDownLatch(dirs.size());
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
 			for (File indexDir : item.getValue()) {
-				String host = item.getKey();
-				IndexSearcher reader = openedDir.get(indexDir);
-				if (reader != null && modifyMap.get(indexDir) >= indexDir.lastModified()) {
+				worker.execute(() -> {
 					try {
-						int count2 = reader.count(search.getQuery());
-						count.getAndAdd(count2);
-						json.put(host, count2);
+						String host = item.getKey();
+						IndexSearcher searcher = getCachedSearch(indexDir, host);
+						long mtatch = searcher.count(search.getQuery());
+						count.getAndAdd(mtatch);
+						json.put(host, mtatch);
 						lock.countDown();
-					} catch (IOException e) {
+					} catch (Exception e) {
 						e.printStackTrace();
 					}
-				} else {
-					worker.execute(() -> {
-						try {
-							IndexSearcher searcher = getCachedSearch(indexDir, host);
-							int count2 = searcher.count(search.getQuery());
-							count.getAndAdd(count2);
-							json.put(host, count2);
-							lock.countDown();
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-					});
-				}
+				});
 			}
 		}
 		try {

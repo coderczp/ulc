@@ -11,21 +11,16 @@
 <link
 	href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
 	rel="stylesheet">
-<link
-	href="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/css/bootstrap-datetimepicker-standalone.min.css"
-	rel="stylesheet">
 <link href="css/ulc.css" rel="stylesheet">
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="http://cdn.bootcss.com/moment.js/2.18.1/moment.min.js"></script>
-<script
-	src="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/js/bootstrap-datetimepicker.min.js"></script>
 <style type="text/css">
 .lines {
 	text-overflow: ellipsis;
-	background: #993366;
 	word-spacing: 1px;
-	color: white;
+	font-size: x-small;
+	margin-bottom: 10px;
 }
 
 .keyword {
@@ -36,6 +31,16 @@
 code {
 	color: white;
 	background-color: #993366;
+}
+
+.datainp {
+	width: 200px;
+	height: 30px;
+	border: 1px #ccc solid;
+}
+
+.datep {
+	margin-bottom: 40px;
 }
 </style>
 </head>
@@ -67,7 +72,7 @@ code {
 	<!--导航-->
 	<div class="container" style="margin-top: 50px">
 		<div class="row" style="padding-top: 20px; padding-bottom: 5px;">
-			<div class="input-group">
+			<div class="input-group col-sm-8">
 				<input type="text" id="q" class="form-control" placeholder="输入关键字">
 				<div class="input-group-btn">
 					<button type="button" class="btn  btn-success" onclick="doQuery()">Go!</button>
@@ -79,30 +84,14 @@ code {
 			</div>
 		</div>
 		<div class="row  collapse" id="cdt">
-			<div class="form-inline" role="form">
+			<div class="form-inline col-sm-8" role="form">
 				<div class="form-group ">
-					<select id="host" class="form-control">
+					<select id="host">
 						<option value="all">Host</option>
 					</select>
 				</div>
 				<div class="form-group">
-					<div class='input-group date' id='start'>
-						<input type='text' class="form-control" /> <span
-							class="input-group-addon"> <span
-							class="glyphicon glyphicon-calendar"></span>
-						</span>
-					</div>
-				</div>
-				<div class="form-group">
-					<div class='input-group date' id='end'>
-						<input type='text' class="form-control" /> <span
-							class="input-group-addon"> <span
-							class="glyphicon glyphicon-calendar"></span>
-						</span>
-					</div>
-				</div>
-				<div class="form-group">
-					<select id="size" class="form-control">
+					<select id="size">
 						<option value="30">Size</option>
 						<option value="50">50</option>
 						<option value="100">100</option>
@@ -110,7 +99,7 @@ code {
 					</select>
 				</div>
 				<div class="form-group">
-					<select id="proc" class="form-control">
+					<select id="proc">
 						<option value="all">Proc</option>
 						<option value="service_order">service_order</option>
 						<option value="service_product">service_product</option>
@@ -129,7 +118,7 @@ code {
 					</select>
 				</div>
 				<div class="form-group">
-					<select id="file" class="form-control">
+					<select id="file">
 						<option value="all">File</option>
 						<option value="run.log">run.log</option>
 						<option value="db.log">db.log</option>
@@ -143,6 +132,13 @@ code {
 					</select>
 				</div>
 				<div class="form-group">
+					<input id="start" type="text" size="15">
+				</div>
+				<div class="form-group">
+					<input id="end" type="text" size="15">
+				</div>
+
+				<div class="form-group">
 					<div class="checkbox">
 						<label> <input type="checkbox" id="loadLine"
 							checked="checked">加载内容
@@ -153,8 +149,8 @@ code {
 		</div>
 		<div class="row">
 			<div class="pannel" style="padding: 5px;">
-				<span id="time"></span>
-				<div id="result"></div>
+				<div id="time" style="margin-bottom: 10px;"></div>
+				<div id="result" class="row"></div>
 			</div>
 		</div>
 	</div>
@@ -169,16 +165,9 @@ code {
 		if (num > -1) {
 			$('#q').val(str.substr(num + 1));
 		}
-
-		$('#start').datetimepicker({
-			format : fmt,
-			locale : moment.locale('zh-cn')
-		}).data('DateTimePicker').date(moment(startTime).format(fmt));
-
-		$('#end').datetimepicker({
-			format : fmt,
-			locale : moment.locale('zh-cn')
-		}).data('DateTimePicker').date(moment(date).format(fmt));
+		
+		$('#end').val(moment(date).format(fmt));
+		$('#start').val(moment(startTime).format(fmt));
 
 		$.get('./host/list', function(d) {
 			var html = '<option value="">Host</option>';
@@ -198,8 +187,8 @@ code {
 				'proc' : $('#proc').val(),
 				'file' : $('#file').val(),
 				'loadLine' : $('#loadLine').is(':checked'),
-				'end' : Date.parse($('#end').data('date')),
-				'start' : Date.parse($('#start').data('date')),
+				'end' : Date.parse($('#end').val()),
+				'start' : Date.parse($('#start').val()),
 			};
 		}
 
@@ -220,19 +209,18 @@ code {
 				'json' : JSON.stringify(json)
 			}, function(resp) {
 				var data = resp.data, q = json.q;
-				var mc = resp.matchCount, cc = resp.lineCount, t = resp.time;
+				var mc = resp.matchCount, cc = resp.docCount, t = resp.time;
 				var html = '';
-				$('#time').html(
-						'find[<b>' + mc + '</b>]in[<b>' + cc
-								+ '</b>]records,time:' + t);
+				$('#time').html('ULC从[' + cc + ']中找到[' + mc + ']条数据,耗时:' + t);
 				for ( var host in data) {
 					var files = data[host];
 					for ( var file in files) {
-						html += buildLink(host, file) + '<div class="lines">';
+						html += buildLink(host, file)
+								+ '<div class="lines col-sm-6">';
 						var lines = files[file];
 						for ( var k in lines) {
-							var tmp = hightlight(lines[k], q);
-							html += '<code>' + tmp + '</code><br>';
+							var tmp = lines[k];
+							html += tmp + '<br>';
 						}
 						html += '</div><br/>';
 					}
@@ -245,8 +233,9 @@ code {
 		}
 
 		function buildLink(host, file) {
-			return "<a onclick=loadFile('" + host + "','" + file + "')>" + host
-					+ file + "</a>";
+			var func = "loadFile('" + host + "','" + file + "')";
+			return "<div class='col-sm-8'><a onclick="+func+">" + host + file
+					+ "</a></div>";
 		}
 
 		function loadFile(host, file) {
@@ -256,12 +245,6 @@ code {
 			json.size = 500;
 			var str = encodeURIComponent(JSON.stringify(json));
 			window.open("/getFile?json=" + str);
-		}
-
-		function hightlight(src, kw) {
-			var k1 = kw.split(" ");
-			var x = new RegExp(k1, "g");
-			return src.replace(x, "<span class='keyword'>" + k1 + "</span>");
 		}
 
 		if ($('#q').val()) {

@@ -130,7 +130,7 @@
 		}).data('DateTimePicker').date(moment(date).format(fmt));
 
 		$.get('./host/list', function(d) {
-			var html = '<option value="">主机(All)</option>';
+			var html = '<option value="">Host</option>';
 			for ( var i in d) {
 				var host = d[i];
 				html += '<option value='+host.name+'>' + host.name
@@ -139,19 +139,31 @@
 			$('#host').html(html);
 		});
 
+		function getCdt() {
+			return {
+				'q' : $('#q').val(),
+				'size' : $('#size').val(),
+				'host' : $('#host').val(),
+				'proc' : $('#proc').val(),
+				'file' : $('#file').val(),
+				'end' : Date.parse($('#end').data('date')),
+				'start' : Date.parse($('#start').data('date'))
+			};
+		}
 		function doQuery() {
-			var q = $('#file').val();
-			var h = $('#host').val();
-			var p = $('#proc').val();
-			var et = Date.parse($('#end').data('date'));
-			var st = Date.parse($('#start').data('date'));
-			if (!q) {
-				$('#file').val('eneter file');
+			var json = getCdt();
+			json.host = json.host == 'all' ? null : json.host;
+			json.proc = json.proc == 'all' ? null : json.proc;
+			json.file = json.file == 'all' ? null : json.file;
+
+			if (!json.file) {
+				$('#file').val('select file');
 				return;
 			}
 			$('#result').html('searching');
-			$.get('./count?file=' + q + '&host=' + h + '&start=' + st + '&end='
-					+ et + '&proc=' + p, function(resp) {
+			$.post('./count', {
+				'json' : JSON.stringify(json)
+			}, function(resp) {
 				var html = "";
 				for ( var host in resp) {
 					html += '<br><span>' + host + "</span>:" + resp[host];

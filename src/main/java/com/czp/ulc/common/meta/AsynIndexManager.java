@@ -53,6 +53,7 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 
 	private RollingWriter writer;
 	private AtomicLong lineCount = new AtomicLong();
+	private AtomicLong lastDocCount = new AtomicLong();
 	private AtomicBoolean hasCompress = new AtomicBoolean();
 	private ExecutorService worker = Executors.newSingleThreadExecutor();
 	private ConcurrentHashMap<File, IndexWriter> indexMap = new ConcurrentHashMap<>();
@@ -187,13 +188,15 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	 * @param lineCount
 	 * @throws IOException
 	 */
-	protected void updateMetaInfo(long bytes, long lineCount, long docCount) {
+	protected void updateMetaInfo(long bytes, long lines, long docs) {
 		IndexMeta meta = new IndexMeta();
 		try {
 			meta.setBytes(bytes);
-			meta.setDocs(docCount);
-			meta.setLines(lineCount);
+			meta.setLines(lines - lineCount.get());
+			meta.setDocs(docs - lastDocCount.get());
 			Application.getBean(IndexMetaDao.class).add(meta);
+			lastDocCount.set(docs);
+			lineCount.set(Math.max(0, lineCount.get() - lines));
 			log.info("sucess to write meta:{}", meta);
 		} catch (Exception e) {
 			log.info("fail to write meta:{}", meta);

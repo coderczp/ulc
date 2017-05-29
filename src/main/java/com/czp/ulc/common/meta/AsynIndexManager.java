@@ -38,7 +38,8 @@ import com.czp.ulc.common.util.Utils;
 import com.czp.ulc.main.Application;
 
 /**
- * 请添加描述 <li>创建人：Jeff.cao</li><br>
+ * 请添加描述 <br/>
+ * <li>创建人：Jeff.cao</li><br>
  * <li>创建时间：2017年5月3日 下午12:40:14</li>
  * 
  * @version 0.0.1
@@ -140,9 +141,9 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 				doc.add(new TextField(DocField.FILE, file, Field.Store.YES));
 
 				File indexDir = createIndexDir(sp.format(day), host);
-				IndexWriter writer = getIndexWriter(analyzer, indexMap, indexDir);
+				IndexWriter writer = getIndexWriter(analyzer, indexDir);
 				if (!writer.isOpen()) {// 防止被flush线程关闭
-					writer = getIndexWriter(analyzer, indexMap, indexDir);
+					writer = getIndexWriter(analyzer, indexDir);
 				}
 				writer.addDocument(doc);
 			} catch (Exception e) {
@@ -171,8 +172,9 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 				long time = Long.valueOf(decodeData[0]);
 				handler.addMemoryIndex(time, srcFile, host, data);
 			}
+			long length = unCompressFile.length();
 			long end = System.currentTimeMillis();
-			log.info("index:{} bytes time:{} ms", unCompressFile.length(), (end - now));
+			log.info("index:{} bytes time:{} ms", length, (end - now));
 		} catch (IOException e) {
 			log.error("index error", e);
 		}
@@ -231,7 +233,7 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 		return count;
 	}
 
-	protected IndexWriter getIndexWriter(Analyzer analyzer, Map<File, IndexWriter> indexMap, File indexDir) {
+	protected IndexWriter getIndexWriter(Analyzer analyzer, File indexDir) {
 		IndexWriter writer = indexMap.get(indexDir);
 		if (writer == null) {
 			writer = createIndexWriter(analyzer, indexDir);
@@ -263,7 +265,7 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	}
 
 	/**
-	 * 标记上一个文件是否压缩完成
+	 * 标记上一个文件是否写入磁盘完成
 	 * 
 	 * @param b
 	 * @return

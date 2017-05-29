@@ -146,7 +146,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		if (memMatch >= search.getSize()) {
 			search.onFinish(allDocs, memMatch);
 		} else {
-			concurrentSearch.search(search, allDocs);
+			concurrentSearch.search(search, allDocs,memMatch);
 		}
 	}
 

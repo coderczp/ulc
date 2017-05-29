@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.lucene.document.Document;
@@ -89,26 +90,32 @@ public class ConcurrentSearch implements ShutdownCallback {
 		}
 	}
 
-	private void doSearch(AtomicBoolean isFinish, AtomicLong matchs, SearchCallback callBack, IndexSearcher searcher,
-			String host, long total) {
-		try {
-			Query query = callBack.getQuery();
-			Set<String> feilds = callBack.getFeilds();
-			TopDocs docs = searcher.search(query, callBack.getSize());
-			for (ScoreDoc scoreDoc : docs.scoreDocs) {
-				Document doc = searcher.doc(scoreDoc.doc, feilds);
-				String file = doc.get(DocField.FILE);
-				String line = doc.get(DocField.LINE);
-				if (!callBack.handle(host, file, line)) {
-					isFinish.set(true);
-					break;
+	private void ansySearch(AtomicBoolean isBreak, AtomicLong matchs, AtomicInteger waitSeachNum, File indexFile,
+			SearchCallback callBack, String host, long total) {
+		worker.execute(() -> {
+			try {
+				Query query = callBack.getQuery();
+				Set<String> feilds = callBack.getFeilds();
+				IndexSearcher searcher = getCachedSearch(indexFile, host);
+				TopDocs docs = searcher.search(query, callBack.getSize());
+				matchs.getAndAdd(docs.totalHits);
+				for (ScoreDoc scoreDoc : docs.scoreDocs) {
+					Document doc = searcher.doc(scoreDoc.doc, feilds);
+					String file = doc.get(DocField.FILE);
+					String line = doc.get(DocField.LINE);
+					if (!callBack.handle(host, file, line)) {
+						isBreak.set(true);
+						break;
+					}
 				}
+			} catch (Exception e) {
+				LOG.error("ansy sear error", e);
+			} finally {
+				if (isBreak.get() || waitSeachNum.decrementAndGet() == 0)
+					callBack.onFinish(total, matchs.get());
 			}
-			if (isFinish.get())
-				callBack.onFinish(total, matchs.get());
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		});
+
 	}
 
 	@Override
@@ -116,28 +123,26 @@ public class ConcurrentSearch implements ShutdownCallback {
 		worker.shutdownNow();
 	}
 
-	public void search(SearchCallback search, long fileDocs) {
-		AtomicLong matchCount = new AtomicLong();
-		AtomicBoolean finish = new AtomicBoolean();
-		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
-		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
-			if (finish.get())
-				break;
-
-			for (File indexDir : item.getValue()) {
-				if (finish.get())
-					break;
-
-				worker.execute(() -> {
-					String host = item.getKey();
-					IndexSearcher searcher = getCachedSearch(indexDir, host);
-					doSearch(finish, matchCount, search, searcher, host, fileDocs);
-				});
+	public void search(SearchCallback search, long allDocs, int memMatch) {
+		AtomicLong match = new AtomicLong(memMatch);
+		AtomicBoolean isBreak = new AtomicBoolean();
+		AtomicInteger waitSeachNum = new AtomicInteger();
+		try {
+			Map<String, Collection<File>> dirs = findMatchIndexDir(search);
+			for (Entry<String, Collection<File>> item : dirs.entrySet()) {
+				Collection<File> value = item.getValue();
+				waitSeachNum.getAndAdd(value.size());
+				String host = item.getKey();
+				value.forEach(file -> ansySearch(isBreak, match, waitSeachNum, file, search, host, allDocs));
 			}
+		} catch (Exception e) {
+			isBreak.set(true);
+			LOG.error("search erro", e);
+		} finally {
+			if (isBreak.get() || waitSeachNum.get() == 0)
+				search.onFinish(allDocs, match.get());
 		}
 
-		if (finish.get() || dirs.isEmpty())
-			search.onFinish(fileDocs, matchCount.get());
 	}
 
 	private IndexSearcher getCachedSearch(File file, String host) {
@@ -220,10 +225,11 @@ public class ConcurrentSearch implements ShutdownCallback {
 	}
 
 	public long count(SearchCallback search, ConcurrentHashMap<String, Long> json) {
-		AtomicLong count = new AtomicLong();
 		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
 		if (dirs.isEmpty())
 			return 0;
+
+		AtomicLong count = new AtomicLong();
 		CountDownLatch lock = new CountDownLatch(dirs.size());
 		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
 			for (File indexDir : item.getValue()) {

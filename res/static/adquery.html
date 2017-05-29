@@ -149,15 +149,19 @@ code {
 		</div>
 		<div class="row">
 			<div class="pannel" style="padding: 5px;">
-				<div id="time" style="margin-bottom: 10px;"></div>
+				<div id="time" style="margin-bottom: 10px; font-size: x-small;"></div>
 				<div id="result" class="row"></div>
 			</div>
 		</div>
 	</div>
 	<script type="text/javascript">
+		var consts = {
+			'fmt' : 'YYYY/MM/DD HH:mm',
+			'dir' : '/var/www/data/work',
+			'work' : 'tomcat7/logs/'
+		};
 		var date = new Date();
 		var startTime = new Date();
-		var fmt = "YYYY/MM/DD HH:mm";
 		startTime.setHours(date.getHours() - 2);
 
 		var str = location.href;
@@ -165,9 +169,9 @@ code {
 		if (num > -1) {
 			$('#q').val(str.substr(num + 1));
 		}
-		
-		$('#end').val(moment(date).format(fmt));
-		$('#start').val(moment(startTime).format(fmt));
+
+		$('#end').val(moment(date).format(consts.fmt));
+		$('#start').val(moment(startTime).format(consts.fmt));
 
 		$.get('./host/list', function(d) {
 			var html = '<option value="">Host</option>';
@@ -186,9 +190,9 @@ code {
 				'host' : $('#host').val(),
 				'proc' : $('#proc').val(),
 				'file' : $('#file').val(),
-				'loadLine' : $('#loadLine').is(':checked'),
 				'end' : Date.parse($('#end').val()),
 				'start' : Date.parse($('#start').val()),
+				'loadLine' : $('#loadLine').is(':checked')
 			};
 		}
 
@@ -216,7 +220,7 @@ code {
 					var files = data[host];
 					for ( var file in files) {
 						html += buildLink(host, file)
-								+ '<div class="lines col-sm-6">';
+								+ '<div class="lines col-sm-8">';
 						var lines = files[file];
 						for ( var k in lines) {
 							var tmp = lines[k];
@@ -233,9 +237,11 @@ code {
 		}
 
 		function buildLink(host, file) {
+			var file0 = file.replace(consts.work, '');
+			var file1 = file0.replace(consts.dir, '');
 			var func = "loadFile('" + host + "','" + file + "')";
-			return "<div class='col-sm-8'><a onclick="+func+">" + host + file
-					+ "</a></div>";
+			return "<div class='col-sm-8' style='font-size:large;'><a style='text-decoration:underline' onclick="+func+">"
+					+ host + file1 + "</a></div>";
 		}
 
 		function loadFile(host, file) {

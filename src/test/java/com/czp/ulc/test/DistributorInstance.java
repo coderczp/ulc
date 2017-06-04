@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.dao.HostDao;
-import com.czp.ulc.common.dao.MonitoFileDao;
+import com.czp.ulc.common.dao.MonitoConfigDao;
 
 /**
  * 分布式环境下的实例：<br>
@@ -36,12 +36,12 @@ public class DistributorInstance implements Watcher, StatCallback {
 
 	private ZooKeeper zk;
 	private HostDao hostDao;
-	private MonitoFileDao mDao;
+	private MonitoConfigDao mDao;
 	private String rootNode = "ulc";
 	private String appNode = String.format("%s/apps", rootNode);
 	private static Logger LOG = LoggerFactory.getLogger(DistributorInstance.class);
 
-	public DistributorInstance(String zkServer, HostDao hostDao, MonitoFileDao mDao) {
+	public DistributorInstance(String zkServer, HostDao hostDao, MonitoConfigDao mDao) {
 		this.hostDao = hostDao;
 		this.mDao = mDao;
 

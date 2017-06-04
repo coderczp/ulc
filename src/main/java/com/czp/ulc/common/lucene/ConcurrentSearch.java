@@ -81,6 +81,7 @@ public class ConcurrentSearch implements ShutdownCallback {
 				for (File index : file.listFiles()) {
 					if (!index.isDirectory())
 						continue;
+					modifyMap.put(index, index.lastModified());
 					indexMap.put(sp.parse(index.getName()).getTime(), index);
 				}
 			}

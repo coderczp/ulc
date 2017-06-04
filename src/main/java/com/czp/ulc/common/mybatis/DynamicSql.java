@@ -17,7 +17,7 @@ import org.springframework.util.Assert;
 import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.bean.IndexMeta;
 import com.czp.ulc.common.bean.KeywordRule;
-import com.czp.ulc.common.bean.MonitorFile;
+import com.czp.ulc.common.bean.MonitorConfig;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -107,7 +107,7 @@ public class DynamicSql {
 		}.toString();
 	}
 
-	public String listMonitorFile(final MonitorFile arg) {
+	public String listMonitorFile(final MonitorConfig arg) {
 		return new SQL() {
 			{
 				SELECT("*");

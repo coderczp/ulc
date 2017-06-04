@@ -42,7 +42,7 @@ import com.czp.ulc.common.MessageCenter;
 import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.dao.HostDao;
 import com.czp.ulc.common.dao.KeywordRuleDao;
-import com.czp.ulc.common.dao.MonitoFileDao;
+import com.czp.ulc.common.dao.MonitoConfigDao;
 import com.czp.ulc.rule.AlarmSender;
 
 /**
@@ -138,7 +138,7 @@ public class Application extends WebMvcConfigurerAdapter implements BeanDefiniti
 
 	private void startMonitorHost() {
 		HostDao hostDao = context.getBean(HostDao.class);
-		MonitoFileDao mDao = context.getBean(MonitoFileDao.class);
+		MonitoConfigDao mDao = context.getBean(MonitoConfigDao.class);
 
 		List<HostBean> hosts = hostDao.list(null);
 		for (HostBean host : hosts) {

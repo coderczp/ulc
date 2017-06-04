@@ -31,8 +31,8 @@ import com.czp.ulc.common.MessageCenter;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.ThreadPools;
 import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.bean.MonitorFile;
-import com.czp.ulc.common.dao.MonitoFileDao;
+import com.czp.ulc.common.bean.MonitorConfig;
+import com.czp.ulc.common.dao.MonitoConfigDao;
 import com.czp.ulc.common.util.Utils;
 import com.jcraft.jsch.ChannelShell;
 
@@ -43,10 +43,10 @@ import com.jcraft.jsch.ChannelShell;
  * @Author:jeff.cao@aoliday.com
  * @version:1.0
  */
-public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile> {
+public class RemoteLogCollector implements Runnable, MessageListener<MonitorConfig> {
 
 	protected HostBean server;
-	protected MonitoFileDao mfdao;
+	protected MonitoConfigDao mfdao;
 	protected int retryTimes = 0;
 	protected ChannelShell shell;
 	protected int maxRetryTimes = 50;
@@ -58,7 +58,7 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 	private static Logger LOG = LoggerFactory.getLogger(RemoteLogCollector.class);
 	private static ConcurrentHashMap<Integer, Boolean> monitorHosts = new ConcurrentHashMap<>();
 
-	public RemoteLogCollector(HostBean server, MonitoFileDao dao) {
+	public RemoteLogCollector(HostBean server, MonitoConfigDao dao) {
 		this.mfdao = dao;
 		this.server = server;
 		this.messageCenter.addConcumer(this);
@@ -163,7 +163,7 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 	 * @return
 	 */
 	private JSONObject locadConfig(HostBean server) {
-		List<MonitorFile> list = queryHostMonitorFile(server);
+		List<MonitorConfig> list = queryHostMonitorFile(server);
 		if (list.isEmpty()) {
 			list = queryGlobMonitorFile();
 		}
@@ -174,7 +174,7 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 		StringBuilder tail = new StringBuilder("tail -n 1 -F ");
 		Set<String> exclude = new HashSet<String>();
 		for (int i = 0; i < list.size(); i++) {
-			MonitorFile obj = list.get(i);
+			MonitorConfig obj = list.get(i);
 			String file = obj.getFile();
 			if (tail.indexOf(file) > -1)
 				continue;
@@ -199,8 +199,8 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 	 * 
 	 * @return
 	 */
-	private List<MonitorFile> queryGlobMonitorFile() {
-		MonitorFile arg = new MonitorFile();
+	private List<MonitorConfig> queryGlobMonitorFile() {
+		MonitorConfig arg = new MonitorConfig();
 		arg.setHostId(-1);
 		return mfdao.list(arg);
 	}
@@ -211,8 +211,8 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 	 * @param server
 	 * @return
 	 */
-	private List<MonitorFile> queryHostMonitorFile(HostBean server) {
-		MonitorFile arg = new MonitorFile();
+	private List<MonitorConfig> queryHostMonitorFile(HostBean server) {
+		MonitorConfig arg = new MonitorConfig();
 		arg.setHostId(server.getId());
 		return mfdao.list(arg);
 	}
@@ -255,12 +255,12 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 	}
 
 	@Override
-	public Class<MonitorFile> processClass() {
-		return MonitorFile.class;
+	public Class<MonitorConfig> processClass() {
+		return MonitorConfig.class;
 	}
 
 	@Override
-	public boolean onMessage(MonitorFile message, Map<String, Object> ext) {
+	public boolean onMessage(MonitorConfig message, Map<String, Object> ext) {
 		String type = String.valueOf(ext.get("type"));
 		if (message.getHostId().equals(server.getId()) && "update".equals(type)) {
 			// 修改了监控文件,则触发重连
@@ -291,7 +291,7 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorFile
 	 * @param host
 	 * @param dao
 	 */
-	public static void monitorIfNotExist(HostBean host, MonitoFileDao dao) {
+	public static void monitorIfNotExist(HostBean host, MonitoConfigDao dao) {
 		if (hasMonitor(host.getId()))
 			return;
 		synchronized (monitorHosts) {

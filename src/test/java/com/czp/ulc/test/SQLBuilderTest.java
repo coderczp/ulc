@@ -21,7 +21,7 @@ import org.junit.Test;
 
 import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.bean.KeywordRule;
-import com.czp.ulc.common.bean.MonitorFile;
+import com.czp.ulc.common.bean.MonitorConfig;
 import com.czp.ulc.common.mybatis.DynamicSql;
 
 /**
@@ -58,7 +58,7 @@ public class SQLBuilderTest {
 
 	@Test
 	public void testSql3() {
-		MonitorFile rule = new MonitorFile();
+		MonitorConfig rule = new MonitorConfig();
 		rule.setHostId(1);
 		rule.setFile("./gc.log");
 		String sql = dynamicSql.listMonitorFile(rule);

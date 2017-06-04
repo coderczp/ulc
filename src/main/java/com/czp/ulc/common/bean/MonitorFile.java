@@ -1,50 +1,46 @@
+/* 
+ * 创建日期 2016-11-10
+ *
+ * 成都澳乐科技有限公司版权所有
+ * 电话：028-85253121 
+ * 传真：028-85253121
+ * 邮编：610041 
+ * 地址：成都市武侯区航空路6号丰德国际C3
+ */
 package com.czp.ulc.common.bean;
 
-import java.io.Serializable;
-
-import javax.validation.constraints.NotNull;
-
-import org.hibernate.validator.constraints.NotEmpty;
-
 /**
- * 要监控的文件
- * <li>创建人：Jeff.cao</li>
- * <li>创建时间：2017年3月30日 下午4:05:17</li>
- * 
- * @version 0.0.1
+ * Function:监控的文件
+ *
+ * @date:2017年6月1日/上午9:59:06
+ * @Author:jeff.cao@aoliday.com
+ * @version:1.0
  */
+public class MonitorFile {
 
-public class MonitorFile implements Serializable {
+	/** 主键ID */
+	private int id;
 
-	private static final long serialVersionUID = 1L;
+	/** 分片ID */
+	private int shard;
 
-	private Integer id;
-
-	/** 主机ID */
-	@NotNull(message = "host id is empty")
-	private Integer hostId;
-
-	/** 监控的文件 */
-	@NotEmpty(message = "file id is empty")
+	/** 文件名 */
 	private String file;
 
-	/** 要排除的文件 */
-	private String excludeFile;
-
-	public Integer getId() {
+	public int getId() {
 		return id;
 	}
 
-	public void setId(Integer id) {
+	public void setId(int id) {
 		this.id = id;
 	}
 
-	public Integer getHostId() {
-		return hostId;
+	public int getShard() {
+		return shard;
 	}
 
-	public void setHostId(Integer hostId) {
-		this.hostId = hostId;
+	public void setShard(int shard) {
+		this.shard = shard;
 	}
 
 	public String getFile() {
@@ -53,14 +49,6 @@ public class MonitorFile implements Serializable {
 
 	public void setFile(String file) {
 		this.file = file;
-	}
-
-	public String getExcludeFile() {
-		return excludeFile;
-	}
-
-	public void setExcludeFile(String excludeFile) {
-		this.excludeFile = excludeFile;
 	}
 
 }

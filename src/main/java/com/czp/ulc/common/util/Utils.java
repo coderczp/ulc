@@ -217,4 +217,8 @@ public class Utils {
 		String name = file.getName();
 		return Integer.parseInt(name.substring(0, name.indexOf(".")));
 	}
+
+	public static int getCpus() {
+		return Runtime.getRuntime().availableProcessors();
+	}
 }

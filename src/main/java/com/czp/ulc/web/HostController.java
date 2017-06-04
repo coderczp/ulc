@@ -27,7 +27,7 @@ import com.czp.ulc.common.MessageCenter;
 import com.czp.ulc.common.ThreadPools;
 import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.dao.HostDao;
-import com.czp.ulc.common.dao.MonitoFileDao;
+import com.czp.ulc.common.dao.MonitoConfigDao;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -45,7 +45,7 @@ public class HostController {
 	private HostDao dao;
 
 	@Autowired
-	private MonitoFileDao mdao;
+	private MonitoConfigDao mdao;
 
 	@Autowired
 	private MessageCenter messageCenter;

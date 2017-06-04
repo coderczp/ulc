@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.apache.ibatis.annotations.SelectProvider;
 
-import com.czp.ulc.common.bean.MonitorFile;
+import com.czp.ulc.common.bean.MonitorConfig;
 import com.czp.ulc.common.mybatis.BaseDao;
 import com.czp.ulc.common.mybatis.DynamicSql;
 
@@ -16,7 +16,7 @@ import com.czp.ulc.common.mybatis.DynamicSql;
  * @version 0.0.1
  */
 
-public interface MonitoFileDao extends BaseDao<MonitorFile> {
+public interface MonitoConfigDao extends BaseDao<MonitorConfig> {
 
 	/***
 	 * 查找监控文件
@@ -25,5 +25,5 @@ public interface MonitoFileDao extends BaseDao<MonitorFile> {
 	 * @return
 	 */
 	@SelectProvider(type = DynamicSql.class, method = "listMonitorFile")
-	List<MonitorFile> list(MonitorFile arg);
+	List<MonitorConfig> list(MonitorConfig arg);
 }

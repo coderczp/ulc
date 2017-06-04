@@ -78,9 +78,8 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			INDEX_DIR.mkdirs();
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
-			int cores = Runtime.getRuntime().availableProcessors();
 			logWriter = new AsynIndexManager(DATA_DIR, INDEX_DIR, this);
-			concurrentSearch = new ConcurrentSearch(cores, INDEX_DIR);
+			concurrentSearch = new ConcurrentSearch(Utils.getCpus(), INDEX_DIR);
 			loadAllIndexDir();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -113,22 +112,22 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			String host = event.getHost().getName();
 			if (file.isEmpty() || line.isEmpty()) {
 				LOG.info("empty file:[{}] line:[{}]", file, line);
-				return false;
+				return true;
 			}
 
 			if (logWriter.checkHasFlush()) {
 				swapRamWriterReader();
 			}
-
+             
 			addMemoryIndex(now, file, host, line);
 			logWriter.write(host, file, line, now);
-			long end = now = System.currentTimeMillis();
-			LOG.debug("create index time:{}ms", (end - now));
-			return false;
+			long end = System.currentTimeMillis();
+			LOG.debug("add index time:{}ms", (end - now));
+			return true;
 		} catch (Exception e) {
 			LOG.error("proces message error", e);
 		}
-		return false;
+		return true;
 	}
 
 	public void addMemoryIndex(long time, String file, String host, String line) throws IOException {
@@ -146,7 +145,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		if (memMatch >= search.getSize()) {
 			search.onFinish(allDocs, memMatch);
 		} else {
-			concurrentSearch.search(search, allDocs,memMatch);
+			concurrentSearch.search(search, allDocs, memMatch);
 		}
 	}
 

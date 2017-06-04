@@ -17,9 +17,9 @@ import com.czp.ulc.common.ArgInvalideException;
 import com.czp.ulc.common.Message;
 import com.czp.ulc.common.MessageCenter;
 import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.bean.MonitorFile;
+import com.czp.ulc.common.bean.MonitorConfig;
 import com.czp.ulc.common.dao.HostDao;
-import com.czp.ulc.common.dao.MonitoFileDao;
+import com.czp.ulc.common.dao.MonitoConfigDao;
 
 /**
  * 监控文件管理接口
@@ -34,7 +34,7 @@ import com.czp.ulc.common.dao.MonitoFileDao;
 public class MonitoFileController {
 
 	@Autowired
-	private MonitoFileDao dao;
+	private MonitoConfigDao dao;
 
 	@Autowired
 	private HostDao hostDao;
@@ -43,7 +43,7 @@ public class MonitoFileController {
 	private MessageCenter messageCenter;
 
 	@RequestMapping("/add")
-	public MonitorFile addHost(@Valid MonitorFile bean, BindingResult result) {
+	public MonitorConfig addHost(@Valid MonitorConfig bean, BindingResult result) {
 		if (result.hasErrors()) {
 			throw new ArgInvalideException(result);
 		}
@@ -63,9 +63,9 @@ public class MonitoFileController {
 	}
 
 	@RequestMapping("/del")
-	public MonitorFile del(MonitorFile arg) {
+	public MonitorConfig del(MonitorConfig arg) {
 		Assert.notNull(arg.getId(), "id is required");
-		MonitorFile inDb = dao.selectOne(arg);
+		MonitorConfig inDb = dao.selectOne(arg);
 		if (inDb != null && dao.delete(arg) > 0) {
 			notifyUpdate(inDb, "update");
 		}
@@ -73,11 +73,11 @@ public class MonitoFileController {
 	}
 
 	@RequestMapping("/list")
-	public List<MonitorFile> list(MonitorFile arg) {
+	public List<MonitorConfig> list(MonitorConfig arg) {
 		return dao.list(arg);
 	}
 
-	private void notifyUpdate(MonitorFile bean, String type) {
+	private void notifyUpdate(MonitorConfig bean, String type) {
 		Map<String, Object> ext = new HashMap<String, Object>();
 		ext.put("type", type);
 		Message message = new Message(bean, ext);

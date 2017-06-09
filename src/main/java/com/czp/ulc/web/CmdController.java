@@ -1,5 +1,7 @@
 package com.czp.ulc.web;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.ConnectManager;
 
 /**
@@ -43,21 +46,26 @@ public class CmdController {
 	}
 
 	@RequestMapping("/search")
-	public Map<String, List<String>> search(@RequestParam String proc) {
+	public List<JSONObject> search(@RequestParam String proc) {
 		String cmd = env.getProperty("process_list_cmd");
 		Assert.notNull(cmd, "process_list_cmd is nul,please add in properties");
-		Map<String, List<String>> exeInAll = ConnectManager.getInstance().exeInAll(cmd);
+		String cmd2 = cmd.concat("|grep ").concat(proc);
+		Map<String, List<String>> exeInAll = ConnectManager.getInstance().exeInAll(cmd2);
 		Set<Entry<String, List<String>>> entrySet = exeInAll.entrySet();
+		List<JSONObject> res = new ArrayList<JSONObject>();
 		for (Entry<String, List<String>> entry : entrySet) {
-			List<String> value = entry.getValue();
-			for (String string : value) {
-				if (!string.contains(proc))
-					value.remove(string);
+			Iterator<String> it = entry.getValue().iterator();
+			while (it.hasNext()) {
+				String next = it.next();
+				if (next.contains(proc)) {
+					JSONObject json = new JSONObject();
+					json.put("host", entry.getKey());
+					json.put("proc", next);
+					res.add(json);
+				}
 			}
-			if (value.isEmpty())
-				exeInAll.remove(entry.getKey());
 		}
-		return exeInAll;
+		return res;
 	}
 
 	// /***

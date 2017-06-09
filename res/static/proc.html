@@ -30,6 +30,7 @@
 				<ul class="nav navbar-nav">
 					<li class="active"><a href="./hosts.html">进程管理</a></li>
 					<li><a href="./index.html">日志搜索</a></li>
+					<li><a href="./proc.html">进程搜索</a></li>
 					<li><a href="./info.html">Info</a></li>
 					<li><a href="./pv.html">PV</a></li>
 				</ul>
@@ -52,50 +53,34 @@
 	</div>
 </body>
 <script type="text/javascript">
-	$(function() {
-		$.get('./host/search', function(d) {
-			/*var html = '<option value="">-all--</option>';
-			for ( var i in d) {
-				var host = d[i];
-				html += '<option value='+host.name+'>' + host.name
-						+ '</option>';
-			}*/
-			$('#host').html(JSON.stringify(d));
-		});
-	});
-
-	//$('#host').change(doSearch);
-	$('#search').click(function(){
-		$.get('./host/search', function(d) {
-			$('#host').html(JSON.stringify(d));
-		});
-	});
+	$('#search').click(doSearch);
 
 	function doSearch() {
-		var host = $('#host').val();
-		$.get('./proc/list?host=' + host, function(data) {
-			if (!data || data.length == 0) {
-				$('#result').html('no result');
-			} else {
-				var html = '<table class="table table-hover table-bordered">';
-				for ( var i in data) {
-					var proc = data[i];
-					var start = proc.indexOf('=') + 1;
-					var end = proc.indexOf('/tomcat7');
-					var size = end > 0 ? (end - start) : proc.length;
-					var info = proc.substr(start, size);
-					html += '<tr><td>' + createBtn(host, info) + '</td><td>'
-							+ info + '</td></tr>';
-				}
-				html += '</table>';
-				$('#result').html(html);
-			}
-		});
-
-		function createBtn(host, path) {
-			return "<button onclick=restartProc('" + host + "','" + path
-					+ "')>Restart</button>";
+		var p = $('#proc').val();
+		if (!p) {
+			return alert('input proc');
 		}
+
+		$.get('./proc/search?proc=' + p, function(data) {
+			var html = '<table class="table table-hover table-bordered">';
+			for ( var i in data) {
+				var item = data[i];
+				var proc = item.proc;
+				var host = item.host;
+				var start = proc.lastIndexOf('/') + 1;
+				var info = proc.substr(start);
+				var show_name = info + "(" + host + ")";
+				html += '<tr><td>' + createBtn(host, proc) + '</td><td>'
+						+ show_name + '</td></tr>';
+			}
+			html += '</table>';
+			$('#result').html(html);
+		});
+	}
+
+	function createBtn(host, path) {
+		return "<button onclick=restartProc('" + host + "','" + path
+				+ "')>Restart</button>";
 	}
 
 	function restartProc(host, path) {

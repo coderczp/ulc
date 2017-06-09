@@ -2,6 +2,7 @@ package com.czp.ulc.collect;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,15 @@ public class ConnectManager implements MessageListener<HostBean> {
 
 	public static ConnectManager getInstance() {
 		return INSTANCE;
+	}
+
+	public Map<String, List<String>> exeInAll(String cmd) {
+		Map<String, List<String>> map = new HashMap<String, List<String>>();
+		for (Entry<String, Session> entry : maps.entrySet()) {
+			List<String> res = exe(entry.getKey(), cmd);
+			map.put(entry.getKey(), res);
+		}
+		return map;
 	}
 
 	public List<String> exe(String host, String cmd) {

@@ -25,7 +25,9 @@ import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ApplicationListener;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.core.env.ConfigurableEnvironment;
@@ -44,6 +46,7 @@ import com.czp.ulc.common.dao.HostDao;
 import com.czp.ulc.common.dao.KeywordRuleDao;
 import com.czp.ulc.common.dao.MonitoConfigDao;
 import com.czp.ulc.rule.AlarmSender;
+import com.czp.ulc.web.AccessFilter;
 
 /**
  * Function:程序入口
@@ -70,6 +73,15 @@ public class Application extends WebMvcConfigurerAdapter implements BeanDefiniti
 		String staticFile = String.format("file:%s", resDir);
 		registry.addResourceHandler("/**").addResourceLocations(staticFile);
 		super.addResourceHandlers(registry);
+	}
+
+	@Bean
+	public FilterRegistrationBean dawsonApiFilter() {
+		String loginUrl = envBean.getProperty("login.url.itrip");
+		FilterRegistrationBean registration = new FilterRegistrationBean();
+		registration.setFilter(new AccessFilter(loginUrl));
+		registration.addUrlPatterns("/*");
+		return registration;
 	}
 
 	@Override

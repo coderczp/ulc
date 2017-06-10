@@ -9,6 +9,11 @@
  */
 package com.czp.ulc.web;
 
+import java.io.IOException;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ApplicationContext;
@@ -31,10 +36,16 @@ public class IndexController {
 
 	@Autowired
 	private ApplicationContext context;
-	
+
 	@RequestMapping("/")
 	public String index() {
 		return "index.html";
+	}
+
+	@RequestMapping("/callback")
+	public void authCallback(HttpServletRequest request, HttpServletResponse response) throws IOException {
+		String string = request.getRequestURL().toString();
+		response.sendRedirect(string.replaceAll("/callback", ""));
 	}
 
 	@ResponseBody

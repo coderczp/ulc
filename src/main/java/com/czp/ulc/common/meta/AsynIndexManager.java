@@ -66,7 +66,7 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 		this.handler = handler;
 		this.dataDir = baseDir;
 		this.indexBaseDir = indexBaseDir;
-		this.writer = new SyncWriter(dataDir, this);
+		this.writer = new RollingWriter(dataDir, this);
 		this.checkHasUnFlushFile(baseDir);
 	}
 

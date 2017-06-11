@@ -118,7 +118,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			if (logWriter.checkHasFlush()) {
 				swapRamWriterReader();
 			}
-             
+
 			addMemoryIndex(now, file, host, line);
 			logWriter.write(host, file, line, now);
 			long end = System.currentTimeMillis();

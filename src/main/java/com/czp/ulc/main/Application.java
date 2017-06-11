@@ -77,9 +77,11 @@ public class Application extends WebMvcConfigurerAdapter implements BeanDefiniti
 
 	@Bean
 	public FilterRegistrationBean dawsonApiFilter() {
-		String loginUrl = envBean.getProperty("login.url.itrip");
 		FilterRegistrationBean registration = new FilterRegistrationBean();
-		registration.setFilter(new AccessFilter(loginUrl));
+		String loginUrl = envBean.getProperty("login.url.itrip");
+		String skipUrl = envBean.getProperty("login.check.skip.url");
+		String key = envBean.getProperty("login.decrypt.key");
+		registration.setFilter(new AccessFilter(loginUrl, skipUrl, key));
 		registration.addUrlPatterns("/*");
 		return registration;
 	}

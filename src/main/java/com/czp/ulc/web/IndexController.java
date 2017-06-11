@@ -10,7 +10,9 @@
 package com.czp.ulc.web;
 
 import java.io.IOException;
+import java.net.URLDecoder;
 
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -37,6 +39,10 @@ public class IndexController {
 	@Autowired
 	private ApplicationContext context;
 
+	public static final String TOKEN = "token";
+
+	public static final String CALLBACK = "/callback";
+
 	@RequestMapping("/")
 	public String index() {
 		return "index.html";
@@ -44,8 +50,13 @@ public class IndexController {
 
 	@RequestMapping("/callback")
 	public void authCallback(HttpServletRequest request, HttpServletResponse response) throws IOException {
+		String token = request.getQueryString();
 		String string = request.getRequestURL().toString();
-		response.sendRedirect(string.replaceAll("/callback", ""));
+		if (token != null && token.contains(TOKEN)) {
+			token = token.substring(token.lastIndexOf(TOKEN) + TOKEN.length() + 1);
+			response.addCookie(new Cookie(TOKEN, URLDecoder.decode(token, "UTF-8").trim()));
+		}
+		response.sendRedirect(string.substring(0, string.indexOf(CALLBACK)));
 	}
 
 	@ResponseBody

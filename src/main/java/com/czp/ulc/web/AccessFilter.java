@@ -10,7 +10,6 @@
 package com.czp.ulc.web;
 
 import java.io.IOException;
-import java.net.URLDecoder;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -39,40 +38,34 @@ public class AccessFilter implements Filter {
 
 	/** 需要跳转的登录地址 */
 	private String loginUrl;
-	public static final String TOKEN = "token";
-	public static final String key = "O/KhRvHBBy8=";
-	public static final long timeout = 1000 * 60 * 60 * 24 * 30l;
+	private String[] skipUrls;
+	private String key = "O/KhRvHBBy8=";
+	private static final long timeout = 1000 * 60 * 60 * 24 * 30l;
 	private static Logger LOG = LoggerFactory.getLogger(AccessFilter.class);
 
-	public AccessFilter(String loginUrl) {
+	public AccessFilter(String loginUrl, String skipUrls, String key) {
+		this.skipUrls = skipUrls.split(",");
 		this.loginUrl = loginUrl;
+		this.key = key;
 	}
 
-	private boolean checkToken(String token) {
+	private boolean checkToken(String token, HttpSession session) {
 		if (token == null || token.isEmpty())
 			return false;
 		try {
 			String decrypt = Utils.decrypt(token, key, "utf-8");
-			LOG.info("user:{}", decrypt);
+			LOG.info("decrypt src:{} to:{}", token, decrypt);
 			String time = decrypt.substring(decrypt.lastIndexOf(",") + 1, decrypt.length() - 1).trim();
-			long end = System.currentTimeMillis();
-			if (end - Long.valueOf(time) > timeout) {
+			if (System.currentTimeMillis() - Long.valueOf(time) > timeout) {
 				LOG.info("token expire");
 				return false;
 			}
+			session.setAttribute("user", decrypt);
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOG.error("decrypt error", e);
 			return false;
 		}
 		return true;
-	}
-
-	@SuppressWarnings("deprecation")
-	private String getToken(HttpServletRequest request) {
-		String token = request.getQueryString();
-		if (token != null && token.contains(TOKEN))
-			return URLDecoder.decode(token.substring(token.lastIndexOf(TOKEN) + TOKEN.length() + 1)).trim();
-		return getCookie(request, TOKEN);
 	}
 
 	private String getCookie(HttpServletRequest request, String key) {
@@ -98,34 +91,35 @@ public class AccessFilter implements Filter {
 		HttpServletRequest req = (HttpServletRequest) request;
 		String url = req.getRequestURL().toString();
 		HttpSession session = req.getSession();
-		LOG.info("url:{}", url);
+		Object user = session.getAttribute("user");
+		LOG.info("url:{},user:{}", url, user);
 
-		if (url.contains("/stop") || session.getAttribute(TOKEN) != null) {
+		if (isSkipUrl(url) || user != null || url.contains(IndexController.CALLBACK)) {
 			paramFilterChain.doFilter(req, rep);
 			return;
 		}
-
-		String token = getToken(req);
-		LOG.info("token:{}", token);
-		if (!checkToken(token)) {
-			String callback = url;
-			if (!url.endsWith("/"))
-				callback = callback.concat("/");
-			if (!callback.contains("/callback"))
-				callback = callback.concat("callback");
-			String replace = loginUrl.replace("#{url}", callback);
-			rep.sendRedirect(replace);
+		String token = getCookie(req, IndexController.TOKEN);
+		if (!checkToken(token, session)) {
+			String uri = req.getRequestURI();
+			String ctx = req.getContextPath();
+			String callback = url.substring(0, url.indexOf(uri) + ctx.length());
+			callback = callback.concat(IndexController.CALLBACK);
+			rep.sendRedirect(loginUrl.replace("#{url}", callback));
 			return;
-		} else {
-			session.setAttribute(TOKEN, token);
-			rep.addCookie(new Cookie(TOKEN, token));
 		}
 		paramFilterChain.doFilter(req, rep);
 	}
 
-	@Override
-	public void init(FilterConfig paramFilterConfig) throws ServletException {
+	private boolean isSkipUrl(String url) {
+		for (String string : skipUrls) {
+			if (url.contains(string))
+				return true;
+		}
+		return false;
+	}
 
+	@Override
+	public void init(FilterConfig cfg) throws ServletException {
 	}
 
 }

@@ -36,12 +36,4 @@ public class Utils {
 		byte[] bytes = cipher.doFinal(textBytes);
 		return new String(bytes, charset);
 	}
-
-	public static void main(String[] args) throws Exception {
-		System.out
-				.println(Utils
-						.decrypt(
-								"scxKnFG6Y+0HvihAju2Yg08UQ7d1Gv/heB2rpuYXZpI4evXfqTZW8gflTKsmvrFY++m5SfhfAYU=",
-								"O/KhRvHBBy8=", "utf-8"));
-	}
 }

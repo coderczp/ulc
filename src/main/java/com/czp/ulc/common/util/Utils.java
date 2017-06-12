@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
  * @Author:jeff.cao@aoliday.com
  * @version:1.0
  */
-@SuppressWarnings("restriction")
 public class Utils {
 
 	public static final String KEY_ALGORITHM = "DES";
@@ -167,11 +166,13 @@ public class Utils {
 		return lines;
 	}
 
-	public static void close(AutoCloseable item) {
+	public static void close(AutoCloseable... items) {
 		try {
-			if (item != null) {
-				item.close();
-				LOG.debug("close:{}", item);
+			for (AutoCloseable item : items) {
+				if (item != null) {
+					item.close();
+					LOG.debug("close:{}", item);
+				}
 			}
 		} catch (Exception e) {
 			throw new RuntimeException(e);

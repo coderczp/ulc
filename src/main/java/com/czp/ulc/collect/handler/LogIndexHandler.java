@@ -39,7 +39,7 @@ import com.czp.ulc.collect.ReadResult;
 import com.czp.ulc.common.MessageListener;
 import com.czp.ulc.common.bean.IndexMeta;
 import com.czp.ulc.common.dao.IndexMetaDao;
-import com.czp.ulc.common.lucene.ConcurrentSearch;
+import com.czp.ulc.common.lucene.ParallelSearch;
 import com.czp.ulc.common.lucene.DocField;
 import com.czp.ulc.common.lucene.LogAnalyzer;
 import com.czp.ulc.common.meta.AsynIndexManager;
@@ -57,8 +57,8 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 
 	private DirectoryReader ramReader;
 	private AsynIndexManager logWriter;
+	private ParallelSearch parallelSearch;
 	private volatile IndexWriter ramWriter;
-	private ConcurrentSearch concurrentSearch;
 	private Analyzer analyzer = new LogAnalyzer();
 
 	/** 索引文件目录日期格式 */
@@ -79,7 +79,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
 			logWriter = new AsynIndexManager(DATA_DIR, INDEX_DIR, this);
-			concurrentSearch = new ConcurrentSearch(Utils.getCpus(), INDEX_DIR);
+			parallelSearch = new ParallelSearch(Utils.getCpus(), INDEX_DIR);
 			loadAllIndexDir();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -97,8 +97,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 
 	@Override
 	public void onExit() {
-		Utils.close(ramWriter);
-		Utils.close(logWriter);
+		Utils.close(ramWriter, logWriter);
 	}
 
 	@Override
@@ -145,12 +144,12 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		if (memMatch >= search.getSize()) {
 			search.onFinish(allDocs, memMatch);
 		} else {
-			concurrentSearch.search(search, allDocs, memMatch);
+			parallelSearch.search(search, allDocs, memMatch);
 		}
 	}
 
 	public void loadAllIndexDir() {
-		concurrentSearch.loadAllIndexDir();
+		parallelSearch.loadAllIndexDir();
 	}
 
 	private int searchInRam(SearchCallback search, long docCount) throws IOException {
@@ -189,8 +188,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		IndexWriter lastWriter = ramWriter;
 		ramWriter = createRAMIndexWriter();
 		ramReader = DirectoryReader.open(ramWriter);
-		Utils.close(lastReader);
-		Utils.close(lastWriter);
+		Utils.close(lastReader, lastWriter);
 		LOG.info("success to swap ram wirter");
 	}
 
@@ -200,24 +198,18 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	}
 
 	public Map<String, Long> count(SearchCallback search) throws IOException {
-		long allCount = 0;
 		long st = System.currentTimeMillis();
 		BooleanQuery bQuery = buildRamQuery(search);
 		IndexSearcher ramSearcher = getRamSearcher();
-		TopDocs count = ramSearcher.search(bQuery, Integer.MAX_VALUE);
+		TopDocs result = ramSearcher.search(bQuery, Integer.MAX_VALUE);
 		ConcurrentHashMap<String, Long> json = new ConcurrentHashMap<>();
-		for (ScoreDoc doc : count.scoreDocs) {
+		for (ScoreDoc doc : result.scoreDocs) {
 			String host = ramSearcher.doc(doc.doc).get(DocField.HOST);
 			Long pv = (Long) json.get(host);
-			if (pv == null) {
-				json.put(host, 1l);
-			} else {
-				json.put(host, pv + 1);
-			}
-			allCount++;
+			json.put(host, pv + json.getOrDefault(host, 1l));
 		}
-		long fileCount = concurrentSearch.count(search, json);
-		json.put("count", allCount + fileCount);
+		long fileCount = parallelSearch.count(search, json);
+		json.put("count", result.totalHits + fileCount);
 		long end = System.currentTimeMillis();
 		LOG.info("count in ram time:{}", (end - st));
 		return json;

@@ -158,6 +158,7 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	 * @throws IOException
 	 */
 	private void indexUnFlushFileToRAM(File unCompressFile) {
+		log.info("repair lost index:{}", unCompressFile);
 		try (BufferedReader br = Files.newBufferedReader(unCompressFile.toPath())) {
 			String line;
 			long now = System.currentTimeMillis();

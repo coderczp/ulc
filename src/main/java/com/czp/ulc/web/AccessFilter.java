@@ -36,10 +36,10 @@ import com.czp.ulc.util.Utils;
  */
 public class AccessFilter implements Filter {
 
+	private String key;
 	/** 需要跳转的登录地址 */
 	private String loginUrl;
 	private String[] skipUrls;
-	private String key = "O/KhRvHBBy8=";
 	private static final long timeout = 1000 * 60 * 60 * 24 * 30l;
 	private static Logger LOG = LoggerFactory.getLogger(AccessFilter.class);
 

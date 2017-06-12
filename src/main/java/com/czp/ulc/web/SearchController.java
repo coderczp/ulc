@@ -59,19 +59,19 @@ public class SearchController {
 		String host = obj.getString("host");
 		Set<String> hosts = buildHost(host);
 		String proc = obj.getString("proc");
-		String q = (String) obj.getOrDefault("q", "");
 		long timeEnd = obj.containsKey("end") ? obj.getLongValue("end") : now;
 		long timeStart = obj.containsKey("start") ? obj.getLongValue("start") : now;
+		String q = "";
 
 		if (Utils.notEmpty(proc)) {
-			q = String.format("%s AND %s:%s", q, DocField.FILE, proc);
+			q = String.format("%s:%s",DocField.FILE, proc);
 		}
 		if (Utils.notEmpty(file)) {
-			q = String.format("%s:%s", DocField.FILE, file);
+			q = String.format("%s AND %s:%s",q, DocField.FILE, file);
 		}
 		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
 
-		String[] fields = new String[] { DocField.FILE };
+		String[] fields = new String[] { DocField.FILE ,DocField.HOST,DocField.TIME};
 		RangeQueryParser parser = new RangeQueryParser(fields, luceneSearch.getAnalyzer());
 		parser.addSpecFied(DocField.TIME, LongPoint.class);
 		SearchCallback search = new SearchCallback();

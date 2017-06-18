@@ -3,7 +3,7 @@ package com.czp.ulc.collect.handler;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.apache.lucene.search.Query;
+import com.czp.ulc.web.QueryCondtion;
 
 /**
  * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年4月19日 上午8:58:08</li>
@@ -13,71 +13,34 @@ import org.apache.lucene.search.Query;
 
 public class SearchCallback {
 
-	private int size;
-
-	private long end;
-
-	private long begin;
-
-	private Query query;
-
-	private Set<String> hosts = new HashSet<>();
+	private QueryCondtion query;
 
 	private Set<String> feilds = new HashSet<String>();
 
-	public Set<String> getHosts() {
-		return hosts;
-	}
-
-	public void setHosts(Set<String> hosts) {
-		this.hosts = hosts;
-	}
-
-	public int getSize() {
-		return size;
-	}
-
-	public void setSize(int size) {
-		this.size = size;
-	}
-
-	public long getBegin() {
-		return begin;
-	}
-
-	public void setBegin(long begin) {
-		this.begin = begin;
-	}
-
-	public long getEnd() {
-		return end;
-	}
-
-	public void setEnd(long end) {
-		this.end = end;
-	}
-
-	public Query getQuery() {
-		return query;
-	}
-
-	public void setQuery(Query query) {
+	public SearchCallback(QueryCondtion query, String... feild) {
 		this.query = query;
+		this.addFeild(feild);
+	}
+
+	public QueryCondtion getQuery() {
+		return query;
 	}
 
 	public Set<String> getFeilds() {
 		return feilds;
 	}
 
-	public void addFeild(String feild) {
-		feilds.add(feild);
+	public void addFeild(String... feild) {
+		for (String item : feild) {
+			feilds.add(item);
+		}
 	}
 
 	public boolean handle(String host, String file, String line) {
 		return false;
 	}
 
-	public void onFinish(long allDoc,long allMatch) {
+	public void onFinish(long allDoc, long allMatch) {
 
 	}
 }

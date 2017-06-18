@@ -33,34 +33,26 @@ public class CmdController {
 
 	@RequestMapping("/list")
 	public List<String> exe(String host) {
-		String cmd = env.getProperty("process_list_cmd");
-		Assert.notNull(cmd, "process_list_cmd is nul,please add in properties");
-		return ConnectManager.getInstance().exe(host, cmd);
+		return ConnectManager.getInstance().exe(host, getCmd());
 	}
 
 	@RequestMapping("/restart")
 	public List<String> restart(String host, String path) {
 		String cmd = String.format("cd %s;./service.sh restart", path);
-		List<String> res = ConnectManager.getInstance().exe(host, cmd);
-		return res;
+		return ConnectManager.getInstance().exe(host, cmd);
 	}
 
 	@RequestMapping("/search")
 	public List<JSONObject> search(@RequestParam String proc) {
-		String cmd = env.getProperty("process_list_cmd");
-		Assert.notNull(cmd, "process_list_cmd is nul,please add in properties");
-		String cmd2 = cmd.concat("|grep ").concat(proc);
-		Map<String, List<String>> exeInAll = ConnectManager.getInstance().exeInAll(cmd2);
-		Set<Entry<String, List<String>>> entrySet = exeInAll.entrySet();
+		String cmd = getCmd().concat("|grep ").concat(proc);
 		List<JSONObject> res = new ArrayList<JSONObject>();
-		for (Entry<String, List<String>> entry : entrySet) {
-			Iterator<String> it = entry.getValue().iterator();
-			while (it.hasNext()) {
-				String next = it.next();
-				if (next.contains(proc)) {
+		Map<String, List<String>> result = ConnectManager.getInstance().exeInAll(cmd);
+		for (Entry<String, List<String>> entry : result.entrySet()) {
+			for (String it : entry.getValue()) {
+				if (it.contains(proc)) {
 					JSONObject json = new JSONObject();
 					json.put("host", entry.getKey());
-					json.put("proc", next);
+					json.put("proc", it);
 					res.add(json);
 				}
 			}
@@ -68,17 +60,9 @@ public class CmdController {
 		return res;
 	}
 
-	// /***
-	// * 检查主机的进程状态
-	// *
-	// * @param host
-	// * @return
-	// */
-	// @RequestMapping("/check")
-	// public JSONArray checkProcessStatus(int hostId) {
-	// List<String> procs = exe(hostId);
-	//
-	// return null;
-	// }
-
+	private String getCmd() {
+		String cmd = env.getProperty("process_list_cmd");
+		Assert.notNull(cmd, "process_list_cmd is nul,please add in properties");
+		return cmd;
+	}
 }

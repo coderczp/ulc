@@ -10,20 +10,18 @@
 package com.czp.ulc.web;
 
 import java.io.PrintWriter;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -33,8 +31,6 @@ import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.collect.handler.LogIndexHandler;
 import com.czp.ulc.collect.handler.SearchCallback;
 import com.czp.ulc.common.lucene.DocField;
-import com.czp.ulc.common.lucene.RangeQueryParser;
-import com.czp.ulc.common.util.Utils;
 
 /**
  * Function:搜索接口
@@ -49,39 +45,14 @@ public class SearchController {
 	@Autowired
 	private LogIndexHandler luceneSearch;
 
-	private static final Logger LOG = LoggerFactory.getLogger(SearchController.class);
-
 	@RequestMapping("/count")
 	public JSONObject count(@RequestParam String json) throws Exception {
-		long now = System.currentTimeMillis();
-		JSONObject obj = JSONObject.parseObject(json);
-		String file = obj.getString("file");
-		String host = obj.getString("host");
-		Set<String> hosts = buildHost(host);
-		String proc = obj.getString("proc");
-		long timeEnd = obj.containsKey("end") ? obj.getLongValue("end") : now;
-		long timeStart = obj.containsKey("start") ? obj.getLongValue("start") : now;
-		String q = "";
-
-		if (Utils.notEmpty(proc)) {
-			q = String.format("%s:%s",DocField.FILE, proc);
-		}
-		if (Utils.notEmpty(file)) {
-			q = String.format("%s AND %s:%s",q, DocField.FILE, file);
-		}
-		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
-
-		String[] fields = new String[] { DocField.FILE ,DocField.HOST,DocField.TIME};
-		RangeQueryParser parser = new RangeQueryParser(fields, luceneSearch.getAnalyzer());
-		parser.addSpecFied(DocField.TIME, LongPoint.class);
-		SearchCallback search = new SearchCallback();
-		search.setQuery(parser.parse(q));
-		search.setBegin(timeStart);
-		search.setHosts(hosts);
-		search.setEnd(timeEnd);
+		long start = System.currentTimeMillis();
+		QueryCondtion cdt = createCdtFromJson(json);
+		SearchCallback search = new SearchCallback(cdt);
 		Map<String, Long> res = luceneSearch.count(search);
-		res.put("time", (System.currentTimeMillis() - now) / 1000);
-
+		long now = System.currentTimeMillis();
+		res.put("time", (now - start));
 		return (JSONObject) JSONObject.toJSON(res);
 	}
 
@@ -91,92 +62,56 @@ public class SearchController {
 	}
 
 	@RequestMapping("/getFile")
-	public void getFile(@RequestParam String json, HttpServletResponse out) throws Exception {
-		long now = System.currentTimeMillis();
-		JSONObject obj = JSONObject.parseObject(json);
-
-		String q = obj.getString("q");
-		int size = obj.getIntValue("size");
-		String file = obj.getString("file");
-		String host = obj.getString("host");
-		Set<String> hosts = buildHost(host);
-		long timeEnd = obj.containsKey("end") ? obj.getLongValue("end") : now;
-		long timeStart = obj.containsKey("start") ? obj.getLongValue("start") : now;
-
-		q = String.format("%s AND %s:%s", q, DocField.FILE, file);
-		q = escape(q, DocField.ALL_FEILD);
-		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
-
-		RangeQueryParser parser = new RangeQueryParser(DocField.ALL_FEILD, luceneSearch.getAnalyzer());
-		parser.addSpecFied(DocField.TIME, LongPoint.class);
-
-		out.setContentType("text/plain");
+	public void getFile(@RequestParam String json, HttpServletRequest req, HttpServletResponse out) throws Exception {
+		QueryCondtion cdt = createCdtFromJson(json);
+		String file = cdt.getFile();
+		cdt.setSize(Math.min(1000, cdt.getSize()));
+		cdt.setFile(file.substring(file.lastIndexOf("/")+1));
 		out.setCharacterEncoding("utf-8");
+		out.setContentType("text/plain;charset=utf-8");
 		PrintWriter writer = out.getWriter();
-		writer.println(String.format("%s:%s", host, file));
-		SearchCallback search = new SearchCallback() {
+
+		CountDownLatch lock = new CountDownLatch(1);
+		writer.println(json);
+		
+		luceneSearch.search(new SearchCallback(cdt, DocField.ALL_FEILD) {
 
 			@Override
 			public boolean handle(String host, String file, String line) {
 				writer.println(line);
 				return true;
 			}
-		};
 
-		search.addFeild(DocField.FILE);
-		search.addFeild(DocField.TIME);
-		search.addFeild(DocField.HOST);
-		search.addFeild(DocField.LINE);
-		search.setQuery(parser.parse(q));
+			@Override
+			public void onFinish(long allDoc, long allMatch) {
+				writer.flush();
+				writer.close();
+				lock.countDown();
+			}
+		});
+		lock.await(2, TimeUnit.MINUTES);
+	}
 
-		search.setBegin(timeStart);
-		search.setHosts(hosts);
-		search.setEnd(timeEnd);
-		search.setSize(Math.min(1000, size));
-
-		luceneSearch.search(search);
-		out.getWriter().close();
+	private QueryCondtion createCdtFromJson(String json) {
+		QueryCondtion cdt = JSONObject.parseObject(json, QueryCondtion.class);
+		cdt.setAnalyzer(luceneSearch.getAnalyzer());
+		return cdt;
 	}
 
 	@RequestMapping("/search")
-	public JSONObject search(@RequestParam String json) throws Exception {
-		long now = System.currentTimeMillis();
-		JSONObject obj = JSONObject.parseObject(json);
-
-		String q = obj.getString("q");
-		int size = obj.getIntValue("size");
-		String proc = obj.getString("proc");
-		String file = obj.getString("file");
-		Boolean loadLine = obj.getBoolean("loadLine");
-		Set<String> hosts = buildHost(obj.getString("host"));
-		long timeEnd = obj.containsKey("end") ? obj.getLongValue("end") : now;
-		long timeStart = obj.containsKey("start") ? obj.getLongValue("start") : now;
-
-		if (!q.startsWith(DocField.LINE)) {
-			q = String.format("%s:%s", DocField.LINE, q);
-		}
-		if (Utils.notEmpty(proc)) {
-			q = String.format("%s AND %s:%s", q, DocField.FILE, proc);
-		}
-		if (Utils.notEmpty(file)) {
-			q = String.format("%s AND %s:%s", q, DocField.FILE, file);
-		}
-		q = escape(q, DocField.ALL_FEILD);
-		q = String.format("%s AND %s:[%s TO %s]", q, DocField.TIME, timeStart, timeEnd);
-
-		RangeQueryParser parser = new RangeQueryParser(DocField.ALL_FEILD, luceneSearch.getAnalyzer());
-		parser.addSpecFied(DocField.TIME, LongPoint.class);
-
-		AtomicLong hasAdd = new AtomicLong();
-		AtomicLong allDocs = new AtomicLong();
-		AtomicLong matchCount = new AtomicLong();
+	public Map<String,Object> search(@RequestParam String json, HttpServletRequest req, HttpServletResponse resp) throws Exception {
+		
 		CountDownLatch lock = new CountDownLatch(1);
+		QueryCondtion cdt = createCdtFromJson(json);
+		Map<String,Object> res = new ConcurrentHashMap<>();
+		
+		luceneSearch.search(new SearchCallback(cdt, cdt.isLoadLine()?DocField.ALL_FEILD:DocField.NO_LINE_FEILD) {
 
-		JSONObject data = new JSONObject();
-		SearchCallback search = new SearchCallback() {
+			JSONObject data = new JSONObject();
+			AtomicLong hasAdd = new AtomicLong();
+			long now = System.currentTimeMillis();
 
 			@Override
-			@SuppressWarnings({ "unchecked" })
 			public boolean handle(String host, String file, String line) {
 				hasAdd.getAndIncrement();
 				JSONObject files = data.getJSONObject(host);
@@ -185,7 +120,7 @@ public class SearchController {
 					data.put(host, files);
 				}
 
-				List<String> lines = (List<String>) files.get(file);
+				List<Object> lines = files.getJSONArray(file);
 				if (lines == null) {
 					lines = new LinkedList<>();
 					files.put(file, lines);
@@ -193,48 +128,25 @@ public class SearchController {
 				if (line != null)
 					lines.add(line);
 
-				return hasAdd.get() <= size;
+				return hasAdd.get() <= cdt.getSize();
 			}
 
 			@Override
 			public void onFinish(long allDoc, long allMatch) {
-				matchCount.set(allMatch);
-				allDocs.set(allDoc);
+				long end = System.currentTimeMillis();
+				res.put("data", data);
+				res.put("docCount", allDoc);
+				res.put("lineCount", allDoc);
+				res.put("time", (end - now));
+				res.put("matchCount", allMatch);
 				lock.countDown();
 			}
-
-		};
-
-		search.addFeild(DocField.FILE);
-		search.addFeild(DocField.TIME);
-		search.addFeild(DocField.HOST);
-
-		if (Boolean.TRUE.equals(loadLine))
-			search.addFeild(DocField.LINE);
-
-		search.setQuery(parser.parse(q));
-		search.setBegin(timeStart);
-		search.setHosts(hosts);
-		search.setEnd(timeEnd);
-		search.setSize(size);
-
-		luceneSearch.search(search);
-		lock.await();
-
-		long end = System.currentTimeMillis();
-		double cost = (end - now) / 1000.0;
-
-		JSONObject res = new JSONObject();
-		res.put("data", data);
-		res.put("time", cost);
-		res.put("docCount", allDocs);
-		res.put("lineCount", allDocs);
-		res.put("matchCount", matchCount.get());
-		LOG.info("query:[{}] time:{}s", q, cost);
+		});
+		lock.await(10, TimeUnit.MINUTES);
 		return res;
 	}
 
-	private String escape(String q, String[] allFeild) {
+	public String escape(String q, String[] allFeild) {
 		// 先把所有DocField.ALL_FEILD开通的替换如: 空白l:error->空白l#error
 		for (String string : allFeild) {
 			if (q.startsWith(string)) {
@@ -254,15 +166,5 @@ public class SearchController {
 			}
 		}
 		return q;
-	}
-
-	private Set<String> buildHost(String host) {
-		Set<String> hostSet = new HashSet<>();
-		if (!Utils.notEmpty(host))
-			return hostSet;
-		for (String string : host.split(",")) {
-			hostSet.add(string);
-		}
-		return hostSet;
 	}
 }

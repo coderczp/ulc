@@ -13,7 +13,6 @@ import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -32,7 +31,6 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
@@ -44,6 +42,7 @@ import com.czp.ulc.collect.handler.SearchCallback;
 import com.czp.ulc.common.shutdown.ShutdownCallback;
 import com.czp.ulc.common.shutdown.ShutdownManager;
 import com.czp.ulc.common.util.Utils;
+import com.czp.ulc.web.QueryCondtion;
 
 /**
  * Function:并行搜索
@@ -108,28 +107,29 @@ public class ParallelSearch implements ShutdownCallback {
 	}
 
 	private void ansySearch(AtomicBoolean isBreak, AtomicLong matchs, AtomicInteger waitSeachNum, File indexFile,
-			SearchCallback callBack, String host, long total) {
+			SearchCallback search, String host, long total) {
 		worker.execute(() -> {
 			try {
-				Query query = callBack.getQuery();
-				Set<String> feilds = callBack.getFeilds();
+				QueryCondtion cdt = search.getQuery();
+				Set<String> feilds = search.getFeilds();
 				IndexSearcher searcher = getCachedSearch(indexFile, host);
-				TopDocs docs = searcher.search(query, callBack.getSize());
+				TopDocs docs = searcher.search(cdt.getQuery(), cdt.getSize());
 				matchs.getAndAdd(docs.totalHits);
 				for (ScoreDoc scoreDoc : docs.scoreDocs) {
 					Document doc = searcher.doc(scoreDoc.doc, feilds);
 					String file = doc.get(DocField.FILE);
 					String line = doc.get(DocField.LINE);
-					if (!callBack.handle(host, file, line)) {
+					if (!search.handle(host, file, line)) {
 						isBreak.set(true);
 						break;
 					}
 				}
+				LOG.info("finish search in {} total {}",indexFile,docs.totalHits);
 			} catch (Exception e) {
 				LOG.error("ansy sear error", e);
 			} finally {
 				if (isBreak.get() || waitSeachNum.decrementAndGet() == 0)
-					callBack.onFinish(total, matchs.get());
+					search.onFinish(total, matchs.get());
 			}
 		});
 
@@ -141,6 +141,7 @@ public class ParallelSearch implements ShutdownCallback {
 	}
 
 	public void search(SearchCallback search, long allDocs, int memMatch) {
+
 		AtomicLong match = new AtomicLong(memMatch);
 		AtomicBoolean isBreak = new AtomicBoolean();
 		AtomicInteger waitSeachNum = new AtomicInteger();
@@ -198,12 +199,11 @@ public class ParallelSearch implements ShutdownCallback {
 	 * @return
 	 */
 	public Map<String, Collection<File>> findMatchIndexDir(SearchCallback searcher) {
-		Date igroeHMSTime = Utils.igroeHMSTime(searcher.getBegin());
-		Date igroeHMSTime2 = Utils.igroeHMSTime(searcher.getEnd());
-		long from = igroeHMSTime.getTime();
-		long to = igroeHMSTime2.getTime();
+		QueryCondtion query = searcher.getQuery();
+		long to = Utils.igroeHMSTime(query.getEnd()).getTime();
+		long from = Utils.igroeHMSTime(query.getStart()).getTime();
 		Map<String, Collection<File>> map = new HashMap<>();
-		Set<String> hosts = searcher.getHosts();
+		Set<String> hosts = query.getHosts();
 		if (hosts != null && !hosts.isEmpty()) {
 			for (String host : hosts) {
 				TreeMap<Long, File> indexs = indexDirMap.get(host);
@@ -214,6 +214,7 @@ public class ParallelSearch implements ShutdownCallback {
 		} else {
 			indexDirMap.forEach((k, v) -> getMatchTimeDir(from, to, map, k, v));
 		}
+		LOG.info("find {} dirs", map);
 		return map;
 	}
 
@@ -267,7 +268,7 @@ public class ParallelSearch implements ShutdownCallback {
 			try {
 				String host = item.getKey();
 				IndexSearcher searcher = getCachedSearch(indexDir, host);
-				long mtatch = searcher.count(search.getQuery());
+				long mtatch = searcher.count(search.getQuery().getQuery());
 				json.put(host, mtatch + json.getOrDefault(host, 0l));
 				count.getAndAdd(mtatch);
 				lock.countDown();

@@ -33,6 +33,7 @@ import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
@@ -56,6 +57,7 @@ import com.czp.ulc.web.AccessFilter;
  * @version:1.0
  */
 
+@EnableAsync
 @EnableAutoConfiguration
 @ComponentScan(value = { "com.czp.ulc" })
 public class Application extends WebMvcConfigurerAdapter implements BeanDefinitionRegistryPostProcessor,
@@ -74,7 +76,7 @@ public class Application extends WebMvcConfigurerAdapter implements BeanDefiniti
 		registry.addResourceHandler("/**").addResourceLocations(staticFile);
 		super.addResourceHandlers(registry);
 	}
-
+	 
 	@Bean
 	public FilterRegistrationBean dawsonApiFilter() {
 		FilterRegistrationBean registration = new FilterRegistrationBean();

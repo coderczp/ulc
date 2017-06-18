@@ -10,6 +10,7 @@
 package com.czp.ulc.web;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
@@ -24,6 +25,7 @@ import org.springframework.validation.ObjectError;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.handler.AbstractHandlerExceptionResolver;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.common.ArgInvalideException;
 
@@ -37,7 +39,7 @@ import com.czp.ulc.common.ArgInvalideException;
 @Component
 public class WebErrorHandler extends AbstractHandlerExceptionResolver {
 
-	private final static String JSON = "application/json;utf-8";
+	private final static String JSON_TYPE = "application/json;utf-8";
 	private static final Logger LOG = LoggerFactory.getLogger(WebErrorHandler.class);
 
 	@Override
@@ -91,12 +93,23 @@ public class WebErrorHandler extends AbstractHandlerExceptionResolver {
 
 	}
 
-	private void writeToClient(HttpServletRequest req, HttpServletResponse resp, String res) throws IOException {
+	public static void writeToClient(HttpServletRequest req, HttpServletResponse resp, String res) throws IOException {
 		String type = req.getContentType();
-		resp.setContentType(type == null ? JSON : type);
+		resp.setContentType(type == null ? JSON_TYPE : type);
 		resp.getWriter().print(res);
 		resp.getWriter().flush();
 		resp.getWriter().close();
+	}
+	
+	public static void writeJSON(HttpServletResponse resp, JSON res) {
+		try {
+			resp.setContentType(JSON_TYPE);
+			PrintWriter writer = resp.getWriter();
+			writer.print(res);
+			writer.close();
+		} catch (Exception e) {
+			LOG.error("web error", e);
+		}
 	}
 
 }

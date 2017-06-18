@@ -111,7 +111,7 @@ public class DynamicSql {
 		return new SQL() {
 			{
 				SELECT("*");
-				FROM("monitor_file");
+				FROM("monitor_config");
 				WHERE("1=1");
 				if (Utils.notEmpty(arg.getHostId()))
 					WHERE("hostId=#{hostId}");

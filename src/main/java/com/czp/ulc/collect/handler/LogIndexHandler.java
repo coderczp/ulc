@@ -24,13 +24,9 @@ import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.search.BooleanClause.Occur;
-import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.RAMDirectory;
 import org.slf4j.Logger;
@@ -46,6 +42,7 @@ import com.czp.ulc.common.lucene.ParallelSearch;
 import com.czp.ulc.common.meta.AsynIndexManager;
 import com.czp.ulc.common.util.Utils;
 import com.czp.ulc.main.Application;
+import com.czp.ulc.web.QueryCondtion;
 
 /**
  * Function:创建log索引,支持实时搜索
@@ -80,7 +77,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
 			logWriter = new AsynIndexManager(DATA_DIR, INDEX_DIR, this);
-			parallelSearch = new ParallelSearch(Utils.getCpus(), INDEX_DIR);
+			parallelSearch = new ParallelSearch(Utils.getCpus()+4, INDEX_DIR);
 			loadAllIndexDir();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -142,7 +139,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	public void search(SearchCallback search) throws Exception {
 		long allDocs = getMeta().getDocs() + ramReader.numDocs();
 		int memMatch = searchInRam(search, allDocs);
-		if (memMatch >= search.getSize()) {
+		if (memMatch >= search.getQuery().getSize()) {
 			search.onFinish(allDocs, memMatch);
 		} else {
 			parallelSearch.search(search, allDocs, memMatch);
@@ -153,10 +150,18 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		parallelSearch.loadAllIndexDir();
 	}
 
+	/***
+	 * 在内存中搜索
+	 * @param search
+	 * @param docCount
+	 * @return
+	 * @throws IOException
+	 */
 	private int searchInRam(SearchCallback search, long docCount) throws IOException {
-		Query bQuery = buildRamQuery(search);
+		QueryCondtion cdt = search.getQuery();
+		Query query = cdt.getQuery();
 		IndexSearcher ramSearcher = getRamSearcher();
-		TopDocs docs = ramSearcher.search(bQuery, search.getSize());
+		TopDocs docs = ramSearcher.search(query, cdt.getSize());
 		Set<String> feilds = search.getFeilds();
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
 			Document doc = ramSearcher.doc(scoreDoc.doc, feilds);
@@ -167,24 +172,12 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 				break;
 			}
 		}
-		LOG.info("query:{} return:{} in ram", bQuery, docs.totalHits);
+		LOG.info("query {} return:{} in ram", query, docs.totalHits);
 		return docs.totalHits;
 	}
 
 	private IndexSearcher getRamSearcher() throws IOException {
 		return new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
-	}
-
-	private Query buildRamQuery(SearchCallback search) {
-		if (search.getHosts().isEmpty())
-			return search.getQuery();
-
-		BooleanQuery.Builder builder = new BooleanQuery.Builder();
-		for (String host : search.getHosts()) {
-			builder.add(new TermQuery(new Term(DocField.HOST, host)), Occur.MUST);
-		}
-		builder.add(search.getQuery(), Occur.MUST);
-		return builder.build();
 	}
 
 	private synchronized void swapRamWriterReader() throws IOException {
@@ -203,24 +196,24 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 
 	public Map<String, Long> count(SearchCallback search) throws IOException {
 		long st = System.currentTimeMillis();
-		Query bQuery = buildRamQuery(search);
+		QueryCondtion query = search.getQuery();
 		IndexSearcher ramSearcher = getRamSearcher();
-		TopDocs result = ramSearcher.search(bQuery, Integer.MAX_VALUE);
+		TopDocs result = ramSearcher.search(query.getQuery(), Integer.MAX_VALUE);
 		ConcurrentHashMap<String, Long> json = new ConcurrentHashMap<>();
-		for (ScoreDoc doc : result.scoreDocs) {
-			Document doc2 = ramSearcher.doc(doc.doc);
-			String host = doc2.get(DocField.HOST);
+		for (ScoreDoc did : result.scoreDocs) {
+			Document doc = ramSearcher.doc(did.doc);
+			String host = doc.get(DocField.HOST);
 			Long pv = (Long) json.get(host);
-			if (pv == null) {
-				json.put(host, 1l);
-			} else {
+			if(pv!=null){
 				json.put(host, pv + 1);
+			}else{
+				json.put(host, 1l);
 			}
 		}
 		long fileCount = parallelSearch.count(search, json);
 		json.put("count", result.totalHits + fileCount);
 		long end = System.currentTimeMillis();
-		LOG.info("count:[{}],time:{}", bQuery, (end - st));
+		LOG.info("count in ram time:{}", (end - st));
 		return json;
 	}
 

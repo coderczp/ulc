@@ -64,6 +64,7 @@ public class HostController {
 		return bean;
 	}
 
+	
 	@RequestMapping("/del")
 	public HostBean delHost(HostBean bean) {
 		if (dao.delete(bean) > 0) {
@@ -84,7 +85,7 @@ public class HostController {
 	public List<HostBean> list(String json) {
 		List<HostBean> list = (json != null) ? dao.list(JSONObject.parseObject(json)) : dao.list(null);
 		for (HostBean hostBean : list) {
-			hostBean.setPwd("xxxxxx");
+			hostBean.setPwd(null);
 		}
 		return list;
 	}

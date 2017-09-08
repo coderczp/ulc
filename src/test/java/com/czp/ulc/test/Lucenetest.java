@@ -83,8 +83,12 @@ public class Lucenetest {
 		// System.out.println(doc);
 		// }
 		// ramSearcher.getIndexReader().close();
+//http://www.itrip.com/login/index?redirect_url=http://pre.itrip.com//ulc/callback?requireToken=1?requireToken=1&allow=aoliday
+//http://www.itrip.com/login/index?redirect_url=http://pre.itrip.com//ulc/callback?requireToken=1?requireToken=1&allow=aoliday		
+		String x = "INFO 2017-09-08 21:35:54 (rid:508c1a68abc259357975171da34ec9a2) [TimingLogFilter.java:59] 104.199.238.87 160 <-- http://www.bestrip.com/itrip_shop/getUserDiscountLimit.do?callback=jQuery181012331813352981413_1504876492215&_=1504877754345 11 (rid:508c1a68abc259357975171da34ec9a2) (host:not_init) ";
 
 		AnalyzerUtil.displayToken("/data/work/itrip_openapi_admin/tomcat7/logs/db.log", new LogAnalyzer());
+		AnalyzerUtil.displayToken(x, new LogAnalyzer());
 //		String temp = "";
 //		String path = "./2.log";
 //		BufferedReader br = new BufferedReader(new FileReader(new File(path)));

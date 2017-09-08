@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<!-->include resource="org/springframework/boot/logging/logback/base.xml" /-->
+	<logger name="org.springframework.web" level="INFO" />
+	<logger name="com.itrip.umc" level="INFO" />
+
+	<appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<Pattern>%d{HH:mm:ss} [%thread] %-5level %logger{36} [%file:%line]- %msg %n
+			</Pattern>
+		</encoder>
+		<filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+			<level>INFO</level>
+		</filter>
+	</appender>
+	
+	<appender name="rolling" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<File>./logs/app.log</File>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>./logs/app.%d{yyyy-MM-dd}.log</FileNamePattern>
+			<maxHistory>30</maxHistory>
+		</rollingPolicy>
+		<encoder>
+			<Pattern>%d{HH:mm:ss} [%thread] %-5level %logger{35} - %msg %n</Pattern>
+		</encoder>
+	</appender>
+	
+	<root level="warn">
+        <appender-ref ref="console"/>
+        <appender-ref ref="rolling"/>
+    </root>
+    
+</configuration>

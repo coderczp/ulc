@@ -38,6 +38,14 @@ public class DynamicSql {
 
 	}
 
+	public String queryAllRecord(Integer size) {
+		return "select id,project,host,author,status,time from deploy_record order by id desc limit " + size;
+	}
+
+	public String selectRecordLog(Integer id) {
+		return "select log from deploy_record where id= " + id;
+	}
+
 	/***
 	 * 查询指定分片的indexMeta总数
 	 * 

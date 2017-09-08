@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+</head>
+<body>
+	<h1>groovy灵活，但请小心</h1>
+	某天下午笔者正在噼里啪啦的码代码时，钉钉告警群疯狂的发FullGC告警，赶紧登陆到对应的机器，ps grep找到PID后，jmap -heap
+	pid保存堆使用情况， 接着jstat -gccause pid 2000
+	居然是Per区满了，我们使用的1.6.0_29-b11(server)版本，永久代最大内存为94M，我们都知道这个区域存储了
+	class字节码以及一些常量信息，这个区域要溢出，除非是一下几种情况:
+	<ul>
+		<li>1、该区域设置过小，根本无法装载应用的所需的所有class</li>
+		<li>2、应用里大量动态生成class,如jsp proxy等</li>
+		<li>3、应用自定义classloader，频繁load class
+		<li>4、应用大量生成字符串常量并调用string.intern()</li>
+	</ul>
+
+	出问题的服务一个class平均大小在10k左右，94M可以加载9625个class，jdk在初始化是会加载2000左右类，应用本身只有99个class[linux递归统计文件数：
+	ls -lR|grep "^-" |wc
+	-l]，加上引用的类在4000个左右，再加上一些常量，大约在60M左右，因此不可能是第一个原因，该服务是基于spring MVC的纯后
+	台服务，只有一个jsp页面，不管是spring的AOP还是其他一些动态代理，都是在程序启动就生成好了的，因此也不可能是第二个原因，剩下3 4
+	，在应用的代码层面
+	，没有一处显示调用string.intern()，也没有显示自定义classloader，但无法排除引用的代码里有，jmap
+	-heap打印的信息看，per区的确是占用99%，究竟
+	是什么数据消耗内存呢，觉得jvm既然有命令可以看各个区的消耗，应该有命令可以查看永久带的信息，jmap --help一下，果然找到一个参数 :
+	-permstat to print permanent generation statistics
+	执行该命令，首先打印的的是字符串占用的空间，20658 intern Strings occupying 2174792
+	bytes，接下来的输出让我傻眼了，满屏的
+	groovy/lang/GroovyClassLoader,该GroovyClassLoader只有3个instance，却有4800多条纪录，也就是说这些相同的classloader
+	在不断load
+	class到虚拟机，直到per区内存消耗完。直觉告诉我，肯定是某个代码static引用了GroovyClassLoader，并不断触发该类load
+	class，问题已经找到，为了不引用线上业务，先重启服务，接下来去代码里搜groovy，但是没有结果，正准备通过maven打印依赖关系【mvn
+	dependency:tree】
+	查找线索时，猛然想到有个工具servlet里使用groovy动态执行一些java代码，groovy是将脚本动态编译后load到虚拟机执行的，自然会产生许多class，问题就是
+	这里了，接下来我们梳理下整个事情来龙去脉：
+	<ul>
+		<li>1 我们代码里创建了一个GroovyShell常量[private
+			static]，GroovyShell持有GroovyClassLoader引用</li>
+		<li>2 每次传一些java代码过来，调用GroovyShell.eval(xxx)</li>
+		<li>3 GroovyShell首先调用jvm的编译类将脚本，再调用GroovyClassLoader load到虚拟机执行。</li>
+		<li>4 当脚本执行完成后，GroovyClassLoader
+			load的class已经没有什么用了，但还驻留在per区，并且不会被卸载，随着eval调用次数越来越多，per区内存就一点点的消耗完。</li>
+	</ul>
+	那么为什么无用的类不会被JVM回收呢，我们得从class卸载机制说起，一个class只有在满足以下条件时，才能被JVM unload
+	<ul>
+		<li>1. 该类所有的实例已经被回收</li>
+		<li>2. 该类的ClassLoder已经被回收</li>
+		<li>3. 该类对应的Java.lang.Class对象没有任何对方被引用</li>
+	</ul>
+	我们的代码中，因为GroovyClassLoader被GroovyShell引用，而GroovyShell被static引用，整个应用运行期间，整个引用链一直都在，无法满足条件2，所以
+	即使我们脚本已经执行完，但动态生成的class会一直驻留jvm直到内存溢出，因为java并没有提供卸载class的接口，所以我们只能去满足上述3个条件，让JVM在必要时
+	能卸载class，解决这个问题有以下方案:
+	<ul>
+		<li>1 将GroovyShell由static改为局部变量</li>
+		<li>2 将GroovyShell放到WeakReference里，既能避免重复创建，又支持JVM卸载class</li>
+	</ul>
+	由于问题代码只是一个运维型工具类，时间上不是很敏感，直接采用第一种方案，经在本地测试，当采用static引用时，以下代码执行循环到1000次时内存溢出
+	用jconsole观察，加载的类直线上升，JVM加XX:+TraceClassLoading和
+	-XX:+TraceClassUnloading 启动，控制台只打印load lcass，不见unload
+	到1000个左右直接溢出，而改成局部变量后，控制台出现unload日志，程序一直运行直到完成。
+	groovy为我们带来很多便利，列如在不重启服务的情况下，修改服务的运行数据，清空缓存等，但若使用不当，则会带来致命打击，所以使用时请小心谨慎。
+	<hr>
+	<a href="https://docs.oracle.com/javase/9/tools/jmap.htm#JSWOR746">jmap命令详解</a>
+	<a href="https://docs.oracle.com/javase/9/tools/jmap.htm#JSWOR746">
+		老年代blog</a>
+</body>
+</html>

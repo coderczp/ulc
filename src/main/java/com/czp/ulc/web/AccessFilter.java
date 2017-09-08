@@ -10,6 +10,7 @@
 package com.czp.ulc.web;
 
 import java.io.IOException;
+import java.net.URLDecoder;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -25,6 +26,7 @@ import javax.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.util.Utils;
 
 /**
@@ -53,14 +55,20 @@ public class AccessFilter implements Filter {
 		if (token == null || token.isEmpty())
 			return false;
 		try {
+			LOG.info("token:{}", token);
+			if (token.contains("%"))
+				token = URLDecoder.decode(token, "utf-8");
+
 			String decrypt = Utils.decrypt(token, key, "utf-8");
 			LOG.info("decrypt src:{} to:{}", token, decrypt);
-			String time = decrypt.substring(decrypt.lastIndexOf(",") + 1, decrypt.length() - 1).trim();
+			JSONObject json = JSONObject.parseObject(decrypt);
+			long time = json.getLongValue("time");
 			if (System.currentTimeMillis() - Long.valueOf(time) > timeout) {
 				LOG.info("token expire");
 				return false;
 			}
-			session.setAttribute("user", decrypt);
+			String account = json.getString("account");
+			session.setAttribute("user", account);
 		} catch (Exception e) {
 			LOG.error("decrypt error", e);
 			return false;
@@ -69,6 +77,9 @@ public class AccessFilter implements Filter {
 	}
 
 	private String getCookie(HttpServletRequest request, String key) {
+		String token = request.getParameter(key);
+		if (token != null && !token.isEmpty())
+			return token;
 		Cookie[] cookies = request.getCookies();
 		if (cookies == null)
 			return null;
@@ -92,22 +103,43 @@ public class AccessFilter implements Filter {
 		String url = req.getRequestURL().toString();
 		HttpSession session = req.getSession();
 		Object user = session.getAttribute("user");
-		LOG.info("url:{},user:{}", url, user);
+		LOG.debug("url:{},user:{}", url, user);
 
-		if (isSkipUrl(url) || user != null || url.contains(IndexController.CALLBACK)) {
+		if (isSkipUrl(url) || user != null) {
 			paramFilterChain.doFilter(req, rep);
 			return;
 		}
+		if (url.contains(IndexController.CALLBACK)) {
+			String token = req.getParameter("token").trim();
+			if (token != null && checkToken(token, session)) {
+				String baseUrl = getBaseUrl(req, url);
+				rep.sendRedirect(baseUrl);
+				return;
+			}
+		}
+
 		String token = getCookie(req, IndexController.TOKEN);
 		if (!checkToken(token, session)) {
-			String uri = req.getRequestURI();
-			String ctx = req.getContextPath();
-			String callback = url.substring(0, url.indexOf(uri) + ctx.length());
-			callback = callback.concat(IndexController.CALLBACK);
-			rep.sendRedirect(loginUrl.replace("#{url}", callback));
+			String baseUrl = getBaseUrl(req, url);
+			String realCallBack = baseUrl.concat(IndexController.CALLBACK);
+			rep.sendRedirect(loginUrl.replace("#{url}", realCallBack));
 			return;
 		}
 		paramFilterChain.doFilter(req, rep);
+	}
+
+	private String getBaseUrl(HttpServletRequest req, String url) {
+		String ctx = req.getContextPath();
+		String host = req.getHeader("host");
+		String uri = req.getRequestURI();
+		// String referer = req.getHeader("referer");
+		// if (referer != null) {
+		// return referer;
+		// }
+		if (host != null) {
+			return String.format("%s://%s%s", req.getScheme(), host, ctx);
+		}
+		return url.substring(0, url.indexOf(uri) + ctx.length());
 	}
 
 	private boolean isSkipUrl(String url) {

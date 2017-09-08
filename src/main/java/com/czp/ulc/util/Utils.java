@@ -32,7 +32,8 @@ public class Utils {
 		SecretKey secretKey = keyFactory.generateSecret(desKeySpec);
 		Cipher cipher = Cipher.getInstance("DES");
 		cipher.init(Cipher.DECRYPT_MODE, secretKey);
-		byte[] textBytes = Base64.getDecoder().decode(text);
+		byte[] textBytes = new sun.misc.BASE64Decoder().decodeBuffer(text);// Base64.getDecoder().decode(text);
+		System.out.println(new String(textBytes));
 		byte[] bytes = cipher.doFinal(textBytes);
 		return new String(bytes, charset);
 	}

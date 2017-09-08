@@ -6,7 +6,6 @@
 	<packaging>jar</packaging>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>ulc Maven Webapp</name>
-	<url>http://maven.apache.org</url>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -114,6 +113,17 @@
 	</dependencies>
 	<build>
 		<finalName>ulc</finalName>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<excludes>
+					<exclude>**/*.properties</exclude>
+					<exclude>**/*.xml</exclude>
+				</excludes>
+				<filtering>true</filtering>
+				<targetPath>${project.basedir}/res</targetPath>
+			</resource>
+		</resources>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -148,17 +158,50 @@
 							<goal>copy-dependencies</goal>
 						</goals>
 						<configuration>
+							<overWriteIfNewer>true</overWriteIfNewer>
 							<outputDirectory>lib</outputDirectory>
 						</configuration>
 					</execution>
 				</executions>
 			</plugin>
-			<!-- >plugin> <groupId>org.springframework.boot</groupId> <artifactId>spring-boot-maven-plugin</artifactId> 
-				</plugin -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>1.8</version>
+				<executions>
+					<execution>
+						<id>ant-build</id>
+						<phase>install</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<ant antfile="build.xml" inheritall="false" inheritrefs="false"
+									target="fileExists" />
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+				<dependencies>
+					<dependency>
+						<groupId>org.apache.ant</groupId>
+						<artifactId>ant</artifactId>
+						<version>1.8.3</version>
+					</dependency>
+					<dependency>
+						<groupId>org.apache.ant</groupId>
+						<artifactId>ant-jsch</artifactId>
+						<version>1.8.3</version>
+					</dependency>
+					<dependency>
+						<groupId>com.jcraft</groupId>
+						<artifactId>jsch</artifactId>
+						<version>0.1.51</version>
+					</dependency>
+				</dependencies>
+			</plugin>
 		</plugins>
-		<!-- resources> <resource> <directory>src/main/resources</directory> <excludes> 
-			<exclude>**/*.properties</exclude> <exclude>**/*.xml</exclude> </excludes> 
-			<filtering>true</filtering> </resource> </resources> -->
 	</build>
 	<profiles>
 		<profile>
@@ -168,9 +211,6 @@
 				<db_pwd>aoliday</db_pwd>
 				<db_user>root</db_user>
 			</properties>
-			<activation>
-				<activeByDefault>true</activeByDefault>
-			</activation>
 		</profile>
 
 		<profile>
@@ -180,6 +220,17 @@
 				<db_user>root</db_user>
 				<db_pwd>Aoliday888itrip</db_pwd>
 			</properties>
+		</profile>
+		<profile>
+			<id>test2</id>
+			<properties>
+				<db>192.168.0.111:3331</db>
+				<db_pwd>aoliday</db_pwd>
+				<db_user>root</db_user>
+			</properties>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
 		</profile>
 	</profiles>
 </project>

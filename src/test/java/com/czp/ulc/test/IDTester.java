@@ -9,10 +9,17 @@
  */
 package com.czp.ulc.test;
 
+import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
+import org.apache.log4j.Appender;
+import org.apache.log4j.Layout;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.PatternLayout;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.czp.ulc.common.util.IdGnerator;
 
@@ -25,6 +32,16 @@ import com.czp.ulc.common.util.IdGnerator;
  */
 public class IDTester {
 
+	public static void main(String[] args) {
+		Enumeration<org.apache.log4j.Logger> allAppenders = LogManager.getCurrentLoggers();
+	    while(allAppenders.hasMoreElements()){
+	    	System.out.println("-------->");
+	    	PatternLayout ot = new PatternLayout("yyyy_MM-dd");
+	    	allAppenders.nextElement().getAppender("console").setLayout(ot);
+	    }	
+	    Logger logger = LoggerFactory.getLogger("test");
+	    logger.info("000000");
+	}
 	@Test
 	public void test() throws InterruptedException {
 		int count = 50;

@@ -68,6 +68,7 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorConf
 	@SuppressWarnings("unchecked")
 	public void run() {
 		try {
+			
 			JSONObject cmd = locadConfig(server);
 			if (cmd == null) {
 				LOG.info("host {} hasn't add monitor file,so this thread will exit", server);

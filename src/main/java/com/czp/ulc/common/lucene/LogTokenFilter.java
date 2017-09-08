@@ -7,15 +7,15 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
 /**
- * 对日志格式进行处理
- * <li>创建人：Jeff.cao</li>
- * <li>创建时间：2017年4月1日 下午5:09:32</li>
+ * 对日志格式进行处理 <li>创建人：Jeff.cao</li> <li>创建时间：2017年4月1日 下午5:09:32</li>
  * 
  * @version 0.0.1
  */
 
 public class LogTokenFilter extends TokenFilter {
 
+	private char[] rid = "rid:".toCharArray();
+	private char[] host = "host:".toCharArray();
 	private char[] java = ".java".toCharArray();
 	private char[] exception = "exception".toCharArray();
 	private final CharTermAttribute termAttr = addAttribute(CharTermAttribute.class);
@@ -39,7 +39,7 @@ public class LogTokenFilter extends TokenFilter {
 			start++;
 		}
 		char lastChar = buffer[end - 1];
-		if (!Character.isLetterOrDigit(lastChar)&&lastChar!='>') {
+		if (!Character.isLetterOrDigit(lastChar) && lastChar != '>') {
 			end--;
 		}
 
@@ -48,6 +48,17 @@ public class LogTokenFilter extends TokenFilter {
 		if (javaIndex != -1) {
 			end = javaIndex;
 		}
+		//处理rid:xxx ->xxx
+		int startIndex = startWith(buffer, start, end, rid);
+		if (startIndex > 0) {
+			start = startIndex+1;
+		}
+		
+		int hoststartIndex = startWith(buffer, start, end, host);
+		if (hoststartIndex > 0) {
+			start = hoststartIndex+1;
+		}
+		
 		// 将com.alibaba.fastjson.jsonexception处理为jsonexception
 		int exeIndex = endWith(buffer, start, end, exception);
 		if (exeIndex != -1) {
@@ -73,6 +84,19 @@ public class LogTokenFilter extends TokenFilter {
 			if (k < start || target[j] != buffer[k--]) {
 				return -1;
 			}
+		}
+		return k;
+	}
+
+	private int startWith(char[] buffer, int start, int end, char[] target) {
+		int len = Math.min(target.length, Math.min(buffer.length, end));
+		if (len == 0)
+			return -1;
+
+		int k = 0;
+		for (; k < len; k++) {
+			if (target[k] != buffer[k + start])
+				return -1;
 		}
 		return k;
 	}

@@ -108,7 +108,7 @@ public class DistributorInstance implements Watcher, StatCallback {
 	 * -------/app0<br>
 	 * -----------monitor_host0<br>
 	 * -----------monitor_host1<br>
-	 * * -------/app1<br>
+	 * * -----/app1<br>
 	 * -----------monitor_host0<br>
 	 * -----------monitor_host1<br>
 	 * 

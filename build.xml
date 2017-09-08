@@ -1,0 +1,91 @@
+<project name="buildzip" basedir="." default="fileExists">
+
+	<property name="project" value="ulc" />
+	<property name="add_jar_info" value="是否打包jar目录(如果不是第一次发版且没有更新选n)?" />
+	<property name="add_res_info" value="是否打包res目录(如果不是第一次发版且没有更新选n)?" />
+	<property name="finish_info" value="打包完成,请将zip上传到http://192.168.0.123:9123/ulc/deploy.html发布" />
+
+	<target name="fileExists">
+		<echo>check tar file is exists ...... ${project}</echo>
+		<condition property="fileIsExists">
+			<and>
+				<available file="target/${project}.jar" />
+			</and>
+		</condition>
+		<antcall target="printError" />
+		<antcall target="checkRequiredFiles">
+		</antcall>
+	</target>
+
+	<target name="printError" unless="fileIsExists">
+		<echo>tar file is not exists ......</echo>
+	</target>
+
+	<target name="checkRequiredFiles" if="fileIsExists">
+		<input validargs="y,n" addproperty="isAddRes" defaultvalue="n">${add_res_info}</input>
+		<input validargs="y,n" addproperty="isAddJars" defaultvalue="n">${add_jar_info}</input>
+		<condition property="addJarsAndRes">
+			<and>
+				<equals arg1="${isAddJars}" arg2="y" />
+				<equals arg1="${isAddRes}" arg2="y" />
+			</and>
+		</condition>
+		<antcall target="zipAddResAndJars" />
+		<antcall target="checkOneCondtion" />
+	</target>
+
+	<target name="checkOneCondtion" unless="addJarsAndRes">
+		<condition property="addRes">
+			<equals arg1="${isAddRes}" arg2="y" />
+		</condition>
+		<antcall target="zipAddRes" />
+		<antcall target="checkAndJar" />
+	</target>
+
+	<target name="checkAndJar" unless="addRes">
+		<condition property="addJars">
+			<equals arg1="${isAddJars}" arg2="y" />
+		</condition>
+		<antcall target="zipAddJars" />
+		<antcall target="zipOnlyClass" />
+	</target>
+
+
+	<target name="zipOnlyClass" unless="addJars">
+		<echo>压缩:${project}.jar</echo>
+		<zip destfile="${project}.zip" duplicate="preserve">
+			<zipfileset dir="target" includes="${project}.jar" prefix="" />
+		</zip>
+		<echo>${finish_info}</echo>
+	</target>
+
+	<target name="zipAddJars" if="addJars">
+		<echo>压缩:${project}.jar  lib/*</echo>
+		<zip destfile="${project}.zip" duplicate="preserve">
+			<zipfileset dir="target" includes="${project}.jar" prefix="" />
+			<zipfileset dir="lib" includes="**/*.*" prefix="lib" />
+		</zip>
+		<echo>${finish_info}</echo>
+	</target>
+
+	<target name="zipAddRes" if="addRes">
+		<echo>压缩:${project}.jar  res/*</echo>
+		<zip destfile="${project}.zip" duplicate="preserve">
+			<zipfileset dir="target" includes="${project}.jar" prefix="" />
+			<zipfileset dir="res" includes="**/*.*" prefix="res" />
+		</zip>
+		<echo>${finish_info}</echo>
+	</target>
+
+	<target name="zipAddResAndJars" if="addJarsAndRes">
+		<echo>正在压缩文件:${project}.jar res/* lib/*</echo>
+		<zip destfile="${project}.zip" duplicate="preserve">
+			<zipfileset dir="shell" includes="service.sh" prefix="" filemode="755" />
+			<zipfileset dir="target" includes="${project}.jar" prefix="" />
+			<zipfileset dir="res" includes="**/*.*" prefix="res" />
+			<zipfileset dir="lib" includes="**/*.*" prefix="lib" />
+		</zip>
+		<echo>${finish_info}</echo>
+	</target>
+
+</project>

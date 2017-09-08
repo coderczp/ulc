@@ -60,8 +60,8 @@ import com.czp.ulc.web.AccessFilter;
 @EnableAsync
 @EnableAutoConfiguration
 @ComponentScan(value = { "com.czp.ulc" })
-public class Application extends WebMvcConfigurerAdapter implements BeanDefinitionRegistryPostProcessor,
-		ApplicationListener<ContextRefreshedEvent> {
+public class Application extends WebMvcConfigurerAdapter
+		implements BeanDefinitionRegistryPostProcessor, ApplicationListener<ContextRefreshedEvent> {
 
 	private static Logger LOG = LoggerFactory.getLogger(Application.class);
 	private MessageCenter dispatch = MessageCenter.getInstance();
@@ -76,7 +76,7 @@ public class Application extends WebMvcConfigurerAdapter implements BeanDefiniti
 		registry.addResourceHandler("/**").addResourceLocations(staticFile);
 		super.addResourceHandlers(registry);
 	}
-	 
+
 	@Bean
 	public FilterRegistrationBean dawsonApiFilter() {
 		FilterRegistrationBean registration = new FilterRegistrationBean();
@@ -158,8 +158,12 @@ public class Application extends WebMvcConfigurerAdapter implements BeanDefiniti
 
 		List<HostBean> hosts = hostDao.list(null);
 		for (HostBean host : hosts) {
-			ConnectManager.getInstance().connect(host);
-			RemoteLogCollector.monitorIfNotExist(host, mDao);
+			try {
+				ConnectManager.getInstance().connect(host);
+				RemoteLogCollector.monitorIfNotExist(host, mDao);
+			} catch (Exception e) {
+				LOG.info("connect err:" + host, e);
+			}
 		}
 	}
 

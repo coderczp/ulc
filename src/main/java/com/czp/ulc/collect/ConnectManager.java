@@ -57,6 +57,10 @@ public class ConnectManager implements MessageListener<HostBean> {
 		return map;
 	}
 
+	public boolean exist(String host) {
+		return maps.containsKey(host);
+	}
+
 	public List<String> exe(String host, String cmd) {
 		Session session = maps.get(host);
 		if (session == null)
@@ -122,7 +126,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 	public Channel openChannel(HostBean server, String type) {
 		Session session = maps.get(server.getName());
 		try {
-			if (!session.isConnected()) {
+			if (session == null || !session.isConnected()) {
 				buildAndCacheSession(server);
 				session = maps.get(server.getName());
 			}

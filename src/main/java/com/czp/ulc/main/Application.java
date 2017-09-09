@@ -60,13 +60,13 @@ import com.czp.ulc.web.AccessFilter;
 @EnableAsync
 @EnableAutoConfiguration
 @ComponentScan(value = { "com.czp.ulc" })
-public class Application extends WebMvcConfigurerAdapter
-		implements BeanDefinitionRegistryPostProcessor, ApplicationListener<ContextRefreshedEvent> {
+public class Application extends WebMvcConfigurerAdapter implements BeanDefinitionRegistryPostProcessor,
+		ApplicationListener<ContextRefreshedEvent> {
 
 	private static Logger LOG = LoggerFactory.getLogger(Application.class);
 	private MessageCenter dispatch = MessageCenter.getInstance();
-	private LogIndexHandler listener = new LogIndexHandler();
 	private static ConfigurableListableBeanFactory context;
+	private LogIndexHandler listener = new LogIndexHandler();
 	private Environment envBean;
 
 	@Override

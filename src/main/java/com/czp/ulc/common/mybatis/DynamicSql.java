@@ -10,6 +10,7 @@
 package com.czp.ulc.common.mybatis;
 
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.ibatis.jdbc.SQL;
 import org.springframework.util.Assert;
@@ -18,6 +19,7 @@ import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.bean.IndexMeta;
 import com.czp.ulc.common.bean.KeywordRule;
 import com.czp.ulc.common.bean.MonitorConfig;
+import com.czp.ulc.common.param.QueryParam;
 import com.czp.ulc.common.util.Utils;
 
 /**
@@ -28,6 +30,26 @@ import com.czp.ulc.common.util.Utils;
  * @version:1.0
  */
 public class DynamicSql {
+
+	public String queryLuceneFile(QueryParam param) {
+		StringBuilder sql = new StringBuilder("select * from lucene_file where ");
+		sql.append(" itime >=").append(param.from);
+		sql.append(" AND itime <=").append(param.to);
+		Set<String> sers = param.servers;
+		if (sers != null && sers.size() > 0) {
+			int len = param.servers.size();
+			sql.append(" AND server in(");
+			for (String ser : sers) {
+				sql.append("'").append(ser).append("'");
+				if (--len > 0) {
+					sql.append(",");
+				}
+			}
+			sql.append(")");
+		}
+		 System.out.println(sql);
+		return sql.toString();
+	}
 
 	public String addIndexMeta(IndexMeta meta) {
 		String update = String.format(

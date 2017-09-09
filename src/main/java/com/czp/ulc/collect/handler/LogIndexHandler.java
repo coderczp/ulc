@@ -38,7 +38,7 @@ import com.czp.ulc.common.bean.IndexMeta;
 import com.czp.ulc.common.dao.IndexMetaDao;
 import com.czp.ulc.common.lucene.DocField;
 import com.czp.ulc.common.lucene.LogAnalyzer;
-import com.czp.ulc.common.lucene.ParallelSearch;
+import com.czp.ulc.common.lucene.ParallelSearchNew;
 import com.czp.ulc.common.meta.AsynIndexManager;
 import com.czp.ulc.common.util.Utils;
 import com.czp.ulc.main.Application;
@@ -55,7 +55,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 
 	private DirectoryReader ramReader;
 	private AsynIndexManager logWriter;
-	private ParallelSearch parallelSearch;
+	private ParallelSearchNew parallelSearch;
 	private volatile IndexWriter ramWriter;
 	private Analyzer analyzer = new LogAnalyzer();
 
@@ -63,22 +63,23 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	public static final String FORMAT = "yyyyMMdd";
 	/*** 根目录 */
 	private static final File ROOT = new File("./log");
-	/** 未压缩文件目录 */
-	private static final File DATA_DIR = new File(ROOT, "data");
 	/** 索引根目录 */
 	private static final File INDEX_DIR = new File(ROOT, "index");
+	/** 未压缩文件目录 */
+	private static final File UNCOMP_DIR = new File(ROOT, "data");
 
 	private static final Logger LOG = LoggerFactory.getLogger(LogIndexHandler.class);
 
 	public LogIndexHandler() {
 		try {
-			DATA_DIR.mkdirs();
+			UNCOMP_DIR.mkdirs();
 			INDEX_DIR.mkdirs();
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
-			logWriter = new AsynIndexManager(DATA_DIR, INDEX_DIR, this);
-			parallelSearch = new ParallelSearch(Utils.getCpus()+4, INDEX_DIR);
-			loadAllIndexDir();
+			parallelSearch = new ParallelSearchNew(Utils.getCpus() + 4);
+			logWriter = new AsynIndexManager(UNCOMP_DIR, INDEX_DIR, this);
+
+			// loadAllIndexDir();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -146,12 +147,13 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		}
 	}
 
-	public void loadAllIndexDir() {
-		parallelSearch.loadAllIndexDir();
-	}
+	// public void loadAllIndexDir() {
+	// parallelSearch.loadAllIndexDir();
+	// }
 
 	/***
 	 * 在内存中搜索
+	 * 
 	 * @param search
 	 * @param docCount
 	 * @return
@@ -204,9 +206,9 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 			Document doc = ramSearcher.doc(did.doc);
 			String host = doc.get(DocField.HOST);
 			Long pv = (Long) json.get(host);
-			if(pv!=null){
+			if (pv != null) {
 				json.put(host, pv + 1);
-			}else{
+			} else {
 				json.put(host, 1l);
 			}
 		}

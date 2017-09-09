@@ -38,7 +38,7 @@ public class HostBean implements Serializable {
 	@NotEmpty(message = "pwd isempty")
 	private String pwd;
 
-	private Integer status;
+	private Integer status = 0;
 	
 	private int port = DEFAULT_PORT;
 

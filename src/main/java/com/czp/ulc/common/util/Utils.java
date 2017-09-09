@@ -15,9 +15,12 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.Inet4Address;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.security.Key;
 import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
@@ -122,6 +125,23 @@ public class Utils {
 			throw new RuntimeException(e);
 		}
 	}
+	
+	public static String decryptAuth(String text, String key, String charset) {
+		try {
+			byte[] keyBase64DecodeBytes = Base64.getDecoder().decode(key);
+			DESKeySpec desKeySpec = new DESKeySpec(keyBase64DecodeBytes);
+			SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("DES");
+			SecretKey secretKey = keyFactory.generateSecret(desKeySpec);
+			Cipher cipher = Cipher.getInstance("DES");
+			cipher.init(Cipher.DECRYPT_MODE, secretKey);
+			byte[] textBytes = new sun.misc.BASE64Decoder().decodeBuffer(text);// Base64.getDecoder().decode(text);
+//			System.out.println(new String(textBytes));
+			byte[] bytes = cipher.doFinal(textBytes);
+			return new String(bytes, charset);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
 
 	public static void sleep(long time) {
 		try {
@@ -221,5 +241,18 @@ public class Utils {
 
 	public static int getCpus() {
 		return Runtime.getRuntime().availableProcessors();
+	}
+
+	public static String getLineSpliter() {
+		return System.getProperty("os.name").toLowerCase().contains("windows") ? "\n" : "\r";
+	}
+
+	public static String getHostName() {
+		try {
+			return Inet4Address.getLocalHost().getHostName();
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
+		return "unknow_host";
 	}
 }

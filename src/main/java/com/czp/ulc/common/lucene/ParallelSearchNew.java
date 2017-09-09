@@ -10,15 +10,9 @@
 package com.czp.ulc.common.lucene;
 
 import java.io.File;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.Map.Entry;
+import java.util.List;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -37,11 +31,14 @@ import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.collect.handler.LogIndexHandler;
 import com.czp.ulc.collect.handler.SearchCallback;
+import com.czp.ulc.common.bean.LuceneFile;
+import com.czp.ulc.common.dao.LuceneFileDao;
+import com.czp.ulc.common.param.QueryParam;
 import com.czp.ulc.common.shutdown.ShutdownCallback;
 import com.czp.ulc.common.shutdown.ShutdownManager;
 import com.czp.ulc.common.util.Utils;
+import com.czp.ulc.main.Application;
 import com.czp.ulc.web.QueryCondtion;
 
 /**
@@ -51,7 +48,7 @@ import com.czp.ulc.web.QueryCondtion;
  * @Author:jeff.cao@aoliday.com
  * @version:1.0
  */
-public class ParallelSearch implements ShutdownCallback {
+public class ParallelSearchNew implements ShutdownCallback {
 
 	/** 包装原始的IndexSearcher支持检测索引文件是否修改 */
 	private static class IndexSearcherWrapper {
@@ -70,40 +67,15 @@ public class ParallelSearch implements ShutdownCallback {
 		}
 	}
 
-	private File indexDir;
 	private ExecutorService worker;
+	private String prefix = IndexFileNames.SEGMENTS + "_";
 	private ConcurrentHashMap<File, IndexSearcherWrapper> openedDir = new ConcurrentHashMap<>();
-	private ConcurrentHashMap<String, TreeMap<Long, File>> indexDirMap = new ConcurrentHashMap<>();
 
-	private static final Logger LOG = LoggerFactory.getLogger(ParallelSearch.class);
+	private static final Logger LOG = LoggerFactory.getLogger(ParallelSearchNew.class);
 
-	public ParallelSearch(int threadSize, File indexDir) {
-		this.indexDir = indexDir;
+	public ParallelSearchNew(int threadSize) {
 		this.worker = Executors.newFixedThreadPool(threadSize);
 		ShutdownManager.getInstance().addCallback(this);
-	}
-
-	public void loadAllIndexDir() {
-		try {
-			SimpleDateFormat sp = new SimpleDateFormat(LogIndexHandler.FORMAT);
-			for (File file : indexDir.listFiles()) {
-				String host = file.getName();
-				TreeMap<Long, File> indexMap = indexDirMap.get(host);
-				if (indexMap == null) {
-					indexMap = new TreeMap<>();
-					indexDirMap.put(host, indexMap);
-				}
-				// 第二层为时间目录 包含索引和数据目录
-				for (File index : file.listFiles()) {
-					if (!index.isDirectory())
-						continue;
-					indexMap.put(sp.parse(index.getName()).getTime(), index);
-				}
-			}
-			LOG.info("load all index");
-		} catch (ParseException e) {
-			LOG.error("ParseException error", e);
-		}
 	}
 
 	private void asynSearch(AtomicBoolean isBreak, AtomicLong matchs, AtomicInteger waitSeachNum, File indexFile,
@@ -124,7 +96,7 @@ public class ParallelSearch implements ShutdownCallback {
 						break;
 					}
 				}
-				LOG.info("finish search in {} total {}",indexFile,docs.totalHits);
+				LOG.info("finish search in {} total {}", indexFile, docs.totalHits);
 			} catch (Exception e) {
 				LOG.error("ansy sear error", e);
 			} finally {
@@ -141,17 +113,17 @@ public class ParallelSearch implements ShutdownCallback {
 	}
 
 	public void search(SearchCallback search, long allDocs, int memMatch) {
-
 		AtomicLong match = new AtomicLong(memMatch);
 		AtomicBoolean isBreak = new AtomicBoolean();
 		AtomicInteger waitSeachNum = new AtomicInteger();
 		try {
-			Map<String, Collection<File>> dirs = findMatchIndexDir(search);
-			for (Entry<String, Collection<File>> item : dirs.entrySet()) {
-				Collection<File> value = item.getValue();
-				waitSeachNum.getAndAdd(value.size());
-				String host = item.getKey();
-				value.forEach(file -> asynSearch(isBreak, match, waitSeachNum, file, search, host, allDocs));
+			List<LuceneFile> dirs = findMatchIndexDir(search);
+			waitSeachNum.set(dirs.size());
+
+			for (LuceneFile item : dirs) {
+				String host = item.getServer();
+				File file = new File(item.getPath());
+				asynSearch(isBreak, match, waitSeachNum, file, search, host, allDocs);
 			}
 		} catch (Exception e) {
 			isBreak.set(true);
@@ -198,61 +170,51 @@ public class ParallelSearch implements ShutdownCallback {
 	 * @param end
 	 * @return
 	 */
-	public Map<String, Collection<File>> findMatchIndexDir(SearchCallback searcher) {
+	public List<LuceneFile> findMatchIndexDir(SearchCallback searcher) {
+		LOG.info("find {} dirs", searcher.getQuery());
 		QueryCondtion query = searcher.getQuery();
 		long to = Utils.igroeHMSTime(query.getEnd()).getTime();
 		long from = Utils.igroeHMSTime(query.getStart()).getTime();
-		Map<String, Collection<File>> map = new HashMap<>();
-		Set<String> hosts = query.getHosts();
-		if (hosts != null && !hosts.isEmpty()) {
-			for (String host : hosts) {
-				TreeMap<Long, File> indexs = indexDirMap.get(host);
-				if (indexs == null)
-					continue;
-				getMatchTimeDir(from, to, map, host, indexs);
-			}
-		} else {
-			indexDirMap.forEach((k, v) -> getMatchTimeDir(from, to, map, k, v));
-		}
-		LOG.info("find {} dirs", map);
-		return map;
-	}
-
-	private void getMatchTimeDir(long from, long to, Map<String, Collection<File>> map, String host,
-			TreeMap<Long, File> indexs) {
-		Collection<File> values = indexs.subMap(from, true, to, true).values();
-		removeNotExistsIndexDir(values);
-		if (values.size() > 0)
-			map.put(host, values);
+		LuceneFileDao lFileDao = Application.getBean(LuceneFileDao.class);
+		List<LuceneFile> files = lFileDao.query(new QueryParam(to, from, query.getHosts()));
+		removeVaildFile(files);
+		return files;
 	}
 
 	// @link DirectoryReader.indexExists
-	private void removeNotExistsIndexDir(Collection<File> next) {
-		String prefix = IndexFileNames.SEGMENTS + "_";
-		Iterator<File> it = next.iterator();
+	private void removeVaildFile(List<LuceneFile> next) {
+		Iterator<LuceneFile> it = next.iterator();
 		while (it.hasNext()) {
 			boolean find = false;
-			File dir = it.next();
-			for (String file : dir.list()) {
-				if (file.startsWith(prefix)) {
+			LuceneFile dir = it.next();
+			File file = new File(dir.getPath());
+			if (!file.exists()) {
+				LOG.error("index file not exist:{}", file);
+				it.remove();
+				continue;
+			}
+			for (File item : file.listFiles()) {
+				if (item.getName().startsWith(prefix)) {
 					find = true;
 					break;
 				}
 			}
-			if (find == false)
+			if (find == false) {
+				LOG.error("segments file not exist:{}", file);
 				it.remove();
+			}
 		}
 	}
 
 	public long count(SearchCallback search, ConcurrentHashMap<String, Long> json) {
-		Map<String, Collection<File>> dirs = findMatchIndexDir(search);
+		List<LuceneFile> dirs = findMatchIndexDir(search);
 		if (dirs.isEmpty())
 			return 0;
 
 		AtomicLong count = new AtomicLong();
 		CountDownLatch lock = new CountDownLatch(dirs.size());
-		for (Entry<String, Collection<File>> item : dirs.entrySet()) {
-			item.getValue().forEach(dir -> executeCountTask(search, json, count, lock, item, dir));
+		for (LuceneFile luceneFile : dirs) {
+			executeCountTask(search, json, count, lock, luceneFile);
 		}
 		try {
 			lock.await();
@@ -263,11 +225,12 @@ public class ParallelSearch implements ShutdownCallback {
 	}
 
 	private void executeCountTask(SearchCallback search, ConcurrentHashMap<String, Long> json, AtomicLong count,
-			CountDownLatch lock, Entry<String, Collection<File>> item, File indexDir) {
+			CountDownLatch lock, LuceneFile luceneFile) {
 		worker.execute(() -> {
 			try {
-				String host = item.getKey();
-				IndexSearcher searcher = getCachedSearch(indexDir, host);
+				String host = luceneFile.getServer();
+				String path = luceneFile.getPath();
+				IndexSearcher searcher = getCachedSearch(new File(path), host);
 				long mtatch = searcher.count(search.getQuery().getQuery());
 				json.put(host, mtatch + json.getOrDefault(host, 0l));
 				count.getAndAdd(mtatch);

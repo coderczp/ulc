@@ -32,7 +32,9 @@ import org.slf4j.LoggerFactory;
 
 import com.czp.ulc.collect.handler.LogIndexHandler;
 import com.czp.ulc.common.bean.IndexMeta;
+import com.czp.ulc.common.bean.LuceneFile;
 import com.czp.ulc.common.dao.IndexMetaDao;
+import com.czp.ulc.common.dao.LuceneFileDao;
 import com.czp.ulc.common.lucene.DocField;
 import com.czp.ulc.common.util.Utils;
 import com.czp.ulc.main.Application;
@@ -57,9 +59,9 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	private ExecutorService worker = Executors.newSingleThreadExecutor();
 	private ConcurrentHashMap<File, IndexWriter> indexMap = new ConcurrentHashMap<>();
 
-	public static final String META_FILE_NAME = "meta.json";
-	public static final String LINE_SPLITER = getLineSpliter();
+	public static final String HOST = Utils.getHostName();
 	public static final Charset UTF8 = Charset.forName("UTF-8");
+	public static final String LINE_SPLITER = Utils.getLineSpliter();
 	private static final Logger log = LoggerFactory.getLogger(AsynIndexManager.class);
 
 	public AsynIndexManager(File baseDir, File indexBaseDir, LogIndexHandler handler) {
@@ -68,10 +70,6 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 		this.indexBaseDir = indexBaseDir;
 		this.writer = new RollingWriter(dataDir, this);
 		this.checkHasUnFlushFile(baseDir);
-	}
-
-	private static String getLineSpliter() {
-		return System.getProperty("os.name").toLowerCase().contains("windows") ? "\n" : "\r";
 	}
 
 	private void checkHasUnFlushFile(File baseDir) {
@@ -140,9 +138,10 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 				doc.add(new TextField(DocField.LINE, line, Field.Store.YES));
 				doc.add(new TextField(DocField.FILE, file, Field.Store.YES));
 
-				File indexDir = createIndexDir(sp.format(day), host);
+				File indexDir = createIndexDir(sp.format(day), host, day);
 				IndexWriter writer = getIndexWriter(analyzer, indexDir);
-				if (!writer.isOpen()) {// 防止被flush线程关闭
+				// 防止被flush线程关闭
+				if (!writer.isOpen()) {
 					writer = getIndexWriter(analyzer, indexDir);
 				}
 				writer.addDocument(doc);
@@ -197,8 +196,7 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 			Application.getBean(IndexMetaDao.class).add(meta);
 			log.info("sucess to write meta:{}", meta);
 		} catch (Exception e) {
-			log.info("fail to write meta:{}", meta);
-			log.error("updateMetaInfo error", e);
+			log.error("fail to write meta" + meta, e);
 		}
 	}
 
@@ -209,10 +207,26 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	 * @param host
 	 * @return
 	 */
-	protected File createIndexDir(String date, String host) {
-		File indexDir = new File(indexBaseDir, String.format("%s/%s", host, date));
-		indexDir.mkdirs();
+	private File createIndexDir(String dateStr, String server, Date date) {
+		File indexDir = new File(indexBaseDir, String.format("%s/%s", server, dateStr));
+		if (!indexDir.exists()) {
+			indexDir.mkdirs();
+			// 当前文件夹是新建的,添加数据记录
+			saveLuceneIndexFileToDb(server, date, indexDir);
+		}
 		return indexDir;
+	}
+
+	private void saveLuceneIndexFileToDb(String server, Date date, File indexDir) {
+		LuceneFile bean = new LuceneFile();
+		bean.setHost(HOST);
+		bean.setServer(server);
+		bean.setItime(date.getTime());
+		bean.setPath(indexDir.getAbsolutePath());
+		int ret = Application.getBean(LuceneFileDao.class).insert(bean);
+		if (ret < 1) {
+			log.error("fail to save lucene file {}", bean);
+		}
 	}
 
 	protected long flushIndex(Map<File, IndexWriter> indexMap) {
@@ -283,7 +297,7 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 				long docCount = flushIndex(indexMap);
 				boolean srcDelete = file.delete();
 				hasCompress.set(true);
-				handler.loadAllIndexDir();
+				// handler.loadAllIndexDir();
 				updateMetaInfo(length, lineCount.getAndSet(0), docCount);
 				log.info("index file:{} size:{} del:{}", file, length, srcDelete);
 			} catch (Exception e) {

@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.util.Utils;
+import com.czp.ulc.common.util.Utils;
 
 /**
  * Function:访问校验
@@ -42,7 +42,9 @@ public class AccessFilter implements Filter {
 	/** 需要跳转的登录地址 */
 	private String loginUrl;
 	private String[] skipUrls;
-	private static final long timeout = 1000 * 60 * 60 * 24 * 30l;
+	private static final String TOKEN_NAME = "account";
+	private static final int COOK_TIMEOUT = 60 * 60 * 24 * 10;
+	private static final long AUTH_TIMEOUT = 1000 * 60 * 60 * 24 * 30l;
 	private static Logger LOG = LoggerFactory.getLogger(AccessFilter.class);
 
 	public AccessFilter(String loginUrl, String skipUrls, String key) {
@@ -51,35 +53,7 @@ public class AccessFilter implements Filter {
 		this.key = key;
 	}
 
-	private boolean checkToken(String token, HttpSession session) {
-		if (token == null || token.isEmpty())
-			return false;
-		try {
-			LOG.info("token:{}", token);
-			if (token.contains("%"))
-				token = URLDecoder.decode(token, "utf-8");
-
-			String decrypt = Utils.decrypt(token, key, "utf-8");
-			LOG.info("decrypt src:{} to:{}", token, decrypt);
-			JSONObject json = JSONObject.parseObject(decrypt);
-			long time = json.getLongValue("time");
-			if (System.currentTimeMillis() - Long.valueOf(time) > timeout) {
-				LOG.info("token expire");
-				return false;
-			}
-			String account = json.getString("account");
-			session.setAttribute("user", account);
-		} catch (Exception e) {
-			LOG.error("decrypt error", e);
-			return false;
-		}
-		return true;
-	}
-
 	private String getCookie(HttpServletRequest request, String key) {
-		String token = request.getParameter(key);
-		if (token != null && !token.isEmpty())
-			return token;
 		Cookie[] cookies = request.getCookies();
 		if (cookies == null)
 			return null;
@@ -96,8 +70,8 @@ public class AccessFilter implements Filter {
 	}
 
 	@Override
-	public void doFilter(ServletRequest request, ServletResponse response, FilterChain paramFilterChain)
-			throws IOException, ServletException {
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException,
+			ServletException {
 		HttpServletResponse rep = (HttpServletResponse) response;
 		HttpServletRequest req = (HttpServletRequest) request;
 		String url = req.getRequestURL().toString();
@@ -106,39 +80,81 @@ public class AccessFilter implements Filter {
 		LOG.debug("url:{},user:{}", url, user);
 
 		if (isSkipUrl(url) || user != null) {
-			paramFilterChain.doFilter(req, rep);
+			chain.doFilter(req, rep);
 			return;
-		}
-		if (url.contains(IndexController.CALLBACK)) {
-			String token = req.getParameter("token").trim();
-			if (token != null && checkToken(token, session)) {
-				String baseUrl = getBaseUrl(req, url);
-				rep.sendRedirect(baseUrl);
-				return;
-			}
 		}
 
-		String token = getCookie(req, IndexController.TOKEN);
-		if (!checkToken(token, session)) {
-			String baseUrl = getBaseUrl(req, url);
-			String realCallBack = baseUrl.concat(IndexController.CALLBACK);
-			rep.sendRedirect(loginUrl.replace("#{url}", realCallBack));
+		if (isAuthSucessCallback(rep, req, url, session)) {
 			return;
 		}
-		paramFilterChain.doFilter(req, rep);
+
+		if (hasLogin(req, session)) {
+			chain.doFilter(request, response);
+			return;
+		}
+
+		gotoLogin(rep, req, url);
+
 	}
 
-	private String getBaseUrl(HttpServletRequest req, String url) {
+	private void gotoLogin(HttpServletResponse rep, HttpServletRequest req, String url) throws IOException {
+		String baseUrl = getCallbackUrl(req, url);
+		String realCallBack = baseUrl.concat(IndexController.CALLBACK);
+		rep.sendRedirect(loginUrl.replace("#{url}", realCallBack));
+	}
+
+	private boolean hasLogin(HttpServletRequest req, HttpSession session) {
+		String token = getCookie(req, TOKEN_NAME);
+		if (token == null)
+			return false;
+
+		try {
+			String account = Utils.decrypt(token);
+			session.setAttribute("user", account);
+			return true;
+		} catch (Exception e) {
+			LOG.error("invalid token", e);
+		}
+		return false;
+	}
+
+	private boolean isAuthSucessCallback(HttpServletResponse rep, HttpServletRequest req, String url,
+			HttpSession session) throws IOException {
+		if (!url.contains(IndexController.CALLBACK))
+			return false;
+
+		String token = req.getParameter("token").trim();
+		if (token == null)
+			return false;
+		if (token.contains("%"))
+			token = URLDecoder.decode(token, "utf-8");
+
+		String decrypt = Utils.decryptAuth(token, key, "utf-8");
+		LOG.info("decrypt auth token to:{}", decrypt);
+		JSONObject json = JSONObject.parseObject(decrypt);
+		long time = json.getLongValue("time");
+		if (System.currentTimeMillis() - Long.valueOf(time) > AUTH_TIMEOUT) {
+			LOG.info("token expire {}", json);
+			return false;
+		}
+		String account = json.getString("account");
+		session.setAttribute("user", account);
+		String baseUrl = getCallbackUrl(req, url);
+		String encrypt = Utils.encrypt(account);
+		Cookie cookie = new Cookie(TOKEN_NAME, encrypt);
+		cookie.setMaxAge(COOK_TIMEOUT);
+		rep.addCookie(cookie);
+		rep.sendRedirect(baseUrl);
+		return true;
+	}
+
+	private String getCallbackUrl(HttpServletRequest req, String url) {
 		String ctx = req.getContextPath();
 		String host = req.getHeader("host");
-		String uri = req.getRequestURI();
-		// String referer = req.getHeader("referer");
-		// if (referer != null) {
-		// return referer;
-		// }
 		if (host != null) {
 			return String.format("%s://%s%s", req.getScheme(), host, ctx);
 		}
+		String uri = req.getRequestURI();
 		return url.substring(0, url.indexOf(uri) + ctx.length());
 	}
 

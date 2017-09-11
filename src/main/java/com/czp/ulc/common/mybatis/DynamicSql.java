@@ -19,7 +19,7 @@ import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.bean.IndexMeta;
 import com.czp.ulc.common.bean.KeywordRule;
 import com.czp.ulc.common.bean.MonitorConfig;
-import com.czp.ulc.common.param.QueryParam;
+import com.czp.ulc.common.module.lucene.QueryParam;
 import com.czp.ulc.common.util.Utils;
 
 /**

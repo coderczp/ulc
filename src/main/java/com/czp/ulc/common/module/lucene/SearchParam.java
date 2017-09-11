@@ -7,7 +7,7 @@
  * 邮编：610041 
  * 地址：成都市武侯区航空路6号丰德国际C3
  */
-package com.czp.ulc.common.lucene;
+package com.czp.ulc.common.module.lucene;
 
 import org.apache.lucene.search.IndexSearcher;
 

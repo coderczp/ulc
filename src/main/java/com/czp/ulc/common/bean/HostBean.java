@@ -38,9 +38,9 @@ public class HostBean implements Serializable {
 	@NotEmpty(message = "pwd isempty")
 	private String pwd;
 
-	private Integer status = 0;
-	
 	private int port = DEFAULT_PORT;
+
+	private int status = 0;
 
 	private Integer id;
 
@@ -51,12 +51,12 @@ public class HostBean implements Serializable {
 	public void setId(Integer id) {
 		this.id = id;
 	}
-	
-	public Integer getStatus() {
+
+	public int getStatus() {
 		return status;
 	}
 
-	public void setStatus(Integer status) {
+	public void setStatus(int status) {
 		this.status = status;
 	}
 

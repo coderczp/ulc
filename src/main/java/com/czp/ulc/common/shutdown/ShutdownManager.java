@@ -15,6 +15,7 @@ import sun.misc.SignalHandler;
  * @Author:coder_czp@126.com
  * @version:1.0
  */
+@SuppressWarnings("restriction")
 public class ShutdownManager extends Thread implements SignalHandler {
 
 	private volatile boolean hasExecute = false;

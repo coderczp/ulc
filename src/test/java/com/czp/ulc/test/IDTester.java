@@ -1,3 +1,4 @@
+package com.czp.ulc.test;
 /* 
  * 创建日期 2016-11-10
  *
@@ -7,7 +8,7 @@
  * 邮编：610041 
  * 地址：成都市武侯区航空路6号丰德国际C3
  */
-package com.czp.ulc.test;
+
 
 import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,6 +43,7 @@ public class IDTester {
 	    Logger logger = LoggerFactory.getLogger("test");
 	    logger.info("000000");
 	}
+	
 	@Test
 	public void test() throws InterruptedException {
 		int count = 50;

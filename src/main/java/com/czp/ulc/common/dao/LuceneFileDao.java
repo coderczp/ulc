@@ -5,9 +5,9 @@ import java.util.List;
 import org.apache.ibatis.annotations.SelectProvider;
 
 import com.czp.ulc.common.bean.LuceneFile;
+import com.czp.ulc.common.module.lucene.QueryParam;
 import com.czp.ulc.common.mybatis.BaseDao;
 import com.czp.ulc.common.mybatis.DynamicSql;
-import com.czp.ulc.common.param.QueryParam;
 
 /**
  * @dec 管理lucene文件

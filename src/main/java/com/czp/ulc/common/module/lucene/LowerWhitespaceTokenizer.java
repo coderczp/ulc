@@ -1,4 +1,4 @@
-package com.czp.ulc.common.lucene;
+package com.czp.ulc.common.module.lucene;
 
 import org.apache.lucene.analysis.util.CharTokenizer;
 

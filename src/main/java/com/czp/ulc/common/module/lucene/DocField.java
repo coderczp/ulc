@@ -1,4 +1,4 @@
-package com.czp.ulc.common.lucene;
+package com.czp.ulc.common.module.lucene;
 
 /**
  * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月13日 下午3:28:59</li>

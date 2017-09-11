@@ -1,4 +1,4 @@
-package com.czp.ulc.common.meta;
+package com.czp.ulc.common.module.lucene;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -7,6 +7,8 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,12 +32,11 @@ import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.collect.handler.LogIndexHandler;
+import com.czp.ulc.common.ThreadPools;
 import com.czp.ulc.common.bean.IndexMeta;
 import com.czp.ulc.common.bean.LuceneFile;
 import com.czp.ulc.common.dao.IndexMetaDao;
 import com.czp.ulc.common.dao.LuceneFileDao;
-import com.czp.ulc.common.lucene.DocField;
 import com.czp.ulc.common.util.Utils;
 import com.czp.ulc.main.Application;
 
@@ -46,40 +47,79 @@ import com.czp.ulc.main.Application;
  * 
  * @version 0.0.1
  */
-
-public class AsynIndexManager implements AutoCloseable, FileChangeListener {
+public class FileIndexBuilder implements AutoCloseable {
 
 	private File dataDir;
 	private File indexBaseDir;
-	private LogIndexHandler handler;
 
+	private Analyzer analyzer;
 	private RollingWriter writer;
 	private AtomicLong lineCount = new AtomicLong();
-	private AtomicBoolean hasCompress = new AtomicBoolean();
+	private AtomicBoolean hasFlushed = new AtomicBoolean();
 	private ExecutorService worker = Executors.newSingleThreadExecutor();
 	private ConcurrentHashMap<File, IndexWriter> indexMap = new ConcurrentHashMap<>();
 
 	public static final String HOST = Utils.getHostName();
 	public static final Charset UTF8 = Charset.forName("UTF-8");
 	public static final String LINE_SPLITER = Utils.getLineSpliter();
-	private static final Logger log = LoggerFactory.getLogger(AsynIndexManager.class);
+	private static final Logger log = LoggerFactory.getLogger(FileIndexBuilder.class);
 
-	public AsynIndexManager(File baseDir, File indexBaseDir, LogIndexHandler handler) {
-		this.handler = handler;
+	// new LuceneFileIndexBuilder(LuceneConfig.UNCOMP_DIR,
+	// LuceneConfig.INDEX_DIR);
+	public FileIndexBuilder(File baseDir, File indexBaseDir, Analyzer analyzer) {
 		this.dataDir = baseDir;
+		this.analyzer = analyzer;
 		this.indexBaseDir = indexBaseDir;
-		this.writer = new RollingWriter(dataDir, this);
-		this.checkHasUnFlushFile(baseDir);
+		this.writer = new RollingWriter(dataDir);
+		this.repairFailFile(baseDir);
 	}
 
-	private void checkHasUnFlushFile(File baseDir) {
+	/***
+	 * 修复因为进程异常退出没有commit的数据
+	 * 
+	 * @param baseDir
+	 */
+	private void repairFailFile(File baseDir) {
+		List<File> files = new LinkedList<File>();
 		for (File file : writer.getAllFiles()) {
-			if (writer.isHistoryFile(file)) {
-				onFileChange(file);
-			} else {
-				indexUnFlushFileToRAM(file);
+			File pFile = file.getParentFile();
+			File dest = new File(pFile, "wait_repair_" + file.getName());
+			if(file.renameTo(dest)){
+				files.add(dest);
+			}else{
+				System.out.println("-------------->");
 			}
 		}
+		asynRepair(files);
+	}
+
+	private void asynRepair(final List<File> files) {
+		ThreadPools.getInstance().startThread("repair-thread", () -> {
+			for (File file : files) {
+				long length = file.length();
+				log.info("repair log file:{}", file);
+				try (BufferedReader br = Files.newBufferedReader(file.toPath())) {
+					String line;
+					long now = System.currentTimeMillis();
+					while ((line = br.readLine()) != null) {
+						String[] decodeData = decodeData(line);
+						if (decodeData == null) {
+							continue;
+						}
+						String host = decodeData[1];
+						String data = decodeData[3];
+						String srcFile = decodeData[2];
+						long time = Long.valueOf(decodeData[0]);
+						doWriteIndex(host, srcFile, data, time);
+					}
+					boolean delete = file.delete();
+					long end = System.currentTimeMillis();
+					log.info("repair:{}  time:{} ms delete:{}", length, (end - now), delete);
+				} catch (IOException e) {
+					log.error("index error", e);
+				}
+			}
+		}, true);
 	}
 
 	/****
@@ -94,9 +134,9 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	 */
 	public boolean write(String host, String file, String line, long now) throws Exception {
 		String string = encodeData(host, file, line, now);
-		writer.append(string.getBytes(UTF8));
-		asynAddDoc(host, file, line, now);
-		return true;
+		RollingWriterResult result = writer.append(string.getBytes(UTF8));
+		asynAddDoc(host, file, line, now, result);
+		return result.isFileChanged();
 	}
 
 	private String encodeData(String host, String file, String line, long now) {
@@ -125,59 +165,36 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	}
 
 	// 异步添加document
-	private void asynAddDoc(String host, String file, String line, long now) {
+	private void asynAddDoc(String host, String file, String line, long now, RollingWriterResult result) {
 		worker.execute(() -> {
 			try {
-				lineCount.getAndIncrement();
-				Date day = Utils.igroeHMSTime(now);
-				Analyzer analyzer = handler.getAnalyzer();
-				SimpleDateFormat sp = new SimpleDateFormat(LogIndexHandler.FORMAT);
-
-				Document doc = new Document();
-				doc.add(new LongPoint(DocField.TIME, now));
-				doc.add(new TextField(DocField.LINE, line, Field.Store.YES));
-				doc.add(new TextField(DocField.FILE, file, Field.Store.YES));
-
-				File indexDir = createIndexDir(sp.format(day), host, day);
-				IndexWriter writer = getIndexWriter(analyzer, indexDir);
-				// 防止被flush线程关闭
-				if (!writer.isOpen()) {
-					writer = getIndexWriter(analyzer, indexDir);
+				doWriteIndex(host, file, line, now);
+				if (result.isFileChanged()) {
+					doFlush(result.getLastFile());
 				}
-				writer.addDocument(doc);
 			} catch (Exception e) {
 				log.error("add documnet error", e);
 			}
 		});
 	}
 
-	/**
-	 * 进程意外退出时内存索引丢失,所以需要reload一次
-	 * 
-	 * @throws IOException
-	 */
-	private void indexUnFlushFileToRAM(File unCompressFile) {
-		log.info("repair lost index:{}", unCompressFile);
-		try (BufferedReader br = Files.newBufferedReader(unCompressFile.toPath())) {
-			String line;
-			long now = System.currentTimeMillis();
-			while ((line = br.readLine()) != null) {
-				String[] decodeData = decodeData(line);
-				if (decodeData == null) {
-					continue;
-				}
-				String host = decodeData[1];
-				String data = decodeData[3];
-				String srcFile = decodeData[2];
-				long time = Long.valueOf(decodeData[0]);
-				handler.addMemoryIndex(time, srcFile, host, data);
-			}
-			long length = unCompressFile.length();
-			long end = System.currentTimeMillis();
-			log.info("index:{} bytes time:{} ms", length, (end - now));
-		} catch (IOException e) {
-			log.error("index error", e);
+	private void doWriteIndex(String host, String file, String line, long now) throws IOException {
+		lineCount.getAndIncrement();
+		Date day = Utils.igroeHMSTime(now);
+		SimpleDateFormat sp = new SimpleDateFormat(LuceneConfig.FORMAT);
+
+		Document doc = new Document();
+		doc.add(new LongPoint(DocField.TIME, now));
+		doc.add(new TextField(DocField.LINE, line, Field.Store.YES));
+		doc.add(new TextField(DocField.FILE, file, Field.Store.YES));
+
+		File indexDir = createIndexDir(sp.format(day), host, day);
+		IndexWriter writer = getIndexWriter(analyzer, indexDir);
+		// 防止被flush线程关闭
+		if (!writer.isOpen()) {
+			writer = getIndexWriter(analyzer, indexDir);
 		}
+		writer.addDocument(doc);
 	}
 
 	/***
@@ -286,24 +303,21 @@ public class AsynIndexManager implements AutoCloseable, FileChangeListener {
 	 * @return
 	 */
 	public boolean checkHasFlush() {
-		return hasCompress.getAndSet(false);
+		return hasFlushed.getAndSet(false);
 	}
 
-	@Override
-	public void onFileChange(File file) {
-		worker.execute(() -> {
-			try {
-				long length = file.length();
-				long docCount = flushIndex(indexMap);
-				boolean srcDelete = file.delete();
-				hasCompress.set(true);
-				// handler.loadAllIndexDir();
-				updateMetaInfo(length, lineCount.getAndSet(0), docCount);
-				log.info("index file:{} size:{} del:{}", file, length, srcDelete);
-			} catch (Exception e) {
-				log.error(e.toString(), e);
-			}
-		});
+	private void doFlush(File file) {
+		try {
+			// 文件滚动时commit索引,完成后删除原文件
+			long length = file.length();
+			long docCount = flushIndex(indexMap);
+			boolean srcDelete = file.delete();
+			hasFlushed.set(true);
+			updateMetaInfo(length, lineCount.getAndSet(0), docCount);
+			log.info("index file:{} size:{} del:{}", file, length, srcDelete);
+		} catch (Exception e) {
+			log.error(e.toString(), e);
+		}
 	}
 
 }

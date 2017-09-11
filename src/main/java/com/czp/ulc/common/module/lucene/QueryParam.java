@@ -1,4 +1,4 @@
-package com.czp.ulc.common.param;
+package com.czp.ulc.common.module.lucene;
 
 import java.util.Set;
 

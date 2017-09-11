@@ -9,7 +9,7 @@
 <link
 	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
 	rel="stylesheet">
-<link href="css/ulc.css" rel="stylesheet">
+<link href="/ulc/css/ulc.css" rel="stylesheet">
 
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
@@ -43,47 +43,263 @@
 	<div class="container-fluid" style="margin-top: 50px">
 		<div class="panel panel-success">
 			<div class="panel-heading">
-				<form method="POST" enctype="multipart/form-data"
-					action="/ulc/file/upload">
-					<input type="file" name="file" /> <input type="submit"
-						value="Upload" />
-				</form>
-
+				<input type="file" id="myfile" name="file" onchange="doUpload()">
+				<label id="tips"></label>
 			</div>
 			<div class="panel-body">
 				<div id="result" class="table-responsive">
-					select host<select id="host"></select>
+					选择文件<select id="tar" onchange="updatePath()"></select> 选择主机<select
+						id="host" onchange="updatePath()"></select> 路径: <select id="path">
+						<option value="">--please select path--</option>
+					</select>
 					<button id="deploy" onclick="deploy()">发布</button>
-					<label id="status"></label>
+					<a href="/ulc/tar.exe">前端打包工具</a>
+				</div>
+				<div id="list" class="table-responsive">
+					<table class="table table-striped">
+						<caption>部署记录</caption>
+						<thead>
+							<tr>
+								<th>ID</th>
+								<th>服务</th>
+								<th>主机</th>
+								<th>人员</th>
+								<th>状态</th>
+								<th>日期</th>
+								<th>进度</th>
+								<th>日志</th>
+							</tr>
+						</thead>
+						<tbody id="record">
+						</tbody>
+					</table>
+				</div>
+
+			</div>
+		</div>
+	</div>
+	</div>
+	<!-- Modal -->
+	<div class="modal fade" id="myModal" tabindex="-1" role="dialog"
+		aria-labelledby="myModalLabel" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal"
+						aria-hidden="true">&times;</button>
+					<h4 class="modal-title">Deploy log</h4>
+
+				</div>
+				<div class="modal-body">
+					<div class="div">
+						<textarea id="logDetail" rows="20" cols="75"
+							style="background: black; color: white;"></textarea>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
 				</div>
 			</div>
 		</div>
 	</div>
+	<!-- /.modal -->
 </body>
 <script type="text/javascript">
-	$(function() {
-		$.get('./host/list', function(d) {
-			var html = '<option value="">-please select host--</option>';
+	var dftOpt = '<option value="">--please select one--</option>';
+	var waitImg = '<img src="/ulc/img/wait.gif" style="width: 30px; height: 30px;"/>'
+
+	$.ajaxSetup({
+		error : function(e) {
+			var err = e.responseJSON;
+			alert(err.message || err.error);
+		},
+		complete : function() {
+			//$("#imgWait").hide();
+		}
+	});
+
+	loadHost();
+	loadFiles();
+	loadRecord();
+
+	function getProject(file) {
+		return file.substring(file.indexOf('_') + 1, file.lastIndexOf("."));
+	}
+
+	function loadHost() {
+		$.get('./host/list?size=15', function(d) {
+			var html = dftOpt;
 			for ( var i in d) {
 				var host = d[i];
-				html += '<option value='+host.name+'>' + host.name
-						+ '</option>';
+				var hname = host.name;
+				html += buildOpt(hname, hname);
 			}
 			$('#host').html(html);
 		});
-	});
+	}
+
+	function loadFiles() {
+		$.get('./project/listtar?size=40', function(d) {
+			var html = dftOpt;
+			for ( var i in d) {
+				var file = d[i];
+				var project = getProject(file);
+				var time = file.substring(0, file.indexOf("_"));
+				html += buildOpt(file, project + "[" + time + "]");
+			}
+			$('#tar').html(html);
+		});
+	}
+
+	function loadRecord() {
+		$.get('./project/record?size=40', function(d) {
+			var html = '';
+			for ( var i in d) {
+				var record = d[i];
+				var id = record.id;
+				var rlog = record.log;
+				var prg = isFinish(record) ? "完成" : waitImg;
+				var log = "<button onclick='loadLog(" + id + ")'>日志</button>";
+
+				html += "<tr><td>" + record.id + "</td><td>" + record.project
+						+ "</td><td>" + record.host + "</td><td>"
+						+ record.author + "</td><td>" + record.status
+						+ "</td><td>" + record.time + "</td><td>" + prg
+						+ "</td><td>" + log + "</td></tr>";
+			}
+			$('#record').html(html);
+		});
+	}
+
+	function openLog(log) {
+		try {
+			$('#logDetail').html(log);
+			$('#myModal').modal('show');
+		} catch (e) {
+			console.log(e)
+		}
+	}
+
+	function loadLog(id) {
+		$.get('./project/queryLog?id=' + id, function(d) {
+			openLog(d);
+		});
+	}
+	function updatePath() {
+		var html = '';
+		var tar = $('#tar').val();
+		var host = $('#host').val();
+		if (!host || !tar) {
+			$('#path').html(dftOpt);
+			return;
+		}
+		var project = getProject(tar);
+		if (host.indexOf("test") > -1) {
+			var path1 = "/data/work/itrip_1/" + project;
+			var path2 = "/data/work/itrip_2/" + project;
+			var path3 = "/data/work/itrip_3/" + project;
+			var path4 = "/data/work/itrip_4/" + project;
+			html += buildOpt(path1, path1);
+			html += buildOpt(path2, path2);
+			html += buildOpt(path3, path3);
+			html += buildOpt(path4, path4);
+		} else {
+                        var path4 = "/var/www/data/work/node/static";
+                        var path5 = "/var/www/data/work/itrip_static";
+                        var path6 = "/var/www/data/work/service_rp";
+                        var path7 = "/var/www/data/work/shop";
+			var path3 = "/var/www/data/work/" + project;
+			var path1 = "/var/www/data/work/itrip_" + project;
+			var path2 = "/var/www/data/work/service_" + project;
+			html += buildOpt(path2, path2);
+			html += buildOpt(path1, path1);
+			html += buildOpt(path3, path3);
+			html += buildOpt(path4, path4);
+			html += buildOpt(path5, path5);
+			html += buildOpt(path6, path6);
+			html += buildOpt(path7, path7);
+		}
+		$('#path').html(html);
+	}
+
+	function buildOpt(val, text) {
+		return '<option value='+val+'>' + text + '</option>';
+	}
+
+	function doUpload() {
+		var formData = new FormData();
+		$('#tips').text("正在上传,请稍等");
+		formData.append("file", document.getElementById("myfile").files[0]);
+		$.ajax({
+			url : "/ulc/file/upload",
+			type : "POST",
+			data : formData,
+			contentType : false,//必须false才会自动加上正确的Content-Type
+			processData : false,//必须false才会避开jQuery对 formdata
+			success : function(data) {
+				$('#tips').text(data.path || data.error);
+				loadFiles();
+			}
+		});
+	}
+
+	function findTd(id, d) {
+		$("#record > tr").each(function() {
+			var cid = $(this).children('td:eq(0)').text();
+			if (cid == id) {
+				statusTd = $(this).children('td:eq(4)');
+				logTd = $(this).children('td:eq(7)');
+				prgTd = $(this).children('td:eq(6)');
+				statusTd.text(d.status);
+			}
+		});
+	}
+
+	var statusTd, logTd, prgTd;
+	function doCheck(id) {
+		$.get('./project/check?id=' + id, function(d) {
+			if (!statusTd) {
+				findTd(id, d);
+			}
+			statusTd.text(d.status);
+			if (!isFinish(d)) {
+				window.setTimeout(doCheck, 1000, id);
+			} else {
+				prgTd.html("完成");
+				openLog(d.log)
+			}
+		});
+	}
+
+	function isFinish(redocrd) {
+		var status = redocrd.status;
+		return status.match('部署完成|部署失败|部署成功') != null;
+	}
+
+	function startCheck(id) {
+		window.setTimeout(doCheck, 1000, id);
+	}
 
 	function deploy() {
+		var tar = $('#tar').val();
 		var host = $('#host').val();
-		if (!host)
-			return alert('请选择主机');
+		if (!host || !tar)
+			return alert('请选择主机和文件');
 		if (host.indexOf('online') > -1) {
 			var a = confirm("确认测试环境ok,并部署到线上吗?");
 			if (a == false)
 				return;
 		}
-
-		$('#status').text("uploading");
+		$.post('./project/deploy', {
+			"tar" : $('#tar').val(),
+			"hostId" : $('#host').val(),
+			"path" : $('#path').val(),
+		}, function(d) {
+			if (d.code == 200)
+				startCheck(d.id);
+			loadRecord();
+		});
+		$("#imgWait").show();
 	}
 </script>
 </body>

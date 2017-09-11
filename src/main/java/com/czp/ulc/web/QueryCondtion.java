@@ -16,8 +16,8 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.search.Query;
 
-import com.czp.ulc.common.lucene.DocField;
-import com.czp.ulc.common.lucene.RangeQueryParser;
+import com.czp.ulc.common.module.lucene.DocField;
+import com.czp.ulc.common.module.lucene.RangeQueryParser;
 import com.czp.ulc.common.util.Utils;
 import com.google.common.collect.Sets;
 

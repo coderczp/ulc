@@ -7,9 +7,8 @@
  * 邮编：610041 
  * 地址：成都市武侯区航空路6号丰德国际C3
  */
-package com.czp.ulc.collect.handler;
+package com.czp.ulc.common.module.lucene;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
@@ -33,15 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.czp.ulc.collect.ReadResult;
+import com.czp.ulc.collect.handler.SearchCallback;
 import com.czp.ulc.common.MessageListener;
-import com.czp.ulc.common.bean.IndexMeta;
-import com.czp.ulc.common.dao.IndexMetaDao;
-import com.czp.ulc.common.lucene.DocField;
-import com.czp.ulc.common.lucene.LogAnalyzer;
-import com.czp.ulc.common.lucene.ParallelSearchNew;
-import com.czp.ulc.common.meta.AsynIndexManager;
 import com.czp.ulc.common.util.Utils;
-import com.czp.ulc.main.Application;
 import com.czp.ulc.web.QueryCondtion;
 
 /**
@@ -51,35 +44,20 @@ import com.czp.ulc.web.QueryCondtion;
  * @Author:jeff.cao@aoliday.com
  * @version:1.0
  */
-public class LogIndexHandler implements MessageListener<ReadResult> {
+public class MemIndexBuilder implements MessageListener<ReadResult> {
 
+	private Analyzer analyzer;
 	private DirectoryReader ramReader;
-	private AsynIndexManager logWriter;
-	private ParallelSearchNew parallelSearch;
 	private volatile IndexWriter ramWriter;
-	private Analyzer analyzer = new LogAnalyzer();
+	private FileIndexBuilder fileIndexBuilder;
+	private static final Logger LOG = LoggerFactory.getLogger(MemIndexBuilder.class);
 
-	/** 索引文件目录日期格式 */
-	public static final String FORMAT = "yyyyMMdd";
-	/*** 根目录 */
-	private static final File ROOT = new File("./log");
-	/** 索引根目录 */
-	private static final File INDEX_DIR = new File(ROOT, "index");
-	/** 未压缩文件目录 */
-	private static final File UNCOMP_DIR = new File(ROOT, "data");
-
-	private static final Logger LOG = LoggerFactory.getLogger(LogIndexHandler.class);
-
-	public LogIndexHandler() {
+	public MemIndexBuilder(FileIndexBuilder fileBuilder, Analyzer analyzer) {
 		try {
-			UNCOMP_DIR.mkdirs();
-			INDEX_DIR.mkdirs();
+			this.analyzer = analyzer;
 			ramWriter = createRAMIndexWriter();
 			ramReader = DirectoryReader.open(ramWriter);
-			parallelSearch = new ParallelSearchNew(Utils.getCpus() + 4);
-			logWriter = new AsynIndexManager(UNCOMP_DIR, INDEX_DIR, this);
-
-			// loadAllIndexDir();
+			fileIndexBuilder = fileBuilder;
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -96,7 +74,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 
 	@Override
 	public void onExit() {
-		Utils.close(ramWriter, logWriter);
+		Utils.close(ramWriter, fileIndexBuilder);
 	}
 
 	@Override
@@ -113,12 +91,12 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 				return true;
 			}
 
-			if (logWriter.checkHasFlush()) {
+			if (fileIndexBuilder.checkHasFlush()) {
 				swapRamWriterReader();
 			}
 
 			addMemoryIndex(now, file, host, line);
-			logWriter.write(host, file, line, now);
+			fileIndexBuilder.write(host, file, line, now);
 			long end = System.currentTimeMillis();
 			LOG.debug("add index time:{}ms", (end - now));
 			return true;
@@ -137,20 +115,6 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 		ramWriter.addDocument(doc);
 	}
 
-	public void search(SearchCallback search) throws Exception {
-		long allDocs = getMeta().getDocs() + ramReader.numDocs();
-		int memMatch = searchInRam(search, allDocs);
-		if (memMatch >= search.getQuery().getSize()) {
-			search.onFinish(allDocs, memMatch);
-		} else {
-			parallelSearch.search(search, allDocs, memMatch);
-		}
-	}
-
-	// public void loadAllIndexDir() {
-	// parallelSearch.loadAllIndexDir();
-	// }
-
 	/***
 	 * 在内存中搜索
 	 * 
@@ -159,7 +123,7 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 	 * @return
 	 * @throws IOException
 	 */
-	private int searchInRam(SearchCallback search, long docCount) throws IOException {
+	public int searchInRam(SearchCallback search) throws IOException {
 		QueryCondtion cdt = search.getQuery();
 		Query query = cdt.getQuery();
 		IndexSearcher ramSearcher = getRamSearcher();
@@ -212,14 +176,8 @@ public class LogIndexHandler implements MessageListener<ReadResult> {
 				json.put(host, 1l);
 			}
 		}
-		long fileCount = parallelSearch.count(search, json);
-		json.put("count", result.totalHits + fileCount);
 		long end = System.currentTimeMillis();
 		LOG.info("count in ram time:{}", (end - st));
 		return json;
-	}
-
-	public IndexMeta getMeta() {
-		return Application.getBean(IndexMetaDao.class).count(null);
 	}
 }

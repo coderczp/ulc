@@ -68,30 +68,28 @@ public class ErrorLogHandler implements MessageListener<ReadResult>, Runnable {
 
 	@Override
 	public boolean onMessage(ReadResult event, Map<String, Object> ext) {
-//		String file = event.getFile();
-//		if (!file.endsWith("error.log") && !file.endsWith(".out")) {
-//			return false;
-//		}
-//
-//		String serName = event.getHost().getName();
-//		String hostFile = serName.concat("#").concat(file);
-//		if (!map.containsKey(hostFile)) {
-//			map.putIfAbsent(hostFile, new MutilLineBean(event.getHost(), file));
-//		}
-//
-//		MutilLineBean bean = map.get(hostFile);
-//		synchronized (bean) {
-//			for (String string : event.getLines()) {
-//				bean.lines.append(string).append("<br>\n");
-//				bean.lineCount.getAndIncrement();
-//			}
-//		}
-//
-//		/** 每lineCount行开始检测是否又关键字出现,为了防止一直<50行并且有错误不报,定时器会检测 */
-//		if (bean.lineCount.get() > lineCount) {
-//			processIfMatch(bean);
-//			resetCache(bean);
-//		}
+		String file = event.getFile();
+		if (!file.endsWith("error.log") && !file.endsWith(".out")) {
+			return false;
+		}
+
+		String serName = event.getHost().getName();
+		String hostFile = serName.concat("#").concat(file);
+		if (!map.containsKey(hostFile)) {
+			map.putIfAbsent(hostFile, new MutilLineBean(event.getHost(), file));
+		}
+
+		MutilLineBean bean = map.get(hostFile);
+		synchronized (bean) {
+			bean.lines.append(event.getLine()).append("<br>\n");
+			bean.lineCount.getAndIncrement();
+		}
+
+		/** 每lineCount行开始检测是否又关键字出现,为了防止一直<50行并且有错误不报,定时器会检测 */
+		if (bean.lineCount.get() > lineCount) {
+			processIfMatch(bean);
+			resetCache(bean);
+		}
 
 		return false;
 	}

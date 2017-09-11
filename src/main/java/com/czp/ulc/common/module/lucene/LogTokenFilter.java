@@ -1,4 +1,4 @@
-package com.czp.ulc.common.lucene;
+package com.czp.ulc.common.module.lucene;
 
 import java.io.IOException;
 

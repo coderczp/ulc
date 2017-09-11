@@ -1,4 +1,4 @@
-package com.czp.ulc.common.meta;
+package com.czp.ulc.common.module.lucene;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -15,7 +15,9 @@ import com.czp.ulc.common.shutdown.ShutdownManager;
 import com.czp.ulc.common.util.Utils;
 
 /**
- * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月18日 上午9:25:45</li>
+ * 请添加描述
+ * <li>创建人：Jeff.cao</li>
+ * <li>创建时间：2017年5月18日 上午9:25:45</li>
  * 
  * @version 0.0.1
  */
@@ -24,7 +26,7 @@ public class RollingWriter implements AutoCloseable, ShutdownCallback {
 
 	protected File baseDir;
 	protected volatile File currentFile;
-	protected FileChangeListener listener;
+	protected volatile RollingWriterResult result;
 	protected volatile BufferedOutputStream stream;
 	protected AtomicLong postion = new AtomicLong();
 
@@ -33,9 +35,8 @@ public class RollingWriter implements AutoCloseable, ShutdownCallback {
 	public static final FilenameFilter FILTER = Utils.newFilter(SUFFX);
 	protected static final Logger LOG = LoggerFactory.getLogger(RollingWriter.class);
 
-	public RollingWriter(File baseDir, FileChangeListener listener) {
+	public RollingWriter(File baseDir) {
 		this.baseDir = baseDir;
-		this.listener = listener;
 		this.stream = getCurrentStream();
 		ShutdownManager.getInstance().addCallback(this);
 	}
@@ -48,11 +49,25 @@ public class RollingWriter implements AutoCloseable, ShutdownCallback {
 	protected File chooseFile() {
 		int num = 0;
 		for (File file : baseDir.listFiles(FILTER)) {
-			num = Math.max(num, getFileId(file));
+			String name = file.getName();
+			if (!isLogDataFile(name))
+				continue;
+
+			num = Math.max(num, getFileId(name));
 			if (file.length() >= EACH_FILE_SIZE)
 				num++;
 		}
 		return new File(baseDir, String.format("%s%s", num, SUFFX));
+	}
+
+	/***
+	 * 检查是否是0.log/1.log/2.log
+	 * 
+	 * @param file
+	 * @return
+	 */
+	private boolean isLogDataFile(String name) {
+		return Character.isDigit(name.charAt(0));
 	}
 
 	/**
@@ -61,17 +76,12 @@ public class RollingWriter implements AutoCloseable, ShutdownCallback {
 	 * @param file
 	 * @return
 	 */
-	public int getFileId(File file) {
-		String name = file.getName();
+	public int getFileId(String name) {
 		return Integer.parseInt(name.substring(0, name.indexOf(".")));
 	}
 
 	public File[] getAllFiles() {
 		return baseDir.listFiles(FILTER);
-	}
-
-	public boolean isHistoryFile(File file) {
-		return file.length() >= EACH_FILE_SIZE;
 	}
 
 	public File getCurrentFile() {
@@ -85,18 +95,21 @@ public class RollingWriter implements AutoCloseable, ShutdownCallback {
 	 * @return
 	 * @throws IOException
 	 */
-	public long append(byte[] bytes) throws IOException {
+	public RollingWriterResult append(byte[] bytes) throws IOException {
 		if (postion.get() >= EACH_FILE_SIZE) {
 			synchronized (this) {
 				if (postion.get() >= EACH_FILE_SIZE) {
 					stream.close();
-					listener.onFileChange(currentFile);
 					stream = getCurrentStream();
+					result.setFileChanged(true);
 				}
 			}
+		} else {
+			result.setFileChanged(false);
 		}
 		stream.write(bytes);
-		return postion.getAndAdd(bytes.length);
+		postion.getAndAdd(bytes.length);
+		return result;
 
 	}
 
@@ -107,9 +120,11 @@ public class RollingWriter implements AutoCloseable, ShutdownCallback {
 	 */
 	private BufferedOutputStream getCurrentStream() {
 		try {
+			File tmp = currentFile;
 			currentFile = chooseFile();
 			postion.set(currentFile.length());
 			LOG.info("use file:{}", currentFile);
+			result = new RollingWriterResult(false, tmp);
 			return new BufferedOutputStream(new FileOutputStream(currentFile, true));
 		} catch (IOException e) {
 			throw new RuntimeException(e.toString(), e);

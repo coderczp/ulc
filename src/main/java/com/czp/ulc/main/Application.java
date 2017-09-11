@@ -12,7 +12,6 @@ package com.czp.ulc.main;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -37,15 +36,10 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
-import com.czp.ulc.collect.ConnectManager;
-import com.czp.ulc.collect.RemoteLogCollector;
 import com.czp.ulc.collect.handler.ErrorLogHandler;
-import com.czp.ulc.collect.handler.LogIndexHandler;
 import com.czp.ulc.common.MessageCenter;
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.dao.HostDao;
 import com.czp.ulc.common.dao.KeywordRuleDao;
-import com.czp.ulc.common.dao.MonitoConfigDao;
+import com.czp.ulc.common.module.IModule;
 import com.czp.ulc.rule.AlarmSender;
 import com.czp.ulc.web.AccessFilter;
 
@@ -60,13 +54,12 @@ import com.czp.ulc.web.AccessFilter;
 @EnableAsync
 @EnableAutoConfiguration
 @ComponentScan(value = { "com.czp.ulc" })
-public class Application extends WebMvcConfigurerAdapter implements BeanDefinitionRegistryPostProcessor,
-		ApplicationListener<ContextRefreshedEvent> {
+public class Application extends WebMvcConfigurerAdapter
+		implements BeanDefinitionRegistryPostProcessor, ApplicationListener<ContextRefreshedEvent> {
 
 	private static Logger LOG = LoggerFactory.getLogger(Application.class);
 	private MessageCenter dispatch = MessageCenter.getInstance();
 	private static ConfigurableListableBeanFactory context;
-	private LogIndexHandler listener = new LogIndexHandler();
 	private Environment envBean;
 
 	@Override
@@ -91,7 +84,6 @@ public class Application extends WebMvcConfigurerAdapter implements BeanDefiniti
 	@Override
 	public void postProcessBeanFactory(ConfigurableListableBeanFactory arg0) throws BeansException {
 		// 将这里创建的bean注入spring上下文,方便web注入
-		arg0.registerSingleton("luceneSearch", listener);
 		arg0.registerSingleton("messageCenter", dispatch);
 		envBean = arg0.getBean(Environment.class);
 		mergeProperties(envBean);
@@ -141,29 +133,20 @@ public class Application extends WebMvcConfigurerAdapter implements BeanDefiniti
 
 	@Override
 	public void onApplicationEvent(ContextRefreshedEvent event) {
-
 		KeywordRuleDao kwDao = context.getBean(KeywordRuleDao.class);
-
-		dispatch.addConcumer(listener);
 		dispatch.addConcumer(new ErrorLogHandler(kwDao));
 		dispatch.addConcumer(AlarmSender.getInstance());
-
 		LOG.info("start monitor host");
-		startMonitorHost();
+		startModule();
 	}
 
-	private void startMonitorHost() {
-		HostDao hostDao = context.getBean(HostDao.class);
-		MonitoConfigDao mDao = context.getBean(MonitoConfigDao.class);
-
-		List<HostBean> hosts = hostDao.list(null);
-		for (HostBean host : hosts) {
-			try {
-				ConnectManager.getInstance().connect(host);
-				RemoteLogCollector.monitorIfNotExist(host, mDao);
-			} catch (Exception e) {
-				LOG.info("connect err:" + host, e);
-			}
+	private void startModule() {
+		Map<String, IModule> modules = context.getBeansOfType(IModule.class);
+		for (Entry<String, IModule> item : modules.entrySet()) {
+			String moduleName = item.getKey();
+			LOG.info("moudle:[{}] starting", moduleName);
+			boolean start = item.getValue().start(context);
+			LOG.info("moudle:[{}],start:{}", moduleName, start);
 		}
 	}
 

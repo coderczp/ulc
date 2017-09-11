@@ -39,13 +39,13 @@ import com.czp.ulc.common.util.Utils;
 public class AccessFilter implements Filter {
 
 	private String key;
-	/** 需要跳转的登录地址 */
 	private String loginUrl;
 	private String[] skipUrls;
 	private static final String TOKEN_NAME = "account";
 	private static final int COOK_TIMEOUT = 60 * 60 * 24 * 10;
 	private static final long AUTH_TIMEOUT = 1000 * 60 * 60 * 24 * 30l;
 	private static Logger LOG = LoggerFactory.getLogger(AccessFilter.class);
+	private static String[] deviceArray = new String[] { "android", "mac os", "windows phone" };
 
 	public AccessFilter(String loginUrl, String skipUrls, String key) {
 		this.skipUrls = skipUrls.split(",");
@@ -70,8 +70,8 @@ public class AccessFilter implements Filter {
 	}
 
 	@Override
-	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException,
-			ServletException {
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+			throws IOException, ServletException {
 		HttpServletResponse rep = (HttpServletResponse) response;
 		HttpServletRequest req = (HttpServletRequest) request;
 		String url = req.getRequestURL().toString();
@@ -100,7 +100,11 @@ public class AccessFilter implements Filter {
 	private void gotoLogin(HttpServletResponse rep, HttpServletRequest req, String url) throws IOException {
 		String baseUrl = getCallbackUrl(req, url);
 		String realCallBack = baseUrl.concat(IndexController.CALLBACK);
-		rep.sendRedirect(loginUrl.replace("#{url}", realCallBack));
+		String login = loginUrl.replace("#{url}", realCallBack);
+		if (isMobileDevice(req.getHeader("User-Agent"))) {
+			login = login.replace("redirect_url", "cb");
+		}
+		rep.sendRedirect(login);
 	}
 
 	private boolean hasLogin(HttpServletRequest req, HttpSession session) {
@@ -123,9 +127,10 @@ public class AccessFilter implements Filter {
 		if (!url.contains(IndexController.CALLBACK))
 			return false;
 
-		String token = req.getParameter("token").trim();
-		if (token == null)
+		String token = req.getParameter("token");
+		if (token == null) {
 			return false;
+		}
 		if (token.contains("%"))
 			token = URLDecoder.decode(token, "utf-8");
 
@@ -146,6 +151,22 @@ public class AccessFilter implements Filter {
 		rep.addCookie(cookie);
 		rep.sendRedirect(baseUrl);
 		return true;
+	}
+
+	/**
+	 * android : 所有android设备 mac os : iphone ipad windows
+	 * phone:Nokia等windows系统的手机
+	 */
+	private static boolean isMobileDevice(String requestHeader) {
+		if (requestHeader == null)
+			return false;
+		requestHeader = requestHeader.toLowerCase();
+		for (int i = 0; i < deviceArray.length; i++) {
+			if (requestHeader.indexOf(deviceArray[i]) > 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private String getCallbackUrl(HttpServletRequest req, String url) {

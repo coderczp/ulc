@@ -22,15 +22,15 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.collect.handler.LogIndexHandler;
 import com.czp.ulc.collect.handler.SearchCallback;
-import com.czp.ulc.common.lucene.DocField;
+import com.czp.ulc.common.module.lucene.DocField;
+import com.czp.ulc.common.module.lucene.LuceneSearcher;
+import com.czp.ulc.main.Application;
 
 /**
  * Function:搜索接口
@@ -42,23 +42,26 @@ import com.czp.ulc.common.lucene.DocField;
 @RestController
 public class SearchController {
 
-	@Autowired
-	private LogIndexHandler luceneSearch;
 
 	@RequestMapping("/count")
 	public JSONObject count(@RequestParam String json) throws Exception {
 		long start = System.currentTimeMillis();
 		QueryCondtion cdt = createCdtFromJson(json);
 		SearchCallback search = new SearchCallback(cdt);
-		Map<String, Long> res = luceneSearch.count(search);
+		Map<String, Long> res = getSearcher().count(search);
 		long now = System.currentTimeMillis();
 		res.put("time", (now - start));
 		return (JSONObject) JSONObject.toJSON(res);
 	}
 
+	/**不能用注入的方式,因为该类init是lucenmodule还没有加载*/
+	private LuceneSearcher getSearcher() {
+		return Application.getBean(LuceneSearcher.class);
+	}
+
 	@RequestMapping("/meta")
 	public JSONObject meta() throws Exception {
-		return (JSONObject) JSONObject.toJSON(luceneSearch.getMeta());
+		return (JSONObject) JSONObject.toJSON(getSearcher().getMeta());
 	}
 
 	@RequestMapping("/getFile")
@@ -66,15 +69,15 @@ public class SearchController {
 		QueryCondtion cdt = createCdtFromJson(json);
 		String file = cdt.getFile();
 		cdt.setSize(Math.min(1000, cdt.getSize()));
-		cdt.setFile(file.substring(file.lastIndexOf("/")+1));
+		cdt.setFile(file.substring(file.lastIndexOf("/") + 1));
 		out.setCharacterEncoding("utf-8");
 		out.setContentType("text/plain;charset=utf-8");
 		PrintWriter writer = out.getWriter();
 
 		CountDownLatch lock = new CountDownLatch(1);
 		writer.println(json);
-		
-		luceneSearch.search(new SearchCallback(cdt, DocField.ALL_FEILD) {
+
+		getSearcher().search(new SearchCallback(cdt, DocField.ALL_FEILD) {
 
 			@Override
 			public boolean handle(String host, String file, String line) {
@@ -94,18 +97,19 @@ public class SearchController {
 
 	private QueryCondtion createCdtFromJson(String json) {
 		QueryCondtion cdt = JSONObject.parseObject(json, QueryCondtion.class);
-		cdt.setAnalyzer(luceneSearch.getAnalyzer());
+		cdt.setAnalyzer(getSearcher().getAnalyzer());
 		return cdt;
 	}
 
 	@RequestMapping("/search")
-	public Map<String,Object> search(@RequestParam String json, HttpServletRequest req, HttpServletResponse resp) throws Exception {
-		
+	public Map<String, Object> search(@RequestParam String json, HttpServletRequest req, HttpServletResponse resp)
+			throws Exception {
+
 		CountDownLatch lock = new CountDownLatch(1);
 		QueryCondtion cdt = createCdtFromJson(json);
-		Map<String,Object> res = new ConcurrentHashMap<>();
-		
-		luceneSearch.search(new SearchCallback(cdt, cdt.isLoadLine()?DocField.ALL_FEILD:DocField.NO_LINE_FEILD) {
+		Map<String, Object> res = new ConcurrentHashMap<>();
+
+		getSearcher().search(new SearchCallback(cdt, cdt.isLoadLine() ? DocField.ALL_FEILD : DocField.NO_LINE_FEILD) {
 
 			JSONObject data = new JSONObject();
 			AtomicLong hasAdd = new AtomicLong();

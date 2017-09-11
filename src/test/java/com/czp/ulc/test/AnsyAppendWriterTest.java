@@ -4,8 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.nio.file.Files;
 
-import com.czp.ulc.common.meta.FileChangeListener;
-import com.czp.ulc.common.meta.RollingWriter;
+import com.czp.ulc.common.module.lucene.RollingWriter;
 
 /**
  * 请添加描述
@@ -15,11 +14,11 @@ import com.czp.ulc.common.meta.RollingWriter;
  * @version 0.0.1
  */
 
-public class AnsyAppendWriterTest implements FileChangeListener {
+public class AnsyAppendWriterTest {
 
 	public void testSyncWrite() throws Exception {
 		long st = System.currentTimeMillis();
-		RollingWriter writer = new RollingWriter(new File("log"), new AnsyAppendWriterTest());
+		RollingWriter writer = new RollingWriter(new File("log"));
 		BufferedReader lines = Files.newBufferedReader(new File("./3.log").toPath());
 		String line = null;
 		while ((line = lines.readLine()) != null) {
@@ -28,11 +27,5 @@ public class AnsyAppendWriterTest implements FileChangeListener {
 		lines.close();
 		writer.close();
 		System.out.println("nio:" + (System.currentTimeMillis() - st));
-	}
-
-	@Override
-	public void onFileChange(File currentFile) {
-		System.out.println(currentFile);
-
 	}
 }

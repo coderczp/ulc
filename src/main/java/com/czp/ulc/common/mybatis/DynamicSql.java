@@ -19,8 +19,8 @@ import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.bean.IndexMeta;
 import com.czp.ulc.common.bean.KeywordRule;
 import com.czp.ulc.common.bean.MonitorConfig;
-import com.czp.ulc.common.module.lucene.QueryParam;
-import com.czp.ulc.common.util.Utils;
+import com.czp.ulc.util.Utils;
+import com.czp.ulc.web.QueryCondtion;
 
 /**
  * Function:动态构建SQL
@@ -31,13 +31,18 @@ import com.czp.ulc.common.util.Utils;
  */
 public class DynamicSql {
 
-	public String queryLuceneFile(QueryParam param) {
+	public String queryLuceneFile(QueryCondtion param) {
 		StringBuilder sql = new StringBuilder("select * from lucene_file where ");
-		sql.append(" itime >=").append(param.from);
-		sql.append(" AND itime <=").append(param.to);
-		Set<String> sers = param.servers;
+
+		// 因为存储的文件夹都是按天的,所以这里要把查询条件里的时间转为日期
+		long end = Utils.igroeHMSTime(param.getEnd()).getTime();
+		long start = Utils.igroeHMSTime(param.getStart()).getTime();
+
+		sql.append(" itime >=").append(start);
+		sql.append(" AND itime <=").append(end);
+		Set<String> sers = param.getHosts();
 		if (sers != null && sers.size() > 0) {
-			int len = param.servers.size();
+			int len = sers.size();
 			sql.append(" AND server in(");
 			for (String ser : sers) {
 				sql.append("'").append(ser).append("'");
@@ -47,7 +52,6 @@ public class DynamicSql {
 			}
 			sql.append(")");
 		}
-		 System.out.println(sql);
 		return sql.toString();
 	}
 
@@ -138,14 +142,9 @@ public class DynamicSql {
 	}
 
 	public String listMonitorFile(final MonitorConfig arg) {
-		return new SQL() {
-			{
-				SELECT("*");
-				FROM("monitor_config");
-				WHERE("1=1");
-				if (Utils.notEmpty(arg.getHostId()))
-					WHERE("hostId=#{hostId}");
-			}
-		}.toString();
+		String where = "";
+		if (Utils.notEmpty(arg.getHostId()))
+			where = "where hostId=" + arg.getHostId();
+		return String.format("select * from monitor_config  %s", where);
 	}
 }

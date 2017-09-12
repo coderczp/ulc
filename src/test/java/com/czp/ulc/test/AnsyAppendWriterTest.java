@@ -4,7 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.nio.file.Files;
 
-import com.czp.ulc.common.module.lucene.RollingWriter;
+import com.czp.ulc.module.lucene.RollingWriter;
 
 /**
  * 请添加描述

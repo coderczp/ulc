@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.collect.ConnectManager;
+import com.czp.ulc.module.conn.ConnectManager;
 
 /**
  * @dec 执行命令
@@ -29,22 +30,29 @@ public class CmdController {
 	@Autowired
 	private Environment env;
 
+	@Autowired
+	private ApplicationContext context;
+
 	@RequestMapping("/list")
 	public List<String> exe(String host) {
-		return ConnectManager.getInstance().exe(host, getCmd());
+		return getConnMgr().exe(host, getCmd());
+	}
+
+	private ConnectManager getConnMgr() {
+		return context.getBean(ConnectManager.class);
 	}
 
 	@RequestMapping("/restart")
 	public List<String> restart(String host, String path) {
 		String cmd = String.format("cd %s;./service.sh restart", path);
-		return ConnectManager.getInstance().exe(host, cmd);
+		return getConnMgr().exe(host, cmd);
 	}
 
 	@RequestMapping("/search")
 	public List<JSONObject> search(@RequestParam String proc) {
 		String cmd = getCmd().concat("|grep ").concat(proc);
 		List<JSONObject> res = new ArrayList<JSONObject>();
-		Map<String, List<String>> result = ConnectManager.getInstance().exeInAll(cmd);
+		Map<String, List<String>> result = getConnMgr().exeInAll(cmd);
 		for (Entry<String, List<String>> entry : result.entrySet()) {
 			for (String it : entry.getValue()) {
 				if (it.contains(proc)) {

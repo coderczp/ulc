@@ -14,7 +14,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.common.MessageListener;
+import com.czp.ulc.common.mq.MessageListener;
 
 /**
  * Function:告警发送中心

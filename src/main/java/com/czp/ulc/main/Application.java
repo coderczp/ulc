@@ -15,6 +15,7 @@ import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.TreeSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +29,9 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.event.ApplicationContextEvent;
 import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.context.event.ContextStoppedEvent;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.FileSystemResource;
@@ -36,11 +39,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
-import com.czp.ulc.collect.handler.ErrorLogHandler;
-import com.czp.ulc.common.MessageCenter;
-import com.czp.ulc.common.dao.KeywordRuleDao;
-import com.czp.ulc.common.module.IModule;
-import com.czp.ulc.rule.AlarmSender;
+import com.czp.ulc.common.shutdown.ShutdownCallback;
+import com.czp.ulc.module.IModule;
 import com.czp.ulc.web.AccessFilter;
 
 /**
@@ -55,12 +55,13 @@ import com.czp.ulc.web.AccessFilter;
 @EnableAutoConfiguration
 @ComponentScan(value = { "com.czp.ulc" })
 public class Application extends WebMvcConfigurerAdapter
-		implements BeanDefinitionRegistryPostProcessor, ApplicationListener<ContextRefreshedEvent> {
+		implements ShutdownCallback, BeanDefinitionRegistryPostProcessor, ApplicationListener<ApplicationContextEvent> {
 
-	private static Logger LOG = LoggerFactory.getLogger(Application.class);
-	private MessageCenter dispatch = MessageCenter.getInstance();
-	private static ConfigurableListableBeanFactory context;
 	private Environment envBean;
+	private TreeSet<IModule> modules = new TreeSet<>();
+
+	private static ConfigurableListableBeanFactory context;
+	private static Logger LOG = LoggerFactory.getLogger(Application.class);
 
 	@Override
 	public void addResourceHandlers(ResourceHandlerRegistry registry) {
@@ -83,8 +84,6 @@ public class Application extends WebMvcConfigurerAdapter
 
 	@Override
 	public void postProcessBeanFactory(ConfigurableListableBeanFactory arg0) throws BeansException {
-		// 将这里创建的bean注入spring上下文,方便web注入
-		arg0.registerSingleton("messageCenter", dispatch);
 		envBean = arg0.getBean(Environment.class);
 		mergeProperties(envBean);
 		context = arg0;
@@ -132,22 +131,46 @@ public class Application extends WebMvcConfigurerAdapter
 	}
 
 	@Override
-	public void onApplicationEvent(ContextRefreshedEvent event) {
-		KeywordRuleDao kwDao = context.getBean(KeywordRuleDao.class);
-		dispatch.addConcumer(new ErrorLogHandler(kwDao));
-		dispatch.addConcumer(AlarmSender.getInstance());
-		LOG.info("start monitor host");
-		startModule();
+	public void onApplicationEvent(ApplicationContextEvent event) {
+		modules = sortByOrder(context.getBeansOfType(IModule.class));
+		if (event instanceof ContextRefreshedEvent) {
+			startModule();
+		} else if (event instanceof ContextStoppedEvent) {
+			stopModule();
+		}
+	}
+
+	private TreeSet<IModule> sortByOrder(Map<String, IModule> beans) {
+		TreeSet<IModule> set = new TreeSet<IModule>(IModule.COMPER);
+		set.addAll(beans.values());
+		return set;
+	}
+
+	private synchronized void stopModule() {
+		for (IModule iModule : modules) {
+			String moduleName = iModule.name();
+			LOG.info("moudle:[{}] stoping", moduleName);
+			boolean start = iModule.stop();
+			LOG.info("moudle:[{}],stoped:{}", moduleName, start);
+		}
+		modules.clear();
 	}
 
 	private void startModule() {
-		Map<String, IModule> modules = context.getBeansOfType(IModule.class);
-		for (Entry<String, IModule> item : modules.entrySet()) {
-			String moduleName = item.getKey();
+		for (IModule iModule : modules) {
+			String moduleName = iModule.name();
 			LOG.info("moudle:[{}] starting", moduleName);
-			boolean start = item.getValue().start(context);
+			boolean start = iModule.start(context);
 			LOG.info("moudle:[{}],start:{}", moduleName, start);
 		}
+	}
+
+	@Override
+	public void onSystemExit() {
+		if (context == null)
+			return;
+		stopModule();
+
 	}
 
 	public static void main(String[] args) throws URISyntaxException {
@@ -157,5 +180,4 @@ public class Application extends WebMvcConfigurerAdapter
 		}
 		SpringApplication.run(Application.class, args);
 	}
-
 }

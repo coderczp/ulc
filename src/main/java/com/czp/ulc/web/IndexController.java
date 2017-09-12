@@ -16,8 +16,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import com.czp.ulc.collect.ConnectManager;
+import com.czp.ulc.common.mq.MessageCenter;
 import com.czp.ulc.common.shutdown.ShutdownManager;
+import com.czp.ulc.module.conn.ConnectManager;
 
 /**
  * Function:配置首页
@@ -30,11 +31,10 @@ import com.czp.ulc.common.shutdown.ShutdownManager;
 public class IndexController {
 
 	@Autowired
+	private MessageCenter mqServer;
+
+	@Autowired
 	private ApplicationContext context;
-
-	public static final String TOKEN = "token";
-
-	public static final String CALLBACK = "/callback";
 
 	@RequestMapping("/")
 	public String index() {
@@ -44,7 +44,8 @@ public class IndexController {
 	@ResponseBody
 	@RequestMapping("/stop")
 	public String stop() {
-		ConnectManager.getInstance().onExit();
+		context.getBean(ConnectManager.class).onExit();
+		mqServer.stop();
 		ShutdownManager.getInstance().run();
 		SpringApplication.exit(context);
 		return "app has stop";

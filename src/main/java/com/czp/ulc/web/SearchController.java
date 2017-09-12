@@ -27,10 +27,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.collect.handler.SearchCallback;
-import com.czp.ulc.common.module.lucene.DocField;
-import com.czp.ulc.common.module.lucene.LuceneSearcher;
 import com.czp.ulc.main.Application;
+import com.czp.ulc.module.lucene.DocField;
+import com.czp.ulc.module.lucene.LuceneSearcher;
+import com.czp.ulc.module.lucene.SearchCallback;
 
 /**
  * Function:搜索接口
@@ -41,7 +41,6 @@ import com.czp.ulc.main.Application;
  */
 @RestController
 public class SearchController {
-
 
 	@RequestMapping("/count")
 	public JSONObject count(@RequestParam String json) throws Exception {
@@ -54,7 +53,7 @@ public class SearchController {
 		return (JSONObject) JSONObject.toJSON(res);
 	}
 
-	/**不能用注入的方式,因为该类init是lucenmodule还没有加载*/
+	/** 不能用注入的方式,因为该类init是lucenmodule还没有加载 */
 	private LuceneSearcher getSearcher() {
 		return Application.getBean(LuceneSearcher.class);
 	}
@@ -71,12 +70,13 @@ public class SearchController {
 		cdt.setSize(Math.min(1000, cdt.getSize()));
 		cdt.setFile(file.substring(file.lastIndexOf("/") + 1));
 		out.setCharacterEncoding("utf-8");
+		
 		out.setContentType("text/plain;charset=utf-8");
 		PrintWriter writer = out.getWriter();
 
 		CountDownLatch lock = new CountDownLatch(1);
-		writer.println(json);
-
+		writer.println(String.format("host:%s,file:%s,keyword:%s", cdt.getHosts(), cdt.getFile(), cdt.getQ()));
+		
 		getSearcher().search(new SearchCallback(cdt, DocField.ALL_FEILD) {
 
 			@Override

@@ -6,7 +6,7 @@
 
 	<appender name="console" class="ch.qos.logback.core.ConsoleAppender">
 		<encoder>
-			<Pattern>%d{HH:mm:ss} [%thread] %-5level %logger{36} [%file:%line]- %msg %n
+			<Pattern>%d{HH:mm:ss} [%thread] %-5level %logger{36} [%file:%line]- %msg%n
 			</Pattern>
 		</encoder>
 		<filter class="ch.qos.logback.classic.filter.ThresholdFilter">
@@ -21,7 +21,7 @@
 			<maxHistory>30</maxHistory>
 		</rollingPolicy>
 		<encoder>
-			<Pattern>%d{HH:mm:ss} [%thread] %-5level %logger{35} - %msg %n</Pattern>
+			<Pattern>%d{HH:mm:ss} [%thread] %-5level %logger{35} - %msg%n</Pattern>
 		</encoder>
 	</appender>
 	

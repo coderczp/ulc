@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.czp.ulc.common.shutdown.ShutdownCallback;
+import com.czp.ulc.common.shutdown.ShutdownManager;
 
 /**
  * Function:KVDB,需要记录每一步的耗时,方便排问题,考虑性能,不采用动态代理
@@ -36,6 +37,7 @@ public class LevelDB implements ShutdownCallback, KVDB {
 			options.createIfMissing(true);
 			db = factory.open(new File(path), options);
 			log.info("kvdb is inited,db:{} path:{}", db, path);
+			ShutdownManager.getInstance().addCallback(this);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}

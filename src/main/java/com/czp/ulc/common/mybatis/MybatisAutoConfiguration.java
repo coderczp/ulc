@@ -28,7 +28,6 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
-import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -56,7 +55,7 @@ public class MybatisAutoConfiguration {
 	private Interceptor[] interceptors;
 
 	@Autowired
-	private ResourceLoader resourceLoader = new DefaultResourceLoader();
+	private ResourceLoader resourceLoader;// = new DefaultResourceLoader();
 
 	@Bean(name = "sqlSessionFactory")
 	@ConditionalOnMissingBean
@@ -96,7 +95,7 @@ public class MybatisAutoConfiguration {
 		File file = new File(env.getProperty("mybatis.mapper.path"));
 		if (file.isFile())
 			return new Resource[] { new FileSystemResource(file.getAbsolutePath()) };
-		
+
 		File[] files = file.getParentFile().listFiles();
 		Resource[] resources = new Resource[files.length];
 		for (int i = 0; i < resources.length; i++) {

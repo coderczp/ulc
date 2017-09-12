@@ -16,9 +16,9 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.search.Query;
 
-import com.czp.ulc.common.module.lucene.DocField;
-import com.czp.ulc.common.module.lucene.RangeQueryParser;
-import com.czp.ulc.common.util.Utils;
+import com.czp.ulc.module.lucene.DocField;
+import com.czp.ulc.module.lucene.RangeQueryParser;
+import com.czp.ulc.util.Utils;
 import com.google.common.collect.Sets;
 
 /**
@@ -47,6 +47,8 @@ public class QueryCondtion {
 
 	private Query query;
 
+	private Query fileQuery;
+
 	private Analyzer analyzer;
 
 	/** 开始时间 */
@@ -66,12 +68,8 @@ public class QueryCondtion {
 		this.analyzer = analyzer;
 	}
 
-	public Query getQuery() {
-		return toQuery();
-	}
-
 	public void setHost(String host) {
-		if(host!=null&&host.length()>0)
+		if (host != null && host.length() > 0)
 			this.hosts = Sets.newHashSet(host.split(","));
 	}
 
@@ -135,16 +133,19 @@ public class QueryCondtion {
 		this.end = end;
 	}
 
-	private Query toQuery() {
-		if (query != null)
-			return query;
+	public Query getQuery() {
+		return query = query == null ? build(true) : query;
+	}
 
+	public Query buildFileIndexQuery() {
+		return fileQuery = fileQuery == null ? build(false) : fileQuery;
+	}
+
+	private Query build(boolean addHost) {
 		try {
 			RangeQueryParser parser = new RangeQueryParser(DocField.ALL_FEILD, analyzer);
 			parser.addSpecFied(DocField.TIME, LongPoint.class);
-			
 			StringBuilder sb = new StringBuilder(String.format("%s:[%s TO %s]", DocField.TIME, start, end));
-
 			if (Utils.notEmpty(proc)) {
 				sb.append(String.format(" AND %s:%s", DocField.FILE, proc));
 			}
@@ -154,19 +155,20 @@ public class QueryCondtion {
 			if (Utils.notEmpty(q)) {
 				sb.append(String.format(" AND %s:%s", DocField.LINE, q));
 			}
-			if (!hosts.isEmpty()) {
-				sb.append(String.format(" AND %s:(", DocField.HOST));
-				int size = hosts.size() - 1, i = 0;
-				for (String string : hosts) {
-					sb.append(string);
-					if (i++ < size) {
-						sb.append(" OR ");
+			if (addHost) {
+				if (!hosts.isEmpty()) {
+					sb.append(String.format(" AND %s:(", DocField.HOST));
+					int size = hosts.size() - 1, i = 0;
+					for (String string : hosts) {
+						sb.append(string);
+						if (i++ < size) {
+							sb.append(" OR ");
+						}
 					}
+					sb.append(")");
 				}
-				sb.append(")");
 			}
-			query =  parser.parse(sb.toString());
-			return query;
+			return parser.parse(sb.toString());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}

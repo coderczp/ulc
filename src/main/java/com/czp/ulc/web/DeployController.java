@@ -17,17 +17,18 @@ import javax.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.collect.ConnectManager;
 import com.czp.ulc.common.bean.DeployRecord;
 import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.dao.HostDao;
 import com.czp.ulc.common.dao.IDeployRecordDao;
+import com.czp.ulc.module.conn.ConnectManager;
 import com.czp.ulc.util.MiniHeap;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSchException;
@@ -49,7 +50,8 @@ public class DeployController {
 	@Autowired
 	private IDeployRecordDao dDao;
 
-	private ConnectManager instance = ConnectManager.getInstance();
+	@Autowired
+	private ApplicationContext context;
 
 	private ExecutorService service = Executors.newFixedThreadPool(4);
 
@@ -174,7 +176,7 @@ public class DeployController {
 				updateStatus(id, "文件上传,准备重启");
 				LOG.info("upload file success");
 				String cmd = String.format("cd %s;./service.sh all", path);
-				List<String> exe = instance.exe(host.getName(), cmd);
+				List<String> exe = getConnMgr().exe(host.getName(), cmd);
 				if (exe.isEmpty()) {
 					updateStatus(id, "部署失败", "请检查工程目录是否有lock");
 				} else {
@@ -194,17 +196,21 @@ public class DeployController {
 	private ChannelSftp createStfp(HostBean host) throws JSchException {
 		ChannelSftp ch = null;
 		try {
-			ch = (ChannelSftp) instance.openChannel(host, "sftp");
+			ch = (ChannelSftp) getConnMgr().openChannel(host, "sftp");
 			ch.connect(1000 * 120);
 		} catch (JSchException ex) {
 			ex.printStackTrace();
-			instance.disconnect(host);
-			ch = (ChannelSftp) instance.openChannel(host, "sftp");
+			getConnMgr().disconnect(host);
+			ch = (ChannelSftp) getConnMgr().openChannel(host, "sftp");
 			ch.connect(1000 * 120);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return ch;
+	}
+
+	private ConnectManager getConnMgr() {
+		return context.getBean(ConnectManager.class);
 	}
 
 	private DeployRecord updateStatus(Integer id, String status, String log) {

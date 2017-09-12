@@ -11,7 +11,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.junit.Test;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.common.TrieTree;
+import com.czp.ulc.util.TrieTree;
 
 /**
  * 请添加描述

@@ -14,21 +14,19 @@ import java.util.List;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.collect.ConnectManager;
-import com.czp.ulc.collect.RemoteLogCollector;
 import com.czp.ulc.common.ArgInvalideException;
-import com.czp.ulc.common.Message;
-import com.czp.ulc.common.MessageCenter;
-import com.czp.ulc.common.ThreadPools;
 import com.czp.ulc.common.bean.HostBean;
 import com.czp.ulc.common.dao.HostDao;
-import com.czp.ulc.common.dao.MonitoConfigDao;
-import com.czp.ulc.common.util.Utils;
+import com.czp.ulc.common.mq.Message;
+import com.czp.ulc.common.mq.MessageCenter;
+import com.czp.ulc.module.conn.ConnectManager;
+import com.czp.ulc.util.Utils;
 
 /**
  * Function:主机信息管理接口
@@ -45,10 +43,10 @@ public class HostController {
 	private HostDao dao;
 
 	@Autowired
-	private MonitoConfigDao mdao;
+	private MessageCenter messageCenter;
 
 	@Autowired
-	private MessageCenter messageCenter;
+	private ApplicationContext context;
 
 	@RequestMapping("/add")
 	public HostBean addHost(@Valid HostBean bean, BindingResult result) throws Exception {
@@ -56,15 +54,17 @@ public class HostController {
 			throw new ArgInvalideException(result);
 		}
 		bean.setPwd(Utils.encrypt(bean.getPwd()));
-		ConnectManager.getInstance().connect(bean);
+		getConnMgr().connect(bean);
 		if (dao.insertUseGeneratedKeys(bean) > 0) {
-			RemoteLogCollector task = new RemoteLogCollector(bean, mdao);
-			ThreadPools.getInstance().startThread(bean.getName(), task, true);
+			getConnMgr().connect(bean);
 		}
 		return bean;
 	}
 
-	
+	private ConnectManager getConnMgr() {
+		return context.getBean(ConnectManager.class);
+	}
+
 	@RequestMapping("/del")
 	public HostBean delHost(HostBean bean) {
 		if (dao.delete(bean) > 0) {

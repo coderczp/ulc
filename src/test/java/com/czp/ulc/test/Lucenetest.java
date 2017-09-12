@@ -26,10 +26,10 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
 
-import com.czp.ulc.common.module.lucene.AnalyzerUtil;
-import com.czp.ulc.common.module.lucene.DocField;
-import com.czp.ulc.common.module.lucene.LogAnalyzer;
-import com.czp.ulc.common.module.lucene.RangeQueryParser;
+import com.czp.ulc.module.lucene.AnalyzerUtil;
+import com.czp.ulc.module.lucene.DocField;
+import com.czp.ulc.module.lucene.LogAnalyzer;
+import com.czp.ulc.module.lucene.RangeQueryParser;
 
 /**
  * 请添加描述

@@ -1,7 +1,9 @@
 package com.czp.ulc.common.bean;
 
 /**
- * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月13日 下午5:18:51</li>
+ * 请添加描述
+ * <li>创建人：Jeff.cao</li>
+ * <li>创建时间：2017年5月13日 下午5:18:51</li>
  * 
  * @version 0.0.1
  */
@@ -73,6 +75,11 @@ public class IndexMeta {
 
 	public void setShardId(int shardId) {
 		this.shardId = shardId;
+	}
+
+	@Override
+	public String toString() {
+		return "IndexMeta [lines=" + lines + ", docs=" + docs + ", bytes=" + bytes + "]";
 	}
 
 }

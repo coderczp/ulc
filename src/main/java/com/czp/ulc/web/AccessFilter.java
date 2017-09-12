@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.common.util.Utils;
+import com.czp.ulc.util.Utils;
 
 /**
  * Function:访问校验
@@ -41,6 +41,7 @@ public class AccessFilter implements Filter {
 	private String key;
 	private String loginUrl;
 	private String[] skipUrls;
+	public static final String CALLBACK = "/callback";
 	private static final String TOKEN_NAME = "account";
 	private static final int COOK_TIMEOUT = 60 * 60 * 24 * 10;
 	private static final long AUTH_TIMEOUT = 1000 * 60 * 60 * 24 * 30l;
@@ -99,7 +100,7 @@ public class AccessFilter implements Filter {
 
 	private void gotoLogin(HttpServletResponse rep, HttpServletRequest req, String url) throws IOException {
 		String baseUrl = getCallbackUrl(req, url);
-		String realCallBack = baseUrl.concat(IndexController.CALLBACK);
+		String realCallBack = baseUrl.concat(CALLBACK);
 		String login = loginUrl.replace("#{url}", realCallBack);
 		if (isMobileDevice(req.getHeader("User-Agent"))) {
 			login = login.replace("redirect_url", "cb");
@@ -124,7 +125,7 @@ public class AccessFilter implements Filter {
 
 	private boolean isAuthSucessCallback(HttpServletResponse rep, HttpServletRequest req, String url,
 			HttpSession session) throws IOException {
-		if (!url.contains(IndexController.CALLBACK))
+		if (!url.contains(CALLBACK))
 			return false;
 
 		String token = req.getParameter("token");

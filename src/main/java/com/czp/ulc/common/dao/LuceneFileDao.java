@@ -20,4 +20,12 @@ public interface LuceneFileDao extends BaseDao<LuceneFile> {
 
 	@SelectProvider(type = DynamicSql.class, method = "queryLuceneFile")
 	List<LuceneFile> query(QueryCondtion param);
+	
+	/***
+	 * 查询已经处理的最早的文件
+	 * @param host
+	 * @return
+	 */
+	@SelectProvider(type = DynamicSql.class, method = "queryEarliestFile")
+	LuceneFile queryEarliestFile(String host);
 }

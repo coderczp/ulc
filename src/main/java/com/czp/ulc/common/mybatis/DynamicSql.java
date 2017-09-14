@@ -31,6 +31,13 @@ import com.czp.ulc.web.QueryCondtion;
  */
 public class DynamicSql {
 
+	public String queryEarliestFile(String host) {
+		if (host == null)
+			return "select *,min(itime) from lucene_file";
+		else
+			return String.format("select *,min(itime) from lucene_file where host='%s'", host);
+	}
+
 	public String queryLuceneFile(QueryCondtion param) {
 		StringBuilder sql = new StringBuilder("select * from lucene_file where ");
 

@@ -9,6 +9,7 @@
  */
 package com.czp.ulc.web;
 
+import java.io.File;
 import java.io.PrintWriter;
 import java.util.LinkedList;
 import java.util.List;
@@ -22,15 +23,20 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
+import com.czp.ulc.common.bean.IndexMeta;
+import com.czp.ulc.common.bean.LuceneFile;
+import com.czp.ulc.common.dao.LuceneFileDao;
 import com.czp.ulc.main.Application;
 import com.czp.ulc.module.lucene.DocField;
 import com.czp.ulc.module.lucene.LuceneSearcher;
 import com.czp.ulc.module.lucene.SearchCallback;
+import com.czp.ulc.util.JVMUtil;
 
 /**
  * Function:搜索接口
@@ -41,6 +47,9 @@ import com.czp.ulc.module.lucene.SearchCallback;
  */
 @RestController
 public class SearchController {
+
+	@Autowired
+	private LuceneFileDao lFileDao;
 
 	@RequestMapping("/count")
 	public JSONObject count(@RequestParam String json) throws Exception {
@@ -53,14 +62,17 @@ public class SearchController {
 		return (JSONObject) JSONObject.toJSON(res);
 	}
 
-	/** 不能用注入的方式,因为该类init是lucenmodule还没有加载 */
-	private LuceneSearcher getSearcher() {
-		return Application.getBean(LuceneSearcher.class);
-	}
-
 	@RequestMapping("/meta")
 	public JSONObject meta() throws Exception {
-		return (JSONObject) JSONObject.toJSON(getSearcher().getMeta());
+		LuceneFile lFile = lFileDao.queryEarliestFile(null);
+		IndexMeta meta = getSearcher().getMeta();
+		JSONObject json = JVMUtil.collectVMInfo();
+		JSONObject metaJson = (JSONObject) JSONObject.toJSON(meta);
+		json.putAll(metaJson);
+		if (lFile != null) {
+			json.put("minFile", new File(lFile.getPath()).getName());
+		}
+		return json;
 	}
 
 	@RequestMapping("/getFile")
@@ -70,13 +82,13 @@ public class SearchController {
 		cdt.setSize(Math.min(1000, cdt.getSize()));
 		cdt.setFile(file.substring(file.lastIndexOf("/") + 1));
 		out.setCharacterEncoding("utf-8");
-		
+
 		out.setContentType("text/plain;charset=utf-8");
 		PrintWriter writer = out.getWriter();
 
 		CountDownLatch lock = new CountDownLatch(1);
 		writer.println(String.format("host:%s,file:%s,keyword:%s", cdt.getHosts(), cdt.getFile(), cdt.getQ()));
-		
+
 		getSearcher().search(new SearchCallback(cdt, DocField.ALL_FEILD) {
 
 			@Override
@@ -170,5 +182,10 @@ public class SearchController {
 			}
 		}
 		return q;
+	}
+
+	/** 不能用注入的方式,因为该类init是lucenmodule还没有加载 */
+	private LuceneSearcher getSearcher() {
+		return Application.getBean(LuceneSearcher.class);
 	}
 }

@@ -57,20 +57,27 @@
 		</div>
 	</div>
 	<script type="text/javascript">
+		var mb = 1024 * 1024;
 		$.get('./meta', function(resp) {
 			var html = "";
-			var mb = 1024 * 1024;
 			var bytes = resp.bytes;
 			var mbSize = 0, gbSize = 0;
+
+			html += "<br>CPU:" + (resp.cpus);
+			html += "<br>活跃线程:" + (resp.thread);
+			html += "<br>最大内存(MB):" + (resp.maxMem);
+			html += "<br>空闲内存(MB):" + (resp.freeMem);
+
 			if (bytes <= 1024) {
-				html = "日志大小(KB):" + bytes;
+				html += "<br>日志大小(KB):" + bytes;
 			} else if ((mbSize = bytes / mb) <= 1024) {
-				html = "日志大小(MB):" + parseInt(mbSize);
+				html += "<br>日志大小(MB):" + parseInt(mbSize);
 			} else {
-				html = "日志大小(GB):" + parseInt(mbSize / 1024);
+				html += "<br>日志大小(GB):" + parseInt(mbSize / 1024);
 			}
 			html += "<br>日志行数:" + (resp.lines);
 			html += "<br>文档总数:" + (resp.docs);
+			html += "<br>最早日志:" + (resp.minFile);
 			$('#result').html(html);
 		});
 	</script>

@@ -109,7 +109,7 @@ public class ParallelSearch {
 	public void shutdown() {
 		worker.shutdownNow();
 	}
-
+	
 	public void search(SearchCallback search, long allDocs, int memMatch) {
 		AtomicLong match = new AtomicLong(memMatch);
 		AtomicBoolean isBreak = new AtomicBoolean();

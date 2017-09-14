@@ -12,11 +12,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.common.ThreadPools;
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.dao.MonitoConfigDao;
-import com.czp.ulc.common.mq.MessageCenter;
-import com.czp.ulc.common.mq.MessageListener;
+import com.czp.ulc.core.ThreadPools;
+import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.dao.MonitoConfigDao;
+import com.czp.ulc.core.message.MessageCenter;
+import com.czp.ulc.core.message.MessageListener;
 import com.czp.ulc.util.Utils;
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
@@ -127,7 +127,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 	 */
 	private void startMonitor(HostBean bean) {
 		RemoteLogCollector task = new RemoteLogCollector(bean, cfgDao, this, mqCenter);
-		ThreadPools.getInstance().startThread("monitor-" + bean.getName(), task, true);
+		ThreadPools.getInstance().run("monitor-" + bean.getName(), task, true);
 	}
 
 	/***

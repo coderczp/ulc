@@ -11,6 +11,6 @@ public interface DocField {
 	String FILE = "f";
 	String LINE = "l";
 	String HOST = "h";
-	String[] ALL_FEILD = { TIME, FILE, LINE, HOST };
 	String[] NO_LINE_FEILD = { TIME, FILE,  HOST };
+	String[] ALL_FEILD = { TIME, FILE, LINE, HOST };
 }

@@ -29,9 +29,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.common.bean.IndexMeta;
-import com.czp.ulc.common.bean.LuceneFile;
-import com.czp.ulc.common.dao.LuceneFileDao;
+import com.czp.ulc.core.bean.IndexMeta;
+import com.czp.ulc.core.bean.LuceneFile;
+import com.czp.ulc.core.dao.LuceneFileDao;
 import com.czp.ulc.main.Application;
 import com.czp.ulc.module.lucene.DocField;
 import com.czp.ulc.module.lucene.LuceneSearcher;

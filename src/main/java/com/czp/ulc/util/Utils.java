@@ -205,7 +205,7 @@ public class Utils {
 	 * @param millis
 	 * @return
 	 */
-	public static Date igroeHMSTime(long millis) {
+	public static Date toDay(long millis) {
 		Calendar ins = Calendar.getInstance();
 		ins.setTimeInMillis(millis);
 		ins.set(Calendar.HOUR_OF_DAY, 0);

@@ -39,7 +39,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
-import com.czp.ulc.common.shutdown.ShutdownCallback;
+import com.czp.ulc.core.shutdown.ShutdownCallback;
 import com.czp.ulc.module.IModule;
 import com.czp.ulc.web.AccessFilter;
 

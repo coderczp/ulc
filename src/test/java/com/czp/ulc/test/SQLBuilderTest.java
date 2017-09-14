@@ -19,10 +19,10 @@ import java.util.zip.ZipOutputStream;
 
 import org.junit.Test;
 
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.bean.KeywordRule;
-import com.czp.ulc.common.bean.MonitorConfig;
-import com.czp.ulc.common.mybatis.DynamicSql;
+import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.bean.KeywordRule;
+import com.czp.ulc.core.bean.MonitorConfig;
+import com.czp.ulc.core.mybatis.DynamicSql;
 
 /**
  * Function:测试SQL生成器

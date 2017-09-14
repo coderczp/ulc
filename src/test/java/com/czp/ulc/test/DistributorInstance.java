@@ -16,9 +16,9 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.dao.HostDao;
-import com.czp.ulc.common.dao.MonitoConfigDao;
+import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.dao.HostDao;
+import com.czp.ulc.core.dao.MonitoConfigDao;
 
 /**
  * 分布式环境下的实例：<br>

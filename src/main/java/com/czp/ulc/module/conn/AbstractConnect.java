@@ -16,9 +16,9 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.mq.MessageCenter;
-import com.czp.ulc.common.mq.MessageListener;
+import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.message.MessageCenter;
+import com.czp.ulc.core.message.MessageListener;
 import com.czp.ulc.util.Utils;
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.JSch;

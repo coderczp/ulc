@@ -12,11 +12,11 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.czp.ulc.common.ArgInvalideException;
-import com.czp.ulc.common.bean.MonitorConfig;
-import com.czp.ulc.common.dao.MonitoConfigDao;
-import com.czp.ulc.common.mq.Message;
-import com.czp.ulc.common.mq.MessageCenter;
+import com.czp.ulc.core.ArgInvalideException;
+import com.czp.ulc.core.bean.MonitorConfig;
+import com.czp.ulc.core.dao.MonitoConfigDao;
+import com.czp.ulc.core.message.Message;
+import com.czp.ulc.core.message.MessageCenter;
 
 /**
  * 监控文件管理接口

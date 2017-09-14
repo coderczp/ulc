@@ -5,8 +5,8 @@ import java.util.Map;
 
 import org.apache.lucene.analysis.Analyzer;
 
-import com.czp.ulc.common.bean.IndexMeta;
-import com.czp.ulc.common.dao.IndexMetaDao;
+import com.czp.ulc.core.bean.IndexMeta;
+import com.czp.ulc.core.dao.IndexMetaDao;
 
 /**
  * 整合内存和文件搜索

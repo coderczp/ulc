@@ -7,9 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
 import org.springframework.stereotype.Service;
 
-import com.czp.ulc.common.dao.IndexMetaDao;
-import com.czp.ulc.common.dao.LuceneFileDao;
-import com.czp.ulc.common.mq.MessageCenter;
+import com.czp.ulc.core.dao.IndexMetaDao;
+import com.czp.ulc.core.dao.LuceneFileDao;
+import com.czp.ulc.core.message.MessageCenter;
 import com.czp.ulc.module.IModule;
 
 /**

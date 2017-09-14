@@ -16,8 +16,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import com.czp.ulc.common.mq.MessageCenter;
-import com.czp.ulc.common.shutdown.ShutdownManager;
+import com.czp.ulc.core.message.MessageCenter;
+import com.czp.ulc.core.shutdown.ShutdownManager;
 import com.czp.ulc.module.conn.ConnectManager;
 
 /**

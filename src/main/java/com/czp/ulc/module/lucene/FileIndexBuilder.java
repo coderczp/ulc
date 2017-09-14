@@ -31,11 +31,11 @@ import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.common.ThreadPools;
-import com.czp.ulc.common.bean.IndexMeta;
-import com.czp.ulc.common.bean.LuceneFile;
-import com.czp.ulc.common.dao.IndexMetaDao;
-import com.czp.ulc.common.dao.LuceneFileDao;
+import com.czp.ulc.core.ThreadPools;
+import com.czp.ulc.core.bean.IndexMeta;
+import com.czp.ulc.core.bean.LuceneFile;
+import com.czp.ulc.core.dao.IndexMetaDao;
+import com.czp.ulc.core.dao.LuceneFileDao;
 import com.czp.ulc.util.Utils;
 
 /**
@@ -65,16 +65,25 @@ public class FileIndexBuilder {
 	public static final String LINE_SPLITER = Utils.getLineSpliter();
 	private static final Logger log = LoggerFactory.getLogger(FileIndexBuilder.class);
 
-	public FileIndexBuilder(File baseDir, File indexBaseDir, Analyzer analyzer, IndexMetaDao metaDao,
+	/***
+	 * 
+	 * @param srcDir 原始文件的存放目录
+	 * @param indexDir 索引文件目录
+	 * @param analyzer 索引分析器
+	 * @param metaDao  meta信息dao
+	 * @param lFileDao Lucene文件dao
+	 */
+	public FileIndexBuilder(File srcDir, File indexDir, Analyzer analyzer, IndexMetaDao metaDao,
 			LuceneFileDao lFileDao) {
 		this.metaDao = metaDao;
-		this.dataDir = baseDir;
+		this.dataDir = srcDir;
 		this.lFileDao = lFileDao;
 		this.analyzer = analyzer;
-		this.indexBaseDir = indexBaseDir;
+		this.indexBaseDir = indexDir;
 		this.writer = new RollingWriter(dataDir);
-		this.repairFailFile(baseDir);
-		this.worker = ThreadPools.getInstance().newThreadPool("lucene-file-index", 1);
+		this.worker = ThreadPools.getInstance().newPool("lucene-file-index", 1);
+
+		this.repairFailFile(srcDir);
 	}
 
 	/***
@@ -83,7 +92,7 @@ public class FileIndexBuilder {
 	 * @param baseDir
 	 */
 	private void repairFailFile(File baseDir) {
-		List<File> files = new LinkedList<File>();
+		LinkedList<File> files = new LinkedList<File>();
 		File curFile = writer.getCurrentFile();
 		for (File file : writer.getAllFiles()) {
 			if (file.equals(curFile))
@@ -93,32 +102,35 @@ public class FileIndexBuilder {
 		asynRepair(files);
 	}
 
+	/**
+	 * 异步修复未提交的索引
+	 * @param files
+	 */
 	private void asynRepair(final List<File> files) {
-
 		log.info("wait repair file size:{}", files.size());
-
-		ThreadPools.getInstance().startThread("repair-thread", () -> {
+		ThreadPools.getInstance().run("repair-thread", () -> {
 			for (File file : files) {
 				log.info("repair log file:{}", file);
 				try (BufferedReader br = Files.newBufferedReader(file.toPath())) {
-					String line;
+					String readLine;
 					long now = System.currentTimeMillis();
-					while ((line = br.readLine()) != null) {
-						String[] decodeData = decodeData(line);
-						if (decodeData == null) {
+					while ((readLine = br.readLine()) != null) {
+						String[] data = decodeData(readLine);
+						if (data == null) {
+							log.error("fail to decode:{}",readLine);
 							continue;
 						}
-						String host = decodeData[1];
-						String data = decodeData[3];
-						String srcFile = decodeData[2];
-						long time = Long.valueOf(decodeData[0]);
-						doWriteIndex(host, srcFile, data, time);
+						String host = data[1];
+						String line = data[3];
+						String srcFile = data[2];
+						long time = Long.valueOf(data[0]);
+						doAddIndex(host, srcFile, line, time);
 					}
 					boolean delete = file.delete();
 					long end = System.currentTimeMillis();
-					log.info("repair:{}  time:{} ms delete:{}", file, (end - now), delete);
-				} catch (IOException e) {
-					log.error("index error", e);
+					log.info("repair:{} time:{}ms delete:{}", file, (end - now), delete);
+				} catch (Exception e) {
+					log.error("repair error:"+file, e);
 				}
 			}
 		}, true);
@@ -130,20 +142,29 @@ public class FileIndexBuilder {
 	 * @param host
 	 * @param file
 	 * @param line
-	 * @param now
+	 * @param time
 	 * @return
 	 * @throws Exception
 	 */
-	public boolean write(String host, String file, String line, long now) throws Exception {
-		String string = encodeData(host, file, line, now);
+	public boolean write(String host, String file, String line, long time) throws Exception {
+		String string = encodeData(host, file, line, time);
 		RollingWriterResult result = writer.append(string.getBytes(UTF8));
-		asynAddDoc(host, file, line, now, result);
+		asynAddDoc(host, file, line, time, result);
 		return result.isFileChanged();
 	}
 
+	/***
+	 * 将主机文件名日志时间都编码到一行,异常退出时才能修复
+	 * @param host
+	 * @param file
+	 * @param line
+	 * @param now
+	 * @return
+	 */
 	private String encodeData(String host, String file, String line, long now) {
 		String time = String.valueOf(now);
-		StringBuilder sb = new StringBuilder(host.length() + file.length() + line.length() + time.length() + 3);
+		int strLen = host.length() + file.length() + line.length() + time.length();
+		StringBuilder sb = new StringBuilder(strLen + 3);
 		sb.append(now).append("#");
 		sb.append(host).append("*");
 		sb.append(file).append("@");
@@ -156,7 +177,7 @@ public class FileIndexBuilder {
 		int indexHost = line.indexOf("*");
 		int indexFile = line.indexOf("@");
 		if (indexTime < 0 || indexHost < 0 || indexFile < 0) {
-			log.debug("error line:{}", line);
+			log.error("error line:{}", line);
 			return null;
 		}
 		String time = line.substring(0, indexTime);
@@ -170,19 +191,19 @@ public class FileIndexBuilder {
 	private void asynAddDoc(String host, String file, String line, long now, RollingWriterResult result) {
 		worker.execute(() -> {
 			try {
-				doWriteIndex(host, file, line, now);
+				doAddIndex(host, file, line, now);
 				if (result.isFileChanged()) {
-					doFlush(result.getLastFile());
+					commitIndex(result.getLastFile());
 				}
 			} catch (Exception e) {
-				log.error("add documnet error", e);
+				log.error("add doc error", e);
 			}
 		});
 	}
 
-	private void doWriteIndex(String host, String file, String line, long now) throws IOException {
+	private void doAddIndex(String host, String file, String line, long now) throws IOException {
 		lineCount.getAndIncrement();
-		Date day = Utils.igroeHMSTime(now);
+		Date day = Utils.toDay(now);
 		SimpleDateFormat sp = new SimpleDateFormat(LuceneConfig.FORMAT);
 
 		Document doc = new Document();
@@ -230,7 +251,7 @@ public class FileIndexBuilder {
 		File indexDir = new File(indexBaseDir, String.format("%s/%s", server, dateStr));
 		if (!indexDir.exists()) {
 			indexDir.mkdirs();
-			// 当前文件夹是新建的,添加数据记录
+			// 当前文件夹是新建的,添加数据库记录
 			saveLuceneIndexFileToDb(server, date, indexDir);
 		}
 		return indexDir;
@@ -307,15 +328,15 @@ public class FileIndexBuilder {
 		return hasFlushed.getAndSet(false);
 	}
 
-	private void doFlush(File file) {
+	// 文件滚动时commit索引,完成后删除原文件
+	private void commitIndex(File srcFile) {
 		try {
-			// 文件滚动时commit索引,完成后删除原文件
-			long length = file.length();
+			long length = srcFile.length();
 			long docCount = flushIndex(indexMap);
-			boolean srcDelete = file.delete();
+			boolean srcDelete = srcFile.delete();
 			hasFlushed.set(true);
 			updateMetaInfo(length, lineCount.getAndSet(0), docCount);
-			log.info("index file:{} size:{} del:{}", file, length, srcDelete);
+			log.info("index file:{} size:{} del:{}", srcFile, length, srcDelete);
 		} catch (Exception e) {
 			log.error(e.toString(), e);
 		}

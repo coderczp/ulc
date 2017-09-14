@@ -6,14 +6,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
 import org.springframework.stereotype.Service;
 
-import com.czp.ulc.common.ThreadPools;
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.dao.HostDao;
-import com.czp.ulc.common.dao.KeywordRuleDao;
-import com.czp.ulc.common.dao.MonitoConfigDao;
-import com.czp.ulc.common.mq.MessageCenter;
+import com.czp.ulc.core.ThreadPools;
+import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.dao.HostDao;
+import com.czp.ulc.core.dao.KeywordRuleDao;
+import com.czp.ulc.core.dao.MonitoConfigDao;
+import com.czp.ulc.core.message.MessageCenter;
 import com.czp.ulc.module.IModule;
-import com.czp.ulc.rule.AlarmSender;
+import com.czp.ulc.module.alarm.AlarmSender;
 
 /**
  * 链接管理模块
@@ -48,7 +48,7 @@ public class ConnectionModule implements IModule, Runnable {
 		mqCenter.addConcumer(new ErrorLogHandler(keyDao, mqCenter));
 
 		ctx.registerSingleton("connectManager", conMgr);
-		ThreadPools.getInstance().startThread("conn-moudle-start", this, true);
+		ThreadPools.getInstance().run("conn-moudle-start", this, true);
 		return true;
 	}
 

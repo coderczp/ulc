@@ -9,7 +9,7 @@
  */
 package com.czp.ulc.module.conn;
 
-import com.czp.ulc.common.bean.HostBean;
+import com.czp.ulc.core.bean.HostBean;
 
 /**
  * Function:每次读取到对象

@@ -24,10 +24,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.common.bean.DeployRecord;
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.dao.HostDao;
-import com.czp.ulc.common.dao.IDeployRecordDao;
+import com.czp.ulc.core.bean.DeployRecord;
+import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.dao.HostDao;
+import com.czp.ulc.core.dao.IDeployRecordDao;
 import com.czp.ulc.module.conn.ConnectManager;
 import com.czp.ulc.util.MiniHeap;
 import com.jcraft.jsch.ChannelSftp;

@@ -20,11 +20,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.common.ArgInvalideException;
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.dao.HostDao;
-import com.czp.ulc.common.mq.Message;
-import com.czp.ulc.common.mq.MessageCenter;
+import com.czp.ulc.core.ArgInvalideException;
+import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.dao.HostDao;
+import com.czp.ulc.core.message.Message;
+import com.czp.ulc.core.message.MessageCenter;
 import com.czp.ulc.module.conn.ConnectManager;
 import com.czp.ulc.util.Utils;
 

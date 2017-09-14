@@ -18,14 +18,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.common.DaemonTimer;
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.bean.KeywordRule;
-import com.czp.ulc.common.dao.KeywordRuleDao;
-import com.czp.ulc.common.mq.Message;
-import com.czp.ulc.common.mq.MessageCenter;
-import com.czp.ulc.common.mq.MessageListener;
-import com.czp.ulc.rule.AlarmBean;
+import com.czp.ulc.core.DaemonTimer;
+import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.bean.KeywordRule;
+import com.czp.ulc.core.dao.KeywordRuleDao;
+import com.czp.ulc.core.message.Message;
+import com.czp.ulc.core.message.MessageCenter;
+import com.czp.ulc.core.message.MessageListener;
+import com.czp.ulc.module.alarm.AlarmBean;
 import com.czp.ulc.util.Utils;
 
 /**
@@ -43,7 +43,7 @@ public class ErrorLogHandler implements MessageListener<ReadResult>, Runnable {
 		String lastFile;
 		HostBean host;
 
-		public MutilLineBean(HostBean host, String lastFile) {
+		 MutilLineBean(HostBean host, String lastFile) {
 			this.lastFile = lastFile;
 			this.host = host;
 		}

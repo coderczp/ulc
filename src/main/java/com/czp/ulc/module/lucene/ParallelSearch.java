@@ -31,10 +31,10 @@ import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.common.ThreadPools;
-import com.czp.ulc.common.bean.LuceneFile;
-import com.czp.ulc.common.cache.SoftRefMap;
-import com.czp.ulc.common.dao.LuceneFileDao;
+import com.czp.ulc.core.ThreadPools;
+import com.czp.ulc.core.bean.LuceneFile;
+import com.czp.ulc.core.cache.SoftRefMap;
+import com.czp.ulc.core.dao.LuceneFileDao;
 import com.czp.ulc.web.QueryCondtion;
 
 /**
@@ -73,7 +73,7 @@ public class ParallelSearch {
 	public ParallelSearch(LuceneFileDao lFileDao) {
 		this.lFileDao = lFileDao;
 		int threadSize = LuceneConfig.PARALLEL_SEARCH_THREADS;
-		this.worker = ThreadPools.getInstance().newThreadPool("ParallelSearch", threadSize);
+		this.worker = ThreadPools.getInstance().newPool("ParallelSearch", threadSize);
 	}
 
 	private void asynSearch(AtomicBoolean isBreak, AtomicLong matchs, AtomicInteger waitSeachNum, File indexFile,

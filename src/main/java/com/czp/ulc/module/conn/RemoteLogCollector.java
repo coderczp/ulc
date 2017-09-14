@@ -26,12 +26,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.common.bean.HostBean;
-import com.czp.ulc.common.bean.MonitorConfig;
-import com.czp.ulc.common.dao.MonitoConfigDao;
-import com.czp.ulc.common.mq.Message;
-import com.czp.ulc.common.mq.MessageCenter;
-import com.czp.ulc.common.mq.MessageListener;
+import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.bean.MonitorConfig;
+import com.czp.ulc.core.dao.MonitoConfigDao;
+import com.czp.ulc.core.message.Message;
+import com.czp.ulc.core.message.MessageCenter;
+import com.czp.ulc.core.message.MessageListener;
 import com.czp.ulc.util.Utils;
 import com.jcraft.jsch.ChannelShell;
 

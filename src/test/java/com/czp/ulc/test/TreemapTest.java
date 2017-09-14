@@ -27,8 +27,8 @@ public class TreemapTest {
 			Long time = sp.parse(file.getName()).getTime();
 			map.put(time, file);
 		}
-		Long from = Utils.igroeHMSTime(System.currentTimeMillis()).getTime();
-		Long to = Utils.igroeHMSTime(System.currentTimeMillis()).getTime();
+		Long from = Utils.toDay(System.currentTimeMillis()).getTime();
+		Long to = Utils.toDay(System.currentTimeMillis()).getTime();
 		NavigableMap<Long, File> subMap = map.subMap(from, true, to, true);
 		for (Entry<Long, File> string : subMap.entrySet()) {
             System.out.println(string.getKey().hashCode());

@@ -27,7 +27,7 @@ import org.springframework.web.servlet.handler.AbstractHandlerExceptionResolver;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.common.ArgInvalideException;
+import com.czp.ulc.core.ArgInvalideException;
 
 /**
  * Function:统一的错误处理器

@@ -1,9 +1,6 @@
 /*
 Navicat MySQL Data Transfer
-
-Source Server         : pre3
 Source Server Version : 50621
-Source Host           : 121.41.24.156:3306
 Source Database       : itrip_ulc
 
 Target Server Type    : MYSQL

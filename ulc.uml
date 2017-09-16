@@ -1,0 +1,90 @@
+@startuml
+!pragma horizontalLineBetweenDifferentPackageAllowed
+
+'left to right direction
+scale  5/6
+
+package core_module {
+   component DAO
+   component MessageCenter
+   component MouduleManager
+   component SpringContext
+}
+
+
+package conn_moudle {
+  component ConnectionManager
+  component LogCollect
+  component ErrorAlarm
+  component FullGCAlarm
+}
+
+
+package lucene_moudle {
+	 component   MemoryIndex
+	 component   FileIndex
+	 component   RollingWriter
+	 component   ParallelSearcher
+}
+
+package web_moudle {
+	component    HostManager
+	component    ProjectManager
+	component    MonitorManager
+	component    LogSearchServer
+	component    AlarmManager
+}
+    
+
+package task_moudle {
+	component    ReportTask
+	component    AlarmTask
+	component    LogSumTask
+	component   SystemInfoCollectTask
+}
+
+
+package notify_moudle {
+	component  MailNotify
+	component  DingdingNotify
+}
+
+'web_moudle引用关系
+HostManager -d-> DAO
+ProjectManager -d-> DAO
+AlarmManager -d-> DAO
+LogSearchServer --> ParallelSearcher
+
+'conn_moudle引用关系
+LogCollect --> ConnectionManager
+ErrorAlarm -l-> MessageCenter
+AlarmManager -l-> MessageCenter
+FullGCAlarm -l-> MessageCenter
+
+
+'lucene_moudle引用关系
+MemoryIndex -r-> MessageCenter
+MemoryIndex --> FileIndex
+FileIndex --> RollingWriter
+ParallelSearcher --> MemoryIndex
+ParallelSearcher --> FileIndex
+
+
+'task_moudle引用关系
+ReportTask -u-> DAO
+AlarmTask -u-> DAO
+LogSumTask -u-> DAO
+SystemInfoCollectTask --> ConnectionManager
+
+'notify_moudle引用关系
+MailNotify --> MessageCenter
+DingdingNotify --> MessageCenter
+
+/'模板引用关系
+core_module -u-> web_moudle
+core_module -d-> conn_moudle
+core_module -l-> lucene_moudle
+core_module -r-> notify_moudle
+core_module -d-> task_moudle
+'/
+@enduml

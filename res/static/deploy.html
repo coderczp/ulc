@@ -10,9 +10,10 @@
 	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
 	rel="stylesheet">
 <link href="/ulc/css/ulc.css" rel="stylesheet">
-
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="js/ulc.js"></script>
+
 <body>
 	<!--导航-->
 	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
@@ -27,13 +28,7 @@
 				<a class="navbar-brand " href="index.html">ULC</a>
 			</div>
 			<div class="collapse navbar-collapse navbar-right is-collapse">
-				<ul class="nav navbar-nav">
-					<li class="active"><a href="./hosts.html">进程管理</a></li>
-					<li><a href="./index.html">日志搜索</a></li>
-					<li><a href="./proc.html">进程搜索</a></li>
-					<li><a href="./info.html">Info</a></li>
-					<li><a href="./pv.html">PV</a></li>
-				</ul>
+				<ul class="nav navbar-nav" id="menuId"></ul>
 			</div>
 			<!-- /.nav-collapse -->
 		</div>
@@ -78,7 +73,6 @@
 			</div>
 		</div>
 	</div>
-	</div>
 	<!-- Modal -->
 	<div class="modal fade" id="myModal" tabindex="-1" role="dialog"
 		aria-labelledby="myModalLabel" aria-hidden="true">
@@ -117,10 +111,6 @@
 			//$("#imgWait").hide();
 		}
 	});
-
-	loadHost();
-	loadFiles();
-	loadRecord();
 
 	function getProject(file) {
 		return file.substring(file.indexOf('_') + 1, file.lastIndexOf("."));
@@ -273,6 +263,7 @@
 
 	function isFinish(redocrd) {
 		var status = redocrd.status;
+		if(status)
 		return status.match('部署完成|部署失败|部署成功') != null;
 	}
 
@@ -301,5 +292,12 @@
 		});
 		$("#imgWait").show();
 	}
+	
+	$(function(){
+		bindMenus('#menuId');
+		loadHost();
+		loadFiles();
+		loadRecord();
+	});
 </script>
 </body>

@@ -18,6 +18,8 @@
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="http://cdn.bootcss.com/moment.js/2.18.1/moment.min.js"></script>
+<script src="js/ulc.js"></script>
+
 <script
 	src="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/js/bootstrap-datetimepicker.min.js"></script>
 <style type="text/css">
@@ -63,13 +65,7 @@ code {
 				<a class="navbar-brand " href="index.html">ULC</a>
 			</div>
 			<div class="collapse navbar-collapse navbar-right is-collapse">
-				<ul class="nav navbar-nav">
-					<li class="active"><a href="./hosts.html">进程管理</a></li>
-					<li><a href="./index.html">日志搜索</a></li>
-					<li><a href="./proc.html">进程搜索</a></li>
-					<li><a href="./info.html">Info</a></li>
-					<li><a href="./pv.html">PV</a></li>
-				</ul>
+				<ul class="nav navbar-nav" id="menuId"></ul>
 			</div>
 			<!-- /.nav-collapse -->
 		</div>
@@ -108,37 +104,11 @@ code {
 						</div>
 					</div>
 					<div class="form-group">
-						<select id="proc" class="form-control">
-							<option value="all">Proc</option>
-							<option value="service_order">service_order</option>
-							<option value="service_product">service_product</option>
-							<option value="service_booking">service_booking</option>
-							<option value="service_b2b">service_b2b</option>
-							<option value="service_pms">service_pms</option>
-							<option value="itrip_shop">itrip_shop</option>
-							<option value="itrip_main">itrip_main</option>
-							<option value="itrip_pay">itrip_pay</option>
-							<option value="itrip_mobile">itrip_mobile</option>
-							<option value="itrip_wap">itrip_wap</option>
-							<option value="itrip_rp">itrip_rp</option>
-							<option value="itrip_openapi">itrip_openapi</option>
-							<option value="itrip_openapi">service_order_email</option>
-							<option value="itrip_b2b_v2_b2b">itrip_b2b_v2_b2b</option>
-							<option value="itrip_openapi_b2b">itrip_openapi_b2b</option>
+						<select id="procId" class="form-control">
 						</select>
 					</div>
 					<div class="form-group">
-						<select id="file" class="form-control">
-							<option value="all">File</option>
-							<option value="run.log">run.log</option>
-							<option value="db.log">db.log</option>
-							<option value="dao.log">dao.log</option>
-							<option value="error.log">error.log</option>
-							<option value="request.log">request.log</option>
-							<option value="booking.log">booking.log</option>
-							<option value="dubborpc.log">dubborpc.log</option>
-							<option value="dubboclient.log">dubboclient.log</option>
-							<option value="sitebooking.log">sitebooking.log</option>
+						<select id="fileId" class="form-control">
 						</select>
 					</div>
 					<div class="form-group">
@@ -282,7 +252,12 @@ code {
 			window.open("/ulc/getFile?json=" + str);
 		}
 
-		$(initDate());
+		$(function(){
+			bindMenus('#menuId');
+			bindProcs('#procId');
+			bindFiles('#fileId');
+			initDate();
+		});
 	</script>
 </body>
 </html>

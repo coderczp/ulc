@@ -13,6 +13,7 @@
 
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="js/ulc.js"></script>
 <body>
 	<!--导航-->
 	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
@@ -27,14 +28,7 @@
 				<a class="navbar-brand " href="index.html">ULC</a>
 			</div>
 			<div class="collapse navbar-collapse navbar-right is-collapse">
-				<ul class="nav navbar-nav">
-					<li class="active"><a href="./hosts.html">进程管理</a></li>
-					<li><a href="./index.html">日志搜索</a></li>
-					<li><a href="./proc.html">进程搜索</a></li>
-					<li><a href="./host.html">机器管理</a></li>
-					<li><a href="./info.html">Info</a></li>
-					<li><a href="./pv.html">PV</a></li>
-				</ul>
+				<ul class="nav navbar-nav" id="menuId"></ul>
 			</div>
 			<!-- /.nav-collapse -->
 		</div>
@@ -74,7 +68,15 @@
 	</div>
 </body>
 <script type="text/javascript">
-	$(function() {
+	
+	function tr(val) {
+		return '<td>' + val + '</td>';
+	}
+
+	function remove(id) {
+	}
+
+	function loadHosts(){
 		$.get('./host/list', function(d) {
 			var html = '';
 			for ( var i in d) {
@@ -93,16 +95,8 @@
 			}
 			$('#record').html(html);
 		});
-	});
-
-	function tr(val) {
-		return '<td>' + val + '</td>';
 	}
-
-	function remove(id) {
-
-	}
-
+	
 	function addHost() {
 		var param = {
 			"name" : $('#name').val().trim(),
@@ -126,5 +120,10 @@
 				location.reload();
 		});
 	}
+	
+	$(function() {
+		bindMenus('#menuId');
+		loadHosts();
+	});
 </script>
 </body>

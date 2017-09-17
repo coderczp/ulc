@@ -20,8 +20,8 @@
 <script src="http://cdn.bootcss.com/moment.js/2.18.1/moment.min.js"></script>
 <script
 	src="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/js/bootstrap-datetimepicker.min.js"></script>
-<style type="text/css">
-</style>
+<script src="js/ulc.js"></script>
+
 </head>
 <body>
 	<!--导航-->
@@ -37,12 +37,7 @@
 				<a class="navbar-brand " href="index.html">ULC</a>
 			</div>
 			<div class="collapse navbar-collapse navbar-right is-collapse">
-				<ul class="nav navbar-nav">
-					<li class="active"><a href="./hosts.html">进程管理</a></li>
-					<li><a href="./index.html">日志搜索</a></li>
-					<li><a href="./info.html">Info</a></li>
-					<li><a href="./pv.html">PV</a></li>
-				</ul>
+				<ul class="nav navbar-nav" id="menuId"></ul>
 			</div>
 			<!-- /.nav-collapse -->
 		</div>
@@ -58,27 +53,34 @@
 	</div>
 	<script type="text/javascript">
 		var mb = 1024 * 1024;
-		$.get('./meta', function(resp) {
-			var html = "";
-			var bytes = resp.bytes;
-			var mbSize = 0, gbSize = 0;
-
-			html += "<br>CPU:" + (resp.cpus);
-			html += "<br>活跃线程:" + (resp.thread);
-			html += "<br>最大内存(MB):" + (resp.maxMem);
-			html += "<br>空闲内存(MB):" + (resp.freeMem);
-
-			if (bytes <= 1024) {
-				html += "<br>日志大小(KB):" + bytes;
-			} else if ((mbSize = bytes / mb) <= 1024) {
-				html += "<br>日志大小(MB):" + parseInt(mbSize);
-			} else {
-				html += "<br>日志大小(GB):" + parseInt(mbSize / 1024);
-			}
-			html += "<br>日志行数:" + (resp.lines);
-			html += "<br>文档总数:" + (resp.docs);
-			html += "<br>最早日志:" + (resp.minFile);
-			$('#result').html(html);
+		
+		function loadMeta(){
+			$.get('./meta', function(resp) {
+				var html = "";
+				var bytes = resp.bytes;
+				var mbSize = 0, gbSize = 0;
+	
+				html += "<br>CPU:" + (resp.cpus);
+				html += "<br>活跃线程:" + (resp.thread);
+				html += "<br>最大内存(MB):" + (resp.maxMem);
+				html += "<br>空闲内存(MB):" + (resp.freeMem);
+	
+				if (bytes <= 1024) {
+					html += "<br>日志大小(KB):" + bytes;
+				} else if ((mbSize = bytes / mb) <= 1024) {
+					html += "<br>日志大小(MB):" + parseInt(mbSize);
+				} else {
+					html += "<br>日志大小(GB):" + parseInt(mbSize / 1024);
+				}
+				html += "<br>日志行数:" + (resp.lines);
+				html += "<br>文档总数:" + (resp.docs);
+				html += "<br>最早日志:" + (resp.minFile);
+				$('#result').html(html);
+			});
+		}
+		
+		$(function(){
+			bindMenus('#menuId');
 		});
 	</script>
 </body>

@@ -144,7 +144,8 @@ public class MemIndexBuilder implements MessageListener<ReadResult> {
 	}
 
 	private IndexSearcher getRamSearcher() throws IOException {
-		return new IndexSearcher(DirectoryReader.openIfChanged(ramReader));
+		DirectoryReader openIfChanged = DirectoryReader.openIfChanged(ramReader);
+		return new IndexSearcher(openIfChanged==null?ramReader:openIfChanged);
 	}
 
 	private synchronized void swapRamWriterReader() throws IOException {

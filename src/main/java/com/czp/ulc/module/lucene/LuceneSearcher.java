@@ -45,7 +45,9 @@ public class LuceneSearcher {
 	}
 
 	public IndexMeta getMeta() {
-		return metaDao.count(null);
+		IndexMeta count = metaDao.count(null);
+		if(count==null)return new IndexMeta();
+		return count;
 	}
 
 	public Map<String, Long> count(SearchCallback search) throws IOException {

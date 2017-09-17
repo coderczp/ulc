@@ -2,7 +2,10 @@
 !pragma horizontalLineBetweenDifferentPackageAllowed
 
 'left to right direction
-scale  5/6
+scale  8/9
+skinparam backgroundColor #AAFFFF
+
+package ulc {
 
 package core_module {
    component DAO
@@ -48,6 +51,7 @@ package notify_moudle {
 	component  MailNotify
 	component  DingdingNotify
 }
+}
 
 'web_moudle引用关系
 HostManager -d-> DAO
@@ -87,4 +91,21 @@ core_module -l-> lucene_moudle
 core_module -r-> notify_moudle
 core_module -d-> task_moudle
 '/
+
+database MySql {
+    component base_info
+   component log_table
+    note right
+          由于不需要事物,且对插入和查询
+          性能要求较高,所以采用MyISAM
+          先将原始记录插入临时表
+          每分钟触发一次汇总任务
+          汇总后删除过去一分钟的原始数据
+          汇总的数据存放按天分区的表里 
+    end note  
+}
+
+'数据库位置
+ulc -u-> MySql
+
 @enduml

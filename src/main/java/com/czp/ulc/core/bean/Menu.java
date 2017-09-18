@@ -3,14 +3,14 @@ package com.czp.ulc.core.bean;
 import java.io.Serializable;
 
 /**
- * 请添加描述
- * <li>创建人：Jeff.cao</li>
- * <li>创建时间：2017年4月18日 下午2:58:10</li>
+ * 菜单
+ *
+ * <li>创建人：coder_czp@126.com</li>
+ * <li>创建时间：2017年9月18日</li>
  * 
  * @version 0.0.1
  */
-
-public class UserBean implements Serializable {
+public class Menu implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
@@ -18,9 +18,7 @@ public class UserBean implements Serializable {
 
 	private String name;
 
-	private String email;
-
-	private String pwd;
+	private String href;
 
 	public Integer getId() {
 		return id;
@@ -38,20 +36,11 @@ public class UserBean implements Serializable {
 		this.name = name;
 	}
 
-	public String getEmail() {
-		return email;
+	public String getHref() {
+		return href;
 	}
 
-	public void setEmail(String email) {
-		this.email = email;
+	public void setHref(String href) {
+		this.href = href;
 	}
-
-	public String getPwd() {
-		return pwd;
-	}
-
-	public void setPwd(String pwd) {
-		this.pwd = pwd;
-	}
-
 }

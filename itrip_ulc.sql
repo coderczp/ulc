@@ -95,3 +95,58 @@ CREATE TABLE `monitor_file` (
   `shard` int(11) DEFAULT NULL COMMENT '分配ID',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------
+-- Table structure for processor
+-- ----------------------------
+DROP TABLE IF EXISTS `processor`;
+CREATE TABLE `processor` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `hostId` int(11) NOT NULL DEFAULT '-1' COMMENT '管理的主机ID',
+  `name` varchar(100) NOT NULL COMMENT '进程名称',
+  `path` varchar(255) NOT NULL COMMENT '进程路径',
+  `shell` varchar(2555) NOT NULL DEFAULT 'service.sh' COMMENT '进程管理脚本[start stop restart]',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `host_name` (`hostId`,`name`) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------
+-- Table structure for menu
+-- ----------------------------
+DROP TABLE IF EXISTS `menu`;
+CREATE TABLE `menu`  (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '菜单称',
+  `href` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '菜单链接',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uq_name`(`name`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of menu
+-- ----------------------------
+INSERT INTO `menu` VALUES (1, '日志搜索', './log.html');
+INSERT INTO `menu` VALUES (2, '进程管理', './proc_mgr.html');
+INSERT INTO `menu` VALUES (3, '主机管理', './proc.html');
+INSERT INTO `menu` VALUES (4, '系统信息', './index.html');
+INSERT INTO `menu` VALUES (5, 'PV', './pv.html');
+INSERT INTO `menu` VALUES (6, '菜单管理', './menu.html');
+
+-- ----------------------------
+-- Table structure for user_menu
+-- ----------------------------
+DROP TABLE IF EXISTS `user_menu`;
+CREATE TABLE `user_menu`  (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `mail` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '用户邮箱',
+  `menu_id` int(11) NOT NULL COMMENT '菜单ID',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of user_menu
+-- ----------------------------
+INSERT INTO `user_menu` VALUES (1, 'jeff.cao@aoliday.com', 1);
+INSERT INTO `user_menu` VALUES (2, 'jeff.cao@aoliday.com', 2);
+INSERT INTO `user_menu` VALUES (3, 'jeff.cao@aoliday.com', 6);
+INSERT INTO `user_menu` VALUES (4, 'jeff.cao@aoliday.com', 5);

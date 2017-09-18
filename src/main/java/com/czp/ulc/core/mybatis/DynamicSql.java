@@ -20,6 +20,7 @@ import com.czp.ulc.core.bean.IndexMeta;
 import com.czp.ulc.core.bean.KeywordRule;
 import com.czp.ulc.core.bean.MonitorConfig;
 import com.czp.ulc.core.bean.ProcessorBean;
+import com.czp.ulc.core.bean.UserMenu;
 import com.czp.ulc.util.Utils;
 import com.czp.ulc.web.QueryCondtion;
 
@@ -31,6 +32,16 @@ import com.czp.ulc.web.QueryCondtion;
  * @version:1.0
  */
 public class DynamicSql {
+
+	public String queryMenus(UserMenu arg) {
+		return "select menu.* from menu inner join user_menu on menu.id=user_menu.menu_id where user_menu.mail='"
+				+ arg.getMail() + "'";
+	}
+
+	public String queryUserMenu(String email) {
+		return "select  menu.* from menu inner join user_menu on menu.id=user_menu.menu_id where user_menu.mail='"
+				+ email + "'";
+	}
 
 	public String getProcById(Integer id) {
 		return "SELECT * FROM processor where id=" + id;

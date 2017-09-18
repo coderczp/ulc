@@ -38,25 +38,20 @@
 	<div class="container-fluid" style="margin-top: 50px">
 		<div class="panel panel-success">
 			<div class="panel-heading">
-				host <select id="hostId"></select>name<input id='name' type="text">
-				path<input id='path' value='/var/www/data/work/' type="text">
-				shell<input id='shell' type="text" value="service.sh">
-				<button onclick="addProc()">Add</button>
+				menuId<input id='menu' type="text"> mail<input id='mail'
+					type="text">
+				<button onclick="addMenu()">Add</button>
 				<button onclick="search()">Select</button>
 			</div>
 			<div class="panel-body">
 				<div id="list" class="table-responsive">
 					<table class="table table-striped">
-						<caption>进程列表</caption>
+						<caption>菜单列表</caption>
 						<thead>
 							<tr>
 								<th>name</th>
-								<th>host</th>
-								<th>path</th>
-								<th>shell</th>
-								<th>stop</th>
-								<th>start</th>
-								<th>restart</th>
+								<th>href</th>
+								<th>user</th>
 								<th>remove</th>
 							</tr>
 						</thead>
@@ -74,69 +69,43 @@
 	}
 
 	function remove(id) {
-		alert('not support');
-	}
-
-	function manage(type, id) {
-		var arg = {
-			"type" : type,
-			"id" : id,
-		};
-		$.get('./proc/mgr', arg, function(data) {
-			alert(data.join('\n'));
-		});
+		$.get('./menu/del?id=' + id, buildTable);
 	}
 
 	function buildTable(data) {
 		var html = '';
 		for ( var i in data) {
-			var proc = data[i];
-			var id = proc.id;
-			var name = proc.name;
-			var path = proc.path;
-			var shell = proc.shell;
-			var host = mapHostIdToName(proc.hostId);
+			var item = data[i];
+			var id = item.id;
+			var name = item.name;
+			var href = item.href;
+			var user = item.mail||$('#mail').val().trim();
 			var del = buildBtn('remove', 'Remove', [ id ]);
-			var stop = buildBtn('manage', 'Stop', [ 'stop', id ]);
-			var start = buildBtn('manage', 'Start', [ 'start', id ]);
-			var restart = buildBtn('manage', 'Restart', [ 'restart', id ]);
-
-			html += "<tr>" + tr(name) + tr(host) + tr(path) + tr(shell)
-					+ tr(stop) + tr(start) + tr(restart) + tr(del) + "</tr>";
+			html += "<tr>" + tr(name) + tr(href) + tr(user) + tr(del) + "</tr>";
 		}
 		$('#record').html(html);
 	}
 
-	function loadProcs() {
-		$.get('./proc/list', buildTable);
-	}
-
 	function getParam() {
 		return {
-			"name" : $('#name').val().trim(),
-			"path" : $('#path').val().trim(),
-			"shell" : $('#shell').val().trim(),
-			"hostId" : $('#hostId').val().trim(),
+			"mail" : $('#mail').val().trim(),
+			"menuId" : $('#menu').val().trim(),
 		};
 	}
 
 	function search() {
 		var param = getParam();
-		$.get('./proc/list', param, buildTable);
+		$.get('./menu/list', param, buildTable);
 	}
 
-	function addProc() {
+	function addMenu() {
 		var param = getParam();
-		if (!param.name)
-			return alert('name is empty');
-		if (!param.path)
-			return alert('path is empty');
-		if (!param.hostId)
-			return alert('host is empty');
-		if (!param.shell)
-			return alert('shell is empty');
+		if (!param.mail)
+			return alert('mail is empty');
+		if (!param.menuId)
+			return alert('menuId is empty');
 
-		$.get('./proc/add', param, function(d) {
+		$.get('./menu/add', param, function(d) {
 			alert(d.error ? d.info : 'success');
 			if (!d.error)
 				location.reload();
@@ -145,7 +114,7 @@
 
 	$(function() {
 		bindMenus('#menuId');
-		asynLoadHost('#hostId', loadProcs);
+		search();
 	});
 </script>
 </body>

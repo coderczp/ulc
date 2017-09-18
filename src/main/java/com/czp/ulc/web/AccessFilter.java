@@ -41,6 +41,7 @@ public class AccessFilter implements Filter {
 	private String key;
 	private String loginUrl;
 	private String[] skipUrls;
+	public static final String SESSION_KEY ="user";
 	public static final String CALLBACK = "/callback";
 	private static final String TOKEN_NAME = "account";
 	private static final int COOK_TIMEOUT = 60 * 60 * 24 * 10;
@@ -77,7 +78,7 @@ public class AccessFilter implements Filter {
 		HttpServletRequest req = (HttpServletRequest) request;
 		String url = req.getRequestURL().toString();
 		HttpSession session = req.getSession();
-		Object user = session.getAttribute("user");
+		Object user = session.getAttribute(SESSION_KEY);
 		LOG.info("url:{},user:{}", url, user);
 
 		if (isSkipUrl(url) || user != null) {
@@ -115,7 +116,7 @@ public class AccessFilter implements Filter {
 
 		try {
 			String account = Utils.decrypt(token);
-			session.setAttribute("user", account);
+			session.setAttribute(SESSION_KEY, account);
 			return true;
 		} catch (Exception e) {
 			LOG.error("invalid token", e);

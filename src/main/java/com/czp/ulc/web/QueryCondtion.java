@@ -55,7 +55,7 @@ public class QueryCondtion {
 	private long start = System.currentTimeMillis();
 
 	/** 查询的主机 */
-	private Set<String> hosts = new HashSet<String>();
+	private HashSet<String> hosts = new HashSet<String>();
 
 	/** 结束时间 */
 	private long end = start;

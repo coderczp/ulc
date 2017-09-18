@@ -104,12 +104,13 @@ public class MessageCenter implements IModule, Runnable {
 		while (!stop) {
 			try {
 				Message message = tasks.take();
-				List<MessageListener> list = concumners.get(message.getMessage().getClass());
+				Object body = message.getMessage();
+				List<MessageListener> list = concumners.get(body.getClass());
 				if (Utils.isEmpty(list)) {
-					LOG.error("can't find processor for:{}", message.getMessage());
+					LOG.error("can't find processor for:{}", body);
 				}
 				for (MessageListener listener : list) {
-					listener.onMessage(message.getMessage(), message.getExt());
+					listener.onMessage(body, message.getExt());
 				}
 			} catch (Exception e) {
 				LOG.error("handle messaeg error", e);

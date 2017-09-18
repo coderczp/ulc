@@ -91,7 +91,6 @@ public class ProcessorController {
 				LOG.info("success execute cmd");
 				return exe;
 			}
-
 		} else {
 			res.add("unsupport command:" + type);
 		}

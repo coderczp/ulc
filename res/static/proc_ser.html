@@ -108,6 +108,7 @@
 	
 	$(function() {
 		bindMenus('#menuId');
+		loadHost();
 		$('#host').change(doSearch);
 		$('#search').click(doSearch);
 	});

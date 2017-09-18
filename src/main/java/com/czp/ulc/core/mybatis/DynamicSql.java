@@ -19,6 +19,7 @@ import com.czp.ulc.core.bean.HostBean;
 import com.czp.ulc.core.bean.IndexMeta;
 import com.czp.ulc.core.bean.KeywordRule;
 import com.czp.ulc.core.bean.MonitorConfig;
+import com.czp.ulc.core.bean.ProcessorBean;
 import com.czp.ulc.util.Utils;
 import com.czp.ulc.web.QueryCondtion;
 
@@ -30,6 +31,25 @@ import com.czp.ulc.web.QueryCondtion;
  * @version:1.0
  */
 public class DynamicSql {
+
+	public String getProcById(Integer id) {
+		return "SELECT * FROM processor where id=" + id;
+	}
+
+	public String getHostById(Integer id) {
+		return "SELECT * FROM host_bean where id=" + id;
+	}
+
+	public String queryProc(ProcessorBean arg) {
+		String where = "where 1=1";
+		if (Utils.notEmpty(arg.getHostId()))
+			where += " AND hostId=" + arg.getHostId();
+		if (Utils.notEmpty(arg.getName()))
+			where += " AND name like '%" + arg.getName() + "%'";
+		if (Utils.notEmpty(arg.getPath()))
+			where += " AND path like '" + arg.getPath() + "%'";
+		return String.format("select * from processor %s", where);
+	}
 
 	public String queryEarliestFile(String host) {
 		if (host == null)

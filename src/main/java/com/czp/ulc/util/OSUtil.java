@@ -10,7 +10,7 @@ import com.alibaba.fastjson.JSONObject;
  * @version 0.0.1
  */
 
-public class JVMUtil {
+public class OSUtil {
 
 	private static long MB_SIZE = 1024 * 1024;
 
@@ -36,4 +36,6 @@ public class JVMUtil {
 
 		return json;
 	}
+	
+	
 }

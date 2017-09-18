@@ -36,7 +36,7 @@ import com.czp.ulc.main.Application;
 import com.czp.ulc.module.lucene.DocField;
 import com.czp.ulc.module.lucene.LuceneSearcher;
 import com.czp.ulc.module.lucene.SearchCallback;
-import com.czp.ulc.util.JVMUtil;
+import com.czp.ulc.util.OSUtil;
 
 /**
  * Function:搜索接口
@@ -66,8 +66,8 @@ public class SearchController {
 	public JSONObject meta() throws Exception {
 		LuceneFile lFile = lFileDao.queryEarliestFile(null);
 		IndexMeta meta = getSearcher().getMeta();
-		JSONObject json = JVMUtil.collectVMInfo();
-		JSONObject metaJson = (JSONObject) JSONObject.toJSON(meta);
+		JSONObject json = OSUtil.collectVMInfo();
+		JSONObject metaJson =  (JSONObject) JSONObject.toJSON(meta);
 		json.putAll(metaJson);
 		if (lFile != null) {
 			json.put("minFile", new File(lFile.getPath()).getName());

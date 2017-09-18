@@ -30,4 +30,6 @@ public interface HostDao extends BaseDao<HostBean> {
 	@SelectProvider(type = DynamicSql.class, method = "listHost")
 	List<HostBean> list(Map<String, Object> param);
 
+	@SelectProvider(type = DynamicSql.class, method = "getHostById")
+	HostBean get(Integer id);
 }

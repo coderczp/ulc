@@ -24,7 +24,7 @@ import com.czp.ulc.module.conn.ConnectManager;
  *
  */
 @RestController
-@RequestMapping("/proc")
+@RequestMapping("/cmd")
 public class CmdController {
 
 	@Autowired

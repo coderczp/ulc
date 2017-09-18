@@ -63,8 +63,8 @@ public class ConnectManager implements MessageListener<HostBean> {
 		return maps.containsKey(host);
 	}
 
-	public List<String> exe(String host, String cmd) {
-		Session session = maps.get(host);
+	public List<String> exe(String hostName, String cmd) {
+		Session session = maps.get(hostName);
 		if (session == null)
 			return notFound;
 
@@ -82,7 +82,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 				res.add(errorInfo);
 			}
 			channel.disconnect();
-			LOG.info("sucess to execute:{} in host:{}", cmd, host);
+			LOG.info("sucess to execute:{} in host:{}", cmd, hostName);
 		} catch (Exception e) {
 			LOG.error("execute error:" + cmd, e);
 			res.add("server error,try again," + e);

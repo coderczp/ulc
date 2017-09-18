@@ -12,7 +12,7 @@ import java.io.File;
 
 public class RollingWriterResult {
 
-	private File lastFile;
+	private volatile File lastFile;
 
 	private volatile boolean fileChanged;
 
@@ -27,6 +27,10 @@ public class RollingWriterResult {
 
 	public boolean isFileChanged() {
 		return fileChanged;
+	}
+
+	public void setLastFile(File lastFile) {
+		this.lastFile = lastFile;
 	}
 
 	public File getLastFile() {

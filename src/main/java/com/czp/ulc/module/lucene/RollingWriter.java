@@ -24,7 +24,7 @@ public class RollingWriter implements AutoCloseable {
 
 	protected File baseDir;
 	protected volatile File currentFile;
-	protected volatile RollingWriterResult result;
+	protected final RollingWriterResult unChange;
 	protected volatile BufferedOutputStream stream;
 	protected AtomicLong postion = new AtomicLong();
 
@@ -36,6 +36,8 @@ public class RollingWriter implements AutoCloseable {
 	public RollingWriter(File baseDir) {
 		this.baseDir = baseDir;
 		this.stream = getCurrentStream();
+		// 初始化一个文件未修改的result,文件变更时重新new一个
+		this.unChange = new RollingWriterResult(false, currentFile);
 	}
 
 	/***
@@ -98,16 +100,15 @@ public class RollingWriter implements AutoCloseable {
 			synchronized (this) {
 				if (postion.get() >= EACH_FILE_SIZE) {
 					stream.close();
+					File tmp = currentFile;
 					stream = getCurrentStream();
-					result.setFileChanged(true);
+					return new RollingWriterResult(true, tmp);
 				}
 			}
-		} else {
-			result.setFileChanged(false);
 		}
 		stream.write(bytes);
 		postion.getAndAdd(bytes.length);
-		return result;
+		return unChange;
 
 	}
 
@@ -118,11 +119,9 @@ public class RollingWriter implements AutoCloseable {
 	 */
 	private BufferedOutputStream getCurrentStream() {
 		try {
-			File tmp = currentFile;
 			currentFile = chooseFile();
 			postion.set(currentFile.length());
 			LOG.info("use file:{}", currentFile);
-			result = new RollingWriterResult(false, tmp);
 			return new BufferedOutputStream(new FileOutputStream(currentFile, true));
 		} catch (IOException e) {
 			throw new RuntimeException(e.toString(), e);

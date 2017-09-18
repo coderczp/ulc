@@ -38,25 +38,26 @@
 	<div class="container-fluid" style="margin-top: 50px">
 		<div class="panel panel-success">
 			<div class="panel-heading">
-				name<input id='name' type="text"> host<input id='host'
-					type="text"> port<input id='port' value='22' type="text">
-				user<input id='user' value='aoliday' type="text"> pwd<input
-					id='pwd' type="text">
-				<button onclick="addHost()">submit</button>
+				host <select id="hostId"></select>name<input id='name' type="text">
+				path<input id='path' value='/var/www/data/work/' type="text">
+				shell<input id='shell' type="text" value="service.sh">
+				<button onclick="addProc()">Add</button>
+				<button onclick="search()">Select</button>
 			</div>
 			<div class="panel-body">
 				<div id="list" class="table-responsive">
 					<table class="table table-striped">
-						<caption>机器列表</caption>
+						<caption>进程列表</caption>
 						<thead>
 							<tr>
-								<th>ID</th>
 								<th>name</th>
 								<th>host</th>
-								<th>port</th>
-								<th>user</th>
-								<th>pwd</th>
-								<th>op</th>
+								<th>path</th>
+								<th>shell</th>
+								<th>stop</th>
+								<th>start</th>
+								<th>restart</th>
+								<th>remove</th>
 							</tr>
 						</thead>
 						<tbody id="record">
@@ -68,63 +69,92 @@
 	</div>
 </body>
 <script type="text/javascript">
-	
 	function tr(val) {
 		return '<td>' + val + '</td>';
 	}
 
 	function remove(id) {
-	 alert('not support');	
+		alert('not support');
 	}
 
-	function loadHosts(){
-		$.get('./host/list', function(d) {
-			var html = '';
-			for ( var i in d) {
-				var host = d[i];
-				var id = host.id;
-				var ip = host.host;
-				var port = host.port;
-				var name = host.name;
-				var user = host.user;
-				var pwd = host.pwd;
-				var del = "<button onclick='remove(" + id + ")'>删除</button>";
-
-				html += "<tr>" + tr(id) + tr(name) + tr(ip) + tr(port)
-						+ tr(user) + tr(pwd) + tr(del)
-				"</tr>";
-			}
-			$('#record').html(html);
+	function manage(type, id) {
+		var arg = {
+			"type" : type,
+			"id" : id,
+		};
+		$.get('./proc/mgr', arg, function(data) {
+			alert(data.join('\n'));
 		});
 	}
-	
-	function addHost() {
-		var param = {
+
+	function buildBtn(func, name, args) {
+		var arg = '';
+		for ( var i in args) {
+			arg += "\"" + args[i] + "\","
+		}
+		return "<button onclick='" + func + "(" + arg + ")'>" + name
+				+ "</button>";
+	}
+
+	function buildTable(data) {
+		var html = '';
+		for ( var i in data) {
+			var proc = data[i];
+			var id = proc.id;
+			var name = proc.name;
+			var path = proc.path;
+			var shell = proc.shell;
+			var host = mapHostIdToName(proc.hostId);
+			var del = buildBtn('remove', 'Remove', [ id ]);
+			var stop = buildBtn('manage', 'Stop', [ 'stop', id ]);
+			var start = buildBtn('manage', 'Start', [ 'start', id ]);
+			var restart = buildBtn('manage', 'Restart', [ 'restart', id ]);
+
+			html += "<tr>" + tr(name) + tr(host) + tr(path) + tr(shell)
+					+ tr(stop) + tr(start) + tr(restart) + tr(del) + "</tr>";
+		}
+		$('#record').html(html);
+	}
+
+	function loadProcs() {
+		$.get('./proc/list', buildTable);
+	}
+
+	function getParam() {
+		return {
 			"name" : $('#name').val().trim(),
-			"host" : $('#host').val().trim(),
-			"port" : $('#port').val().trim(),
-			"user" : $('#user').val().trim(),
-			"pwd" : $('#pwd').val().trim(),
+			"path" : $('#path').val().trim(),
+			"shell" : $('#shell').val().trim(),
+			"hostId" : $('#hostId').val().trim(),
 		};
+	}
+
+	function search() {
+		var param = getParam();
+		$.get('./proc/list', param, buildTable);
+	}
+
+	function addProc() {
+		var param = getParam();
 		if (!param.name)
 			return alert('name is empty');
-		if (!param.host)
+		if (!param.path)
+			return alert('path is empty');
+		if (!param.hostId)
 			return alert('host is empty');
-		if (!param.user)
-			return alert('user is empty');
-		if (!param.pwd)
-			return alert('pwd is empty');
+		if (!param.shell)
+			return alert('shell is empty');
 
-		$.get('./host/add', param, function(d) {
+		$.get('./proc/add', param, function(d) {
 			alert(d.error ? d.info : 'success');
 			if (!d.error)
 				location.reload();
 		});
 	}
-	
+
 	$(function() {
 		bindMenus('#menuId');
-		loadHosts();
+		asynLoadHost('#hostId', loadProcs);
 	});
 </script>
 </body>

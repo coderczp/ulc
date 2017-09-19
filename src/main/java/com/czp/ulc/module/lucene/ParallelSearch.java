@@ -109,7 +109,7 @@ public class ParallelSearch {
 	public void shutdown() {
 		worker.shutdownNow();
 	}
-	
+
 	public void search(SearchCallback search, long allDocs, int memMatch) {
 		AtomicLong match = new AtomicLong(memMatch);
 		AtomicBoolean isBreak = new AtomicBoolean();
@@ -142,7 +142,7 @@ public class ParallelSearch {
 			// 锁住目录
 			synchronized (file) {
 				// 关闭过期目录
-				if (searcher != null) {
+				if (searcher != null && searcher.isOverdue()) {
 					dirMap.remove(file).search.getIndexReader().close();
 				}
 				if (!dirMap.containsKey(file)) {

@@ -55,7 +55,6 @@
 								<th>host</th>
 								<th>port</th>
 								<th>user</th>
-								<th>pwd</th>
 								<th>monitor</th>
 								<th>op</th>
 							</tr>
@@ -87,13 +86,11 @@
 				var port = host.port;
 				var name = host.name;
 				var user = host.user;
-				var pwd = host.pwd;
 				var status = host.status == 0 ? '监控' : '不监控';
 				var del = "<button onclick='remove(" + id + ")'>删除</button>";
 
 				html += "<tr>" + tr(name) + tr(ip) + tr(port) + tr(user)
-						+ tr(pwd) + tr(status) + tr(del)
-				"</tr>";
+						+ tr(status) + tr(del) + "</tr>";
 			}
 			$('#record').html(html);
 		});

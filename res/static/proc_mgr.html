@@ -39,26 +39,29 @@
 		<div class="panel panel-success">
 			<div class="panel-heading">
 				host <select id="hostId"></select>name<input id='name' size=10
-					onkeydown="updatePath()" onchange="updatePath()" type="text"> path<input id='path'
-					value='/var/www/data/work/' size=35 type="text"> shell<input
-					id='shell' type="text" value="service.sh" size=8>
+					onkeydown="updatePath()" onchange="updatePath()" type="text">
+				path<input id='path' value='/var/www/data/work/' size=35 type="text">
+				shell<input id='shell' type="text" value="service.sh" size=8>
 				<button onclick="addProc()">Add</button>
 				<button onclick="search()">Select</button>
 			</div>
 			<div class="panel-body">
 				<div id="list" class="table-responsive">
 					<table class="table table-striped">
-						<caption>进程列表</caption>
+						<caption>
+							简约模式<input type="checkbox" id="switch" checked="checked"
+								onclick="switchModel()">
+						</caption>
 						<thead>
 							<tr>
 								<th>name</th>
 								<th>host</th>
-								<th>path</th>
-								<th>shell</th>
+								<th class="hid">path</th>
+								<th class="hid">shell</th>
 								<th>stop</th>
 								<th>start</th>
 								<th>restart</th>
-								<th>remove</th>
+								<th class="hid">remove</th>
 							</tr>
 						</thead>
 						<tbody id="record">
@@ -72,25 +75,43 @@
 <script type="text/javascript">
 	var bathPath = "/var/www/data/work/";
 
-	function tr(val) {
-		return '<td>' + val + '</td>';
+	function tr(val, cls) {
+		var cls = cls ? 'class=' + cls : '';
+		return '<td '+cls+'>' + val + '</td>';
 	}
 
 	function remove(id) {
-		alert('not support');
 	}
 
 	function updatePath() {
 		$('#path').val(bathPath + $('#name').val());
 	}
 
-	function manage(type, id) {
+	function switchModel() {
+		if ($("#switch").is(":checked"))
+			$('.hid').hide();
+		else
+			$('.hid').show();
+	}
+
+	function manage(type, id,event) {
+		event = event ? event : window.event; 
+		var obj = event.srcElement ? event.srcElement : event.target; 
+		var btn = $(obj);
+		if (btn.text().indexOf("ing")>-1) {
+			alert(type + ' is not reurn');
+			return;
+		}
+		if (!confirm("Are you sure?"))
+			return;
 		var arg = {
 			"type" : type,
 			"id" : id,
 		};
+		btn.text(type + 'ing');
 		$.get('./proc/mgr', arg, function(data) {
 			alert(data.join('\n'));
+			btn.text(type);
 		});
 	}
 
@@ -108,8 +129,9 @@
 			var start = buildBtn('manage', 'Start', [ 'start', id ]);
 			var restart = buildBtn('manage', 'Restart', [ 'restart', id ]);
 
-			html += "<tr>" + tr(name) + tr(host) + tr(path) + tr(shell)
-					+ tr(stop) + tr(start) + tr(restart) + tr(del) + "</tr>";
+			html += "<tr>" + tr(name) + tr(host) + tr(path, 'hid')
+					+ tr(shell, 'hid') + tr(stop) + tr(start) + tr(restart)
+					+ tr(del,'hid') + "</tr>";
 		}
 		$('#record').html(html);
 	}
@@ -128,7 +150,9 @@
 	}
 
 	function search() {
+		//不支持路径搜索
 		var param = getParam();
+		delete param.path;
 		$.get('./proc/list', param, buildTable);
 	}
 

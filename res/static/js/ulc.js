@@ -1,5 +1,5 @@
 var procs = {
-	'Processor' : 'all',
+	'all' : 'all',
 	'itrip_rp' : 'itrip_rp',
 	'itrip_wap' : 'itrip_wap',
 	'itrip_pay' : 'itrip_pay',
@@ -18,7 +18,7 @@ var procs = {
 };
 
 var files = {
-	'File' : 'all',
+	'all' : 'all',
 	'run.log' : 'run.log',
 	'db.log' : 'db.log',
 	'dao.log' : 'dao.log',
@@ -39,7 +39,13 @@ var Glob = {
 $.ajaxSetup({
 	error : function(jqXHR, textStatus, errorMsg) {
 		alert('发送错误,请刷新' + (errorMsg || textStatus));
-	}
+	},
+	success : function(data) {
+		if (data.error) {
+			alert(data.info);
+			return false;
+		}
+	},
 });
 
 /** 将菜单绑定到指定的元素 */
@@ -80,7 +86,7 @@ function bindFiles(fileId) {
 		alert('ULC not found file select');
 	var html = '';
 	for ( var name in files) {
-		var val = procs[name];
+		var val = files[name];
 		html += '<option value="' + val + '">' + name + '</option>';
 	}
 	file.html(html);
@@ -90,7 +96,7 @@ function bindFiles(fileId) {
 function asynLoadHost(hostSelectId, callback) {
 	$.get('./host/list', function(d) {
 		var hosts = Glob.hosts;
-		var html = '<option value="">-all--</option>';
+		var html = '<option value="">all</option>';
 		for ( var i in d) {
 			var host = d[i];
 			var id = host.id;
@@ -111,7 +117,7 @@ function mapHostIdToName(id) {
 	return Glob.hosts[id] || id;
 }
 
-/**创建button*/
+/** 创建button */
 function buildBtn(func, name, args) {
 	var arg = '';
 	for ( var i in args) {

@@ -55,9 +55,7 @@ public class HostController {
 		}
 		bean.setPwd(Utils.encrypt(bean.getPwd()));
 		getConnMgr().connect(bean);
-		if (dao.insertUseGeneratedKeys(bean) > 0) {
-			getConnMgr().connect(bean);
-		}
+		dao.insertUseGeneratedKeys(bean);
 		return bean;
 	}
 

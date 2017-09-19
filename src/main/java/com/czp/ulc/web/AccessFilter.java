@@ -79,7 +79,7 @@ public class AccessFilter implements Filter {
 		String url = req.getRequestURL().toString();
 		HttpSession session = req.getSession();
 		Object user = session.getAttribute(SESSION_KEY);
-		LOG.info("url:{},user:{}", url, user);
+		LOG.debug("url:{},user:{}", url, user);
 
 		if (isSkipUrl(url) || user != null) {
 			chain.doFilter(req, rep);

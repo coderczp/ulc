@@ -89,35 +89,27 @@
 		var fmt = "YYYY/MM/DD HH:mm";
 		startTime.setHours(date.getHours() - 5);
 
-		$('#start').datetimepicker({
-			format : fmt,
-			locale : moment.locale('zh-cn')
-		}).data('DateTimePicker').date(moment(startTime).format(fmt));
+		function initDate() {
+			$('#start').datetimepicker({
+				format : fmt,
+				locale : moment.locale('zh-cn')
+			}).data('DateTimePicker').date(moment(startTime).format(fmt));
 
-		$('#end').datetimepicker({
-			format : fmt,
-			locale : moment.locale('zh-cn')
-		}).data('DateTimePicker').date(moment(date).format(fmt));
-
-		$.get('./host/list', function(d) {
-			var html = '<option value="">Host</option>';
-			for ( var i in d) {
-				var host = d[i];
-				html += '<option value='+host.name+'>' + host.name
-						+ '</option>';
-			}
-			$('#host').html(html);
-		});
+			$('#end').datetimepicker({
+				format : fmt,
+				locale : moment.locale('zh-cn')
+			}).data('DateTimePicker').date(moment(date).format(fmt));
+		}
 
 		function getCdt() {
 			return {
 				'q' : $('#q').val(),
 				'size' : $('#size').val(),
-				'host' : $('#host').val(),
-				'proc' : $('#proc').val(),
-				'file' : $('#file').val(),
+				'file' : $('#fileId').val(),
 				'end' : Date.parse($('#end').data('date')),
-				'start' : Date.parse($('#start').data('date'))
+				'start' : Date.parse($('#start').data('date')),
+				'host' : $("#host").find("option:selected").text(),
+				'proc' : $("#procId").find("option:selected").text(),
 			};
 		}
 		function doQuery() {
@@ -127,7 +119,7 @@
 			json.file = json.file == 'all' ? null : json.file;
 
 			if (!json.file) {
-				$('#file').val('select file');
+				alert('select file');
 				return;
 			}
 			$('#result').html('searching');
@@ -141,14 +133,14 @@
 				$('#result').html(html);
 			});
 		}
-		
-		$(function(){
+
+		$(function() {
+			asynLoadHost('#host');
 			bindMenus('#menuId');
 			bindProcs('#procId');
 			bindFiles('#fileId');
 			initDate();
 		});
-		
 	</script>
 </body>
 </html>

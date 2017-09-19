@@ -82,7 +82,7 @@ public class ProcessorController {
 			if (hostBean == null) {
 				res.add("host not exist");
 			} else {
-				String path = proc.getPath().concat(proc.getName());
+				String path = proc.getPath();
 				String fmt = "cd %s;./service.sh %s";
 				String host = hostBean.getName();
 				String cmd = String.format(fmt, path, type);

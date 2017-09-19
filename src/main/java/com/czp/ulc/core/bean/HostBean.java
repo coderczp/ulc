@@ -25,6 +25,10 @@ public class HostBean implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	public static final int DEFAULT_PORT = 22;
+	
+	public static final int STATUS_MONITOR = 0;
+	
+	public static final int STATUS_NO_MONITOR = 1;
 
 	@NotEmpty(message = "host isempty")
 	private String host;
@@ -40,7 +44,7 @@ public class HostBean implements Serializable {
 
 	private int port = DEFAULT_PORT;
 
-	private int status = 0;
+	private int status = STATUS_NO_MONITOR;
 
 	private Integer id;
 

@@ -38,9 +38,10 @@
 	<div class="container-fluid" style="margin-top: 50px">
 		<div class="panel panel-success">
 			<div class="panel-heading">
-				host <select id="hostId"></select>name<input id='name' type="text">
-				path<input id='path' value='/var/www/data/work/' type="text">
-				shell<input id='shell' type="text" value="service.sh">
+				host <select id="hostId"></select>name<input id='name' size=10
+					onkeydown="updatePath()" onchange="updatePath()" type="text"> path<input id='path'
+					value='/var/www/data/work/' size=35 type="text"> shell<input
+					id='shell' type="text" value="service.sh" size=8>
 				<button onclick="addProc()">Add</button>
 				<button onclick="search()">Select</button>
 			</div>
@@ -69,12 +70,18 @@
 	</div>
 </body>
 <script type="text/javascript">
+	var bathPath = "/var/www/data/work/";
+
 	function tr(val) {
 		return '<td>' + val + '</td>';
 	}
 
 	function remove(id) {
 		alert('not support');
+	}
+
+	function updatePath() {
+		$('#path').val(bathPath + $('#name').val());
 	}
 
 	function manage(type, id) {

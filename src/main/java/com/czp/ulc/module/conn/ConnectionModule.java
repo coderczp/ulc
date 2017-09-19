@@ -1,5 +1,8 @@
 package com.czp.ulc.module.conn;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,7 +67,9 @@ public class ConnectionModule implements IModule, Runnable {
 
 	@Override
 	public void run() {
-		for (HostBean host : hostDao.list(null)) {
+		Map<String, Object> param = new HashMap<>();
+		param.put("status", HostBean.STATUS_MONITOR);
+		for (HostBean host : hostDao.list(param)) {
 			try {
 				conMgr.connect(host);
 			} catch (Exception e) {

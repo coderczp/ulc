@@ -67,7 +67,10 @@ public class ConnectManager implements MessageListener<HostBean> {
 		Session session = maps.get(hostName);
 		if (session == null)
 			return notFound;
+		return doExe(hostName, cmd, session);
+	}
 
+	public List<String> doExe(String hostName, String cmd, Session session) {
 		List<String> res = new LinkedList<>();
 		try {
 			ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -113,8 +116,10 @@ public class ConnectManager implements MessageListener<HostBean> {
 			session.connect(5000);
 			LOG.info("success connect:{}", bean);
 			maps.put(bean.getName(), session);
-
-			startMonitor(bean);
+			
+			if (bean.getStatus() == HostBean.STATUS_MONITOR) {
+				startMonitor(bean);
+			}
 		} catch (JSchException e) {
 			throw new RuntimeException(e);
 		}
@@ -130,6 +135,15 @@ public class ConnectManager implements MessageListener<HostBean> {
 		ThreadPools.getInstance().run("monitor-" + bean.getName(), task, true);
 	}
 
+	public Session getSession(HostBean bean) {
+		Session session = maps.get(bean.getName());
+		if (session != null && !session.isConnected()) {
+			buildAndCacheSession(bean);
+			session = maps.get(bean.getName());
+		}
+		return session;
+	}
+
 	/***
 	 * 打开channel
 	 * 
@@ -138,12 +152,8 @@ public class ConnectManager implements MessageListener<HostBean> {
 	 * @return
 	 */
 	public Channel openChannel(HostBean server, String type) {
-		Session session = maps.get(server.getName());
 		try {
-			if (session == null || !session.isConnected()) {
-				buildAndCacheSession(server);
-				session = maps.get(server.getName());
-			}
+			Session session = getSession(server);
 			return session == null ? null : session.openChannel(type);
 		} catch (JSchException e) {
 			throw new RuntimeException(e);

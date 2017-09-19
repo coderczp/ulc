@@ -41,7 +41,8 @@
 				name<input id='name' type="text"> host<input id='host'
 					type="text"> port<input id='port' value='22' type="text">
 				user<input id='user' value='aoliday' type="text"> pwd<input
-					id='pwd' type="text">
+					id='pwd' type="text"> monitor<input id='monitor'
+					type="checkbox">
 				<button onclick="addHost()">submit</button>
 			</div>
 			<div class="panel-body">
@@ -50,12 +51,12 @@
 						<caption>机器列表</caption>
 						<thead>
 							<tr>
-								<th>ID</th>
 								<th>name</th>
 								<th>host</th>
 								<th>port</th>
 								<th>user</th>
 								<th>pwd</th>
+								<th>monitor</th>
 								<th>op</th>
 							</tr>
 						</thead>
@@ -68,16 +69,15 @@
 	</div>
 </body>
 <script type="text/javascript">
-	
 	function tr(val) {
 		return '<td>' + val + '</td>';
 	}
 
 	function remove(id) {
-	 alert('not support');	
+		alert('not support');
 	}
 
-	function loadHosts(){
+	function loadHosts() {
 		$.get('./host/list', function(d) {
 			var html = '';
 			for ( var i in d) {
@@ -88,23 +88,25 @@
 				var name = host.name;
 				var user = host.user;
 				var pwd = host.pwd;
+				var status = host.status == 0 ? '监控' : '不监控';
 				var del = "<button onclick='remove(" + id + ")'>删除</button>";
 
-				html += "<tr>" + tr(id) + tr(name) + tr(ip) + tr(port)
-						+ tr(user) + tr(pwd) + tr(del)
+				html += "<tr>" + tr(name) + tr(ip) + tr(port) + tr(user)
+						+ tr(pwd) + tr(status) + tr(del)
 				"</tr>";
 			}
 			$('#record').html(html);
 		});
 	}
-	
+
 	function addHost() {
 		var param = {
+			"pwd" : $('#pwd').val().trim(),
 			"name" : $('#name').val().trim(),
 			"host" : $('#host').val().trim(),
 			"port" : $('#port').val().trim(),
 			"user" : $('#user').val().trim(),
-			"pwd" : $('#pwd').val().trim(),
+			"status" : $('#monitor').is(':checked') ? 0 : 1,
 		};
 		if (!param.name)
 			return alert('name is empty');
@@ -121,7 +123,7 @@
 				location.reload();
 		});
 	}
-	
+
 	$(function() {
 		bindMenus('#menuId');
 		loadHosts();

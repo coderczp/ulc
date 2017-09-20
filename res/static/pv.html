@@ -2,146 +2,136 @@
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<meta name="viewport"
-	content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="./favicon.ico" type="image/x-icon" rel=icon>
-<link
-	href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css"
-	rel="stylesheet">
-<link
-	href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
-	rel="stylesheet">
-<link
-	href="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/css/bootstrap-datetimepicker-standalone.min.css"
-	rel="stylesheet">
+<link href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" rel="stylesheet">
+<link href="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/css/bootstrap-datetimepicker-standalone.min.css" rel="stylesheet">
 <link href="css/ulc.css" rel="stylesheet">
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="http://cdn.bootcss.com/moment.js/2.18.1/moment.min.js"></script>
-<script
-	src="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/js/bootstrap-datetimepicker.min.js"></script>
+<script src="http://cdn.bootcss.com/bootstrap-datetimepicker/4.17.47/js/bootstrap-datetimepicker.min.js"></script>
 <script src="js/ulc.js"></script>
 </head>
 <body>
-	<!--导航-->
-	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
-		<div class="container">
-			<div class="navbar-header nav-title ">
-				<button type="button" class="navbar-toggle" data-toggle="collapse"
-					data-target=".navbar-collapse">
-					<span class="sr-only">Toggle navigation</span> <span
-						class="icon-bar"></span> <span class="icon-bar"></span> <span
-						class="icon-bar"></span>
-				</button>
-				<a class="navbar-brand " href="index.html">ULC</a>
-			</div>
-			<div class="collapse navbar-collapse navbar-right is-collapse">
-				<ul class="nav navbar-nav" id="menuId"></ul>
-			</div>
-			<!-- /.nav-collapse -->
-		</div>
-		<!-- /.container -->
-	</div>
-	<!--导航-->
-	<div class="container-fluid" style="margin-top: 50px">
-		<div class="panel panel-success">
-			<div class="panel-heading">
-				<div class="form-inline" role="form">
-					<div class="form-group">
-						<select id="host" class="form-control"></select>
-					</div>
-					<div class="form-group">
-						<div class='input-group date' id='start'>
-							<input type='text' class="form-control" /> <span
-								class="input-group-addon"> <span
-								class="glyphicon glyphicon-calendar"></span>
-							</span>
-						</div>
-					</div>
-					<div class="form-group">
-						<div class='input-group date' id='end'>
-							<input type='text' class="form-control" /> <span
-								class="input-group-addon"> <span
-								class="glyphicon glyphicon-calendar"></span>
-							</span>
-						</div>
-					</div>
-					<div class="form-group">
-						<select id="procId" class="form-control"></select>
-					</div>
-					<div class="form-group">
-						<select id="fileId" class="form-control"></select>
-					</div>
-					<div class="form-group">
-						<button class="btn btn-success btn-small" type="button"
-							onclick="doQuery()">Go!</button>
-					</div>
-				</div>
-			</div>
-			<div class="panel-body">
-				<div id="result"></div>
-			</div>
-		</div>
-	</div>
-	<script type="text/javascript">
-		var date = new Date();
-		var startTime = new Date();
-		var fmt = "YYYY/MM/DD HH:mm";
-		startTime.setHours(date.getHours() - 5);
+  <!--导航-->
+  <div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
+    <div class="container">
+      <div class="navbar-header nav-title ">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand " href="index.html">ULC</a>
+      </div>
+      <div class="collapse navbar-collapse navbar-right is-collapse">
+        <ul class="nav navbar-nav" id="menuId"></ul>
+      </div>
+      <!-- /.nav-collapse -->
+    </div>
+    <!-- /.container -->
+  </div>
+  <!--导航-->
+  <div class="container-fluid" style="margin-top: 50px">
+    <div class="panel panel-success">
+      <div class="panel-heading">
+        <div class="form-inline" role="form">
+          <div class="form-group">
+            <select id="host" class="form-control"></select>
+          </div>
+          <div class="form-group">
+            <div class='input-group date' id='start'>
+              <input type='text' class="form-control" />
+              <span class="input-group-addon">
+                <span class="glyphicon glyphicon-calendar"></span>
+              </span>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class='input-group date' id='end'>
+              <input type='text' class="form-control" />
+              <span class="input-group-addon">
+                <span class="glyphicon glyphicon-calendar"></span>
+              </span>
+            </div>
+          </div>
+          <div class="form-group">
+            <select id="procId" class="form-control"></select>
+          </div>
+          <div class="form-group">
+            <select id="fileId" class="form-control"></select>
+          </div>
+          <div class="form-group">
+            <button class="btn btn-success btn-small" type="button" onclick="doQuery()">Go!</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="result"></div>
+      </div>
+    </div>
+  </div>
+  <script type="text/javascript">
+			var date = new Date();
+			var startTime = new Date();
+			var fmt = "YYYY/MM/DD HH:mm";
+			startTime.setHours(date.getHours() - 5);
 
-		function initDate() {
-			$('#start').datetimepicker({
-				format : fmt,
-				locale : moment.locale('zh-cn')
-			}).data('DateTimePicker').date(moment(startTime).format(fmt));
+			function initDate() {
+				$('#start').datetimepicker({
+					format : fmt,
+					locale : moment.locale('zh-cn')
+				}).data('DateTimePicker').date(moment(startTime).format(fmt));
 
-			$('#end').datetimepicker({
-				format : fmt,
-				locale : moment.locale('zh-cn')
-			}).data('DateTimePicker').date(moment(date).format(fmt));
-		}
-
-		function getCdt() {
-			return {
-				'q' : $('#q').val(),
-				'size' : $('#size').val(),
-				'file' : $('#fileId').val(),
-				'end' : Date.parse($('#end').data('date')),
-				'start' : Date.parse($('#start').data('date')),
-				'host' : $("#host").find("option:selected").text(),
-				'proc' : $("#procId").find("option:selected").text(),
-			};
-		}
-		function doQuery() {
-			var json = getCdt();
-			json.host = json.host == 'all' ? null : json.host;
-			json.proc = json.proc == 'all' ? null : json.proc;
-			json.file = json.file == 'all' ? null : json.file;
-
-			if (!json.file) {
-				alert('select file');
-				return;
+				$('#end').datetimepicker({
+					format : fmt,
+					locale : moment.locale('zh-cn')
+				}).data('DateTimePicker').date(moment(date).format(fmt));
 			}
-			$('#result').html('searching');
-			$.post('./count', {
-				'json' : JSON.stringify(json)
-			}, function(resp) {
-				var html = "";
-				for ( var host in resp) {
-					html += '<br><span>' + host + "</span>:" + resp[host];
-				}
-				$('#result').html(html);
-			});
-		}
 
-		$(function() {
-			asynLoadHost('#host');
-			bindMenus('#menuId');
-			bindProcs('#procId');
-			bindFiles('#fileId');
-			initDate();
-		});
-	</script>
+			function getCdt() {
+				return {
+					'q' : $('#q').val(),
+					'size' : $('#size').val(),
+					'file' : $('#fileId').val(),
+					'end' : Date.parse($('#end').data('date')),
+					'start' : Date.parse($('#start').data('date')),
+					'host' : $("#host").find("option:selected").text(),
+					'proc' : $("#procId").find("option:selected").text(),
+				};
+			}
+			function doQuery() {
+				var json = getCdt();
+				json.host = json.host == 'all' ? null : json.host;
+				json.proc = json.proc == 'all' ? null : json.proc;
+				json.file = json.file == 'all' ? null : json.file;
+
+				if (!json.file) {
+					alert('select file');
+					return;
+				}
+				$('#result').html('searching');
+				$.post('./count', {
+					'json' : JSON.stringify(json)
+				}, function(resp) {
+					var html = "";
+					for ( var host in resp) {
+						html += '<br><span>' + host + "</span>:" + resp[host];
+					}
+					$('#result').html(html);
+				});
+			}
+
+			$(function() {
+				asynLoadHost('#host');
+				bindMenus('#menuId');
+				bindProcs('#procId');
+				bindFiles('#fileId');
+				initDate();
+			});
+		</script>
 </body>
 </html>
-

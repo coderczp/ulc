@@ -1,100 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
 <title>ULC</title>
-<link
-	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css"
-	rel="stylesheet">
-<link
-	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
-	rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" rel="stylesheet">
 <link href="/ulc/css/ulc.css" rel="stylesheet">
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="js/ulc.js"></script>
 <body>
-	<!--导航-->
-	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
-		<div class="container">
-			<div class="navbar-header nav-title ">
-				<button type="button" class="navbar-toggle" data-toggle="collapse"
-					data-target=".navbar-collapse">
-					<span class="sr-only">Toggle navigation</span> <span
-						class="icon-bar"></span> <span class="icon-bar"></span> <span
-						class="icon-bar"></span>
-				</button>
-				<a class="navbar-brand " href="index.html">ULC</a>
-			</div>
-			<div class="collapse navbar-collapse navbar-right is-collapse">
-				<ul class="nav navbar-nav" id="menuId"></ul>
-			</div>
-			<!-- /.nav-collapse -->
-		</div>
-		<!-- /.container -->
-	</div>
-	<!--导航-->
-	<div class="container-fluid" style="margin-top: 50px">
-		<div class="panel panel-success">
-			<div class="panel-heading">
-				<input type="file" id="myfile" name="file" onchange="doUpload()">
-				<label id="tips"></label>
-			</div>
-			<div class="panel-body">
-				<div id="result" class="table-responsive">
-					工程名<input type="text" size="8" id="filter" placeholder="输入tar名" onkeyup="updateTar()">
-					<select id="tar"></select> 选择主机<select id="hostId"
-						onchange="loadProc()"></select> 选择工程<select id="proc"></select>
-					<button id="deploy" onclick="deploy()">发布</button>
-					<a href="/ulc/tar.exe">前端打包工具</a>
-				</div>
-				<div id="list" class="table-responsive">
-					<table class="table table-striped">
-						<caption>部署记录</caption>
-						<thead>
-							<tr>
-								<th>ID</th>
-								<th>服务</th>
-								<th>主机</th>
-								<th>人员</th>
-								<th>状态</th>
-								<th>日期</th>
-								<th>进度</th>
-								<th>日志</th>
-							</tr>
-						</thead>
-						<tbody id="record">
-						</tbody>
-					</table>
-				</div>
-
-			</div>
-		</div>
-	</div>
-	<!-- Modal -->
-	<div class="modal fade" id="myModal" tabindex="-1" role="dialog"
-		aria-labelledby="myModalLabel" aria-hidden="true">
-		<div class="modal-dialog">
-			<div class="modal-content">
-				<div class="modal-header">
-					<button type="button" class="close" data-dismiss="modal"
-						aria-hidden="true">&times;</button>
-					<h4 class="modal-title">Deploy log</h4>
-
-				</div>
-				<div class="modal-body">
-					<div class="div">
-						<textarea id="logDetail" rows="20" cols="75"
-							style="background: black; color: white;"></textarea>
-					</div>
-				</div>
-				<div class="modal-footer">
-					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-				</div>
-			</div>
-		</div>
-	</div>
-	<!-- /.modal -->
+  <!--导航-->
+  <div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
+    <div class="container">
+      <div class="navbar-header nav-title ">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand " href="index.html">ULC</a>
+      </div>
+      <div class="collapse navbar-collapse navbar-right is-collapse">
+        <ul class="nav navbar-nav" id="menuId"></ul>
+      </div>
+      <!-- /.nav-collapse -->
+    </div>
+    <!-- /.container -->
+  </div>
+  <!--导航-->
+  <div class="container-fluid" style="margin-top: 50px">
+    <div class="panel panel-success">
+      <div class="panel-heading">
+        <input type="file" id="myfile" name="file" onchange="doUpload()">
+        <label id="tips"></label>
+      </div>
+      <div class="panel-body">
+        <div id="result" class="table-responsive">
+          工程名
+          <input type="text" size="8" id="filter" placeholder="输入tar名" onkeyup="updateTar()">
+          <select id="tar"></select>
+          选择主机
+          <select id="hostId" onchange="loadProc()"></select>
+          选择工程
+          <select id="proc"></select>
+          <button id="deploy" onclick="deploy()">发布</button>
+          <a href="/ulc/tar.exe">前端打包工具</a>
+        </div>
+        <div id="list" class="table-responsive">
+          <table class="table table-striped">
+            <caption>部署记录</caption>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>服务</th>
+                <th>主机</th>
+                <th>人员</th>
+                <th>状态</th>
+                <th>日期</th>
+                <th>进度</th>
+                <th>日志</th>
+              </tr>
+            </thead>
+            <tbody id="record">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Modal -->
+  <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+          <h4 class="modal-title">Deploy log</h4>
+        </div>
+        <div class="modal-body">
+          <div class="div">
+            <textarea id="logDetail" rows="20" cols="75" style="background: black; color: white;"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- /.modal -->
 </body>
 <script type="text/javascript">
 	var waitImg = '<img src="/ulc/img/wait.gif" style="width: 30px; height: 30px;"/>';
@@ -238,10 +234,10 @@
 		var tar = $('#tar').val();
 		var proc = $('#proc').val();
 		var host = $('#hostId').val();
-		var hostName =  $("#hostId").find("option:selected").text();
+		var hostName = $("#hostId").find("option:selected").text();
 		if (!host || !tar || !proc)
 			return alert('请选择主机 文件 工程');
-		
+
 		if (hostName.indexOf('online') > -1) {
 			var a = confirm("确认测试环境ok,并部署到线上吗?");
 			if (a == false)

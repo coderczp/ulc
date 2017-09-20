@@ -1,67 +1,69 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
 <title>ULC</title>
-<link
-	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css"
-	rel="stylesheet">
-<link
-	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
-	rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" rel="stylesheet">
 <link href="css/ulc.css" rel="stylesheet">
-
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="js/ulc.js"></script>
 <body>
-	<!--导航-->
-	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
-		<div class="container">
-			<div class="navbar-header nav-title ">
-				<button type="button" class="navbar-toggle" data-toggle="collapse"
-					data-target=".navbar-collapse">
-					<span class="sr-only">Toggle navigation</span> <span
-						class="icon-bar"></span> <span class="icon-bar"></span> <span
-						class="icon-bar"></span>
-				</button>
-				<a class="navbar-brand " href="index.html">ULC</a>
-			</div>
-			<div class="collapse navbar-collapse navbar-right is-collapse">
-				<ul class="nav navbar-nav" id="menuId"></ul>
-			</div>
-			<!-- /.nav-collapse -->
-		</div>
-		<!-- /.container -->
-	</div>
-	<!--导航-->
-	<div class="container-fluid" style="margin-top: 50px">
-		<div class="panel panel-success">
-			<div class="panel-heading">
-				menuId<input id='menu' type="text"> mail<input id='mail'
-					type="text">
-				<button onclick="addMenu()">Add</button>
-				<button onclick="search()">Select</button>
-			</div>
-			<div class="panel-body">
-				<div id="list" class="table-responsive">
-					<table class="table table-striped">
-						<caption>菜单列表</caption>
-						<thead>
-							<tr>
-								<th>name</th>
-								<th>href</th>
-								<th>user</th>
-								<th>remove</th>
-							</tr>
-						</thead>
-						<tbody id="record">
-						</tbody>
-					</table>
-				</div>
-			</div>
-		</div>
-	</div>
+  <!--导航-->
+  <div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
+    <div class="container">
+      <div class="navbar-header nav-title ">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand " href="index.html">ULC</a>
+      </div>
+      <div class="collapse navbar-collapse navbar-right is-collapse">
+        <ul class="nav navbar-nav" id="menuId"></ul>
+      </div>
+      <!-- /.nav-collapse -->
+    </div>
+    <!-- /.container -->
+  </div>
+  <!--导航-->
+  <div class="container-fluid" style="margin-top: 50px">
+    <div class="panel panel-success">
+      <div class="panel-heading">
+        <div class="form-inline" role="form">
+          <div class="form-group">
+            <input id='menu' type="text" class="form-control" placeholder="menu id">
+          </div>
+          <div class="form-group">
+            <input id='mail' type="text" class="form-control" value="jeff.cao@aoliday.com">
+          </div>
+          <div class="form-group">
+            <button onclick="search()">Query</button>
+            <button onclick="addMenu()">Add</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="list" class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>name</th>
+                <th>href</th>
+                <th>remove</th>
+              </tr>
+            </thead>
+            <tbody id="record">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 <script type="text/javascript">
 	function tr(val) {
@@ -69,7 +71,10 @@
 	}
 
 	function remove(id) {
-		$.get('./menu/del?id=' + id, buildTable);
+		if (confirm('确定删除?'))
+			$.get('./menu/del?id=' + id, function(d) {
+				d.error ? alert(d.info) : location.reload();
+			});
 	}
 
 	function buildTable(data) {
@@ -79,9 +84,8 @@
 			var id = item.id;
 			var name = item.name;
 			var href = item.href;
-			var user = item.mail||$('#mail').val().trim();
 			var del = buildBtn('remove', 'Remove', [ id ]);
-			html += "<tr>" + tr(name) + tr(href) + tr(user) + tr(del) + "</tr>";
+			html += "<tr>" + tr(name) + tr(href) + tr(del) + "</tr>";
 		}
 		$('#record').html(html);
 	}
@@ -106,9 +110,7 @@
 			return alert('menuId is empty');
 
 		$.get('./menu/add', param, function(d) {
-			alert(d.error ? d.info : 'success');
-			if (!d.error)
-				location.reload();
+			d.error ? alert(d.info) : location.reload();
 		});
 	}
 

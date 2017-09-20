@@ -31,7 +31,7 @@ public class MenuController {
 
 	@Autowired
 	private MenuDao dao;
-	
+
 	@Autowired
 	private UserMenuDao uMdao;
 
@@ -50,7 +50,7 @@ public class MenuController {
 	public UserMenu del(UserMenu arg) {
 		Assert.notNull(arg.getId(), "id is required");
 		UserMenu inDb = uMdao.selectOne(arg);
-		if (inDb == null && uMdao.delete(arg) > 0) {
+		if (inDb == null || uMdao.delete(arg) < 1) {
 			throw new RuntimeException("del bean fail");
 		}
 		return arg;
@@ -61,7 +61,7 @@ public class MenuController {
 		String email = (String) req.getSession().getAttribute(AccessFilter.SESSION_KEY);
 		return dao.queryUserMenu(email);
 	}
-	
+
 	@RequestMapping("/list")
 	public List<Menu> list(UserMenu arg) {
 		return uMdao.query(arg);

@@ -1,16 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
 <title>ULC</title>
-<link
-	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css"
-	rel="stylesheet">
-<link
-	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
-	rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" rel="stylesheet">
 <link href="css/ulc.css" rel="stylesheet">
-
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="js/ulc.js"></script>
@@ -20,71 +16,69 @@
 }
 </style>
 <body>
-	<!--导航-->
-	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
-		<div class="container">
-			<div class="navbar-header nav-title ">
-				<button type="button" class="navbar-toggle" data-toggle="collapse"
-					data-target=".navbar-collapse">
-					<span class="sr-only">Toggle navigation</span> <span
-						class="icon-bar"></span> <span class="icon-bar"></span> <span
-						class="icon-bar"></span>
-				</button>
-				<a class="navbar-brand " href="index.html">ULC</a>
-			</div>
-			<div class="collapse navbar-collapse navbar-right is-collapse">
-				<ul class="nav navbar-nav" id="menuId"></ul>
-			</div>
-			<!-- /.nav-collapse -->
-		</div>
-		<!-- /.container -->
-	</div>
-	<!--导航-->
-	<div class="container-fluid" style="margin-top: 50px">
-		<div class="panel panel-success">
-			<div class="panel-heading">
-				<div class="form-inline" role="form">
-					<div class="form-group">
-						<select id="hostId" class="form-control"></select>
-					</div>
-					<div class="form-group">
-						<input id='name' class="form-control" type="text">
-					</div>
-					<div class="form-group">
-						<input id='path' class="form-control hid" value='/var/www/data/work/'
-							type="text">
-					</div>
-					<div class="form-group">
-						<input id='shell' type="text" class="form-control hid"
-							value="service.sh">
-					</div>
-					<div class="form-group">
-						<button onclick="search()" class="form-control">Select</button>
-						<button onclick="addProc()" class="form-control hid">Add</button>
-						更多<input type="checkbox" id="more">
-					</div>
-				</div>
-			</div>
-			<div class="panel-body">
-				<div id="list" class="table-responsive">
-					<table class="table table-striped">
-						<thead>
-							<tr>
-								<th>name</th>
-								<th>host</th>
-								<th class="hid">path</th>
-								<th class="hid">shell</th>
-								<th class="hid">remove</th>
-								<th>管理</th>
-							</tr>
-						</thead>
-						<tbody id="record">
-						</tbody>
-					</table>
-				</div>
-			</div>
-		</div>
-	</div>
+  <!--导航-->
+  <div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
+    <div class="container">
+      <div class="navbar-header nav-title ">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand " href="index.html">ULC</a>
+      </div>
+      <div class="collapse navbar-collapse navbar-right is-collapse">
+        <ul class="nav navbar-nav" id="menuId"></ul>
+      </div>
+      <!-- /.nav-collapse -->
+    </div>
+    <!-- /.container -->
+  </div>
+  <!--导航-->
+  <div class="container-fluid" style="margin-top: 50px">
+    <div class="panel panel-success">
+      <div class="panel-heading">
+        <div class="form-inline" role="form">
+          <div class="form-group">
+            <select id="hostId" class="form-control"></select>
+          </div>
+          <div class="form-group">
+            <input id='name' class="form-control" type="text">
+          </div>
+          <div class="form-group">
+            <input id='path' class="form-control hid" value='/var/www/data/work/' type="text">
+          </div>
+          <div class="form-group">
+            <input id='shell' type="text" class="form-control hid" value="service.sh">
+          </div>
+          <div class="form-group">
+            <button onclick="search()" class="form-control">Query</button>
+            <button onclick="addProc()" class="form-control hid">Add</button>
+            <input type="checkbox" id="more"> 更多
+          </div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="list" class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>name</th>
+                <th>host</th>
+                <th class="hid">path</th>
+                <th class="hid">shell</th>
+                <th class="hid">remove</th>
+                <th>管理</th>
+              </tr>
+            </thead>
+            <tbody id="record">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 <script type="text/javascript">
 	var bathPath = "/var/www/data/work/";

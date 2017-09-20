@@ -1,57 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
 <title>ULC</title>
-<link
-	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css"
-	rel="stylesheet">
-<link
-	href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
-	rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" rel="stylesheet">
 <link href="css/ulc.css" rel="stylesheet">
-
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="js/ulc.js"></script>
-
 <body>
-	<!--导航-->
-	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
-		<div class="container">
-			<div class="navbar-header nav-title ">
-				<button type="button" class="navbar-toggle" data-toggle="collapse"
-					data-target=".navbar-collapse">
-					<span class="sr-only">Toggle navigation</span> <span
-						class="icon-bar"></span> <span class="icon-bar"></span> <span
-						class="icon-bar"></span>
-				</button>
-				<a class="navbar-brand " href="index.html">ULC</a>
-			</div>
-			<div class="collapse navbar-collapse navbar-right is-collapse">
-				<ul class="nav navbar-nav" id="menuId"></ul>
-			</div>
-			<!-- /.nav-collapse -->
-		</div>
-		<!-- /.container -->
-	</div>
-	<!--导航-->
-	<div class="container-fluid" style="margin-top: 50px">
-		<div class="panel panel-success">
-			<div class="panel-heading">
-				host<select id="host"></select>
-				<button id="search">Search</button>
-				<a href="./proc.html">进程视图</a>
-			</div>
-			<div class="panel-body">
-				<div id="result" class="table-responsive"></div>
-			</div>
-		</div>
-	</div>
+  <!--导航-->
+  <div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
+    <div class="container">
+      <div class="navbar-header nav-title ">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand " href="index.html">ULC</a>
+      </div>
+      <div class="collapse navbar-collapse navbar-right is-collapse">
+        <ul class="nav navbar-nav" id="menuId"></ul>
+      </div>
+      <!-- /.nav-collapse -->
+    </div>
+    <!-- /.container -->
+  </div>
+  <!--导航-->
+  <div class="container-fluid" style="margin-top: 50px">
+    <div class="panel panel-success">
+      <div class="panel-heading">
+        host
+        <select id="host"></select>
+        <button id="search">Search</button>
+        <a href="./proc.html">进程视图</a>
+      </div>
+      <div class="panel-body">
+        <div id="result" class="table-responsive"></div>
+      </div>
+    </div>
+  </div>
 </body>
 <script type="text/javascript">
 	function doSearch() {
-		var host =$("#host").find("option:selected").text();
+		var host = $("#host").find("option:selected").text();
 		$.get('./cmd/list?host=' + host, function(data) {
 			if (!data || data.length == 0) {
 				$('#result').html('no result');
@@ -92,7 +88,7 @@
 			btn.removeAttr("disabled");
 		});
 	}
-	
+
 	$(function() {
 		bindMenus('#menuId');
 		asynLoadHost('#host');

@@ -26,17 +26,18 @@ public class AnalyzerUtil {
 	 *            分词器
 	 *
 	 */
-	public static void displayToken(String str, Analyzer analyzer) {
+	public static String displayToken(String str, Analyzer analyzer) {
 		try {
 			TokenStream stream = analyzer.tokenStream("log", new StringReader(str));
 			CharTermAttribute cta = stream.addAttribute(CharTermAttribute.class);
+			StringBuilder info = new StringBuilder();
 			stream.reset();
 			while (stream.incrementToken()) {
-				System.out.print("["+cta+"]");
+				info.append("[").append(cta).append("]");
 			}
-			System.out.println();
+			return info.toString();
 		} catch (IOException e) {
-			e.printStackTrace();
+			return e.toString();
 		}
 	}
 }

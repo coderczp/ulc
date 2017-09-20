@@ -14,6 +14,11 @@
 <script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
 <script src="http://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="js/ulc.js"></script>
+<style type="text/css">
+#list button {
+	margin-right: 5px;
+}
+</style>
 <body>
 	<!--导航-->
 	<div class="navbar navbar-fixed-top navbar-inverse" role="navigation">
@@ -38,30 +43,39 @@
 	<div class="container-fluid" style="margin-top: 50px">
 		<div class="panel panel-success">
 			<div class="panel-heading">
-				host <select id="hostId"></select>name<input id='name' size=10
-					onkeydown="updatePath()" onchange="updatePath()" type="text">
-				path<input id='path' value='/var/www/data/work/' size=35 type="text">
-				shell<input id='shell' type="text" value="service.sh" size=8>
-				<button onclick="addProc()">Add</button>
-				<button onclick="search()">Select</button>
+				<div class="form-inline" role="form">
+					<div class="form-group">
+						<select id="hostId" class="form-control"></select>
+					</div>
+					<div class="form-group">
+						<input id='name' class="form-control" type="text">
+					</div>
+					<div class="form-group">
+						<input id='path' class="form-control hid" value='/var/www/data/work/'
+							type="text">
+					</div>
+					<div class="form-group">
+						<input id='shell' type="text" class="form-control hid"
+							value="service.sh">
+					</div>
+					<div class="form-group">
+						<button onclick="search()" class="form-control">Select</button>
+						<button onclick="addProc()" class="form-control hid">Add</button>
+						更多<input type="checkbox" id="more">
+					</div>
+				</div>
 			</div>
 			<div class="panel-body">
 				<div id="list" class="table-responsive">
 					<table class="table table-striped">
-						<caption>
-							简约模式<input type="checkbox" id="switch" checked="checked"
-								onclick="switchModel()">
-						</caption>
 						<thead>
 							<tr>
 								<th>name</th>
 								<th>host</th>
 								<th class="hid">path</th>
 								<th class="hid">shell</th>
-								<th>stop</th>
-								<th>start</th>
-								<th>restart</th>
 								<th class="hid">remove</th>
+								<th>管理</th>
 							</tr>
 						</thead>
 						<tbody id="record">
@@ -88,30 +102,30 @@
 	}
 
 	function switchModel() {
-		if ($("#switch").is(":checked"))
-			$('.hid').hide();
-		else
+		if ($(event.target).is(":checked"))
 			$('.hid').show();
+		else
+			$('.hid').hide();
 	}
 
-	function manage(type, id,event) {
-		event = event ? event : window.event; 
-		var obj = event.srcElement ? event.srcElement : event.target; 
-		var btn = $(obj);
-		if (btn.text().indexOf("ing")>-1) {
-			alert(type + ' is not reurn');
+	function manage(type, id) {
+		if (!confirm("确认操作?"))
 			return;
-		}
-		if (!confirm("Are you sure?"))
-			return;
+
 		var arg = {
 			"type" : type,
 			"id" : id,
 		};
-		btn.text(type + 'ing');
+
+		var btn = $(event.target);
+		btn.text('waiting....');
+		btn.attr({
+			"disabled" : "disabled"
+		});
 		$.get('./proc/mgr', arg, function(data) {
 			alert(data.join('\n'));
 			btn.text(type);
+			btn.removeAttr("disabled");
 		});
 	}
 
@@ -130,8 +144,8 @@
 			var restart = buildBtn('manage', 'Restart', [ 'restart', id ]);
 
 			html += "<tr>" + tr(name) + tr(host) + tr(path, 'hid')
-					+ tr(shell, 'hid') + tr(stop) + tr(start) + tr(restart)
-					+ tr(del,'hid') + "</tr>";
+					+ tr(shell, 'hid') + tr(restart + stop + start)
+					+ tr(del, 'hid') + "</tr>";
 		}
 		$('#record').html(html);
 	}
@@ -176,7 +190,11 @@
 
 	$(function() {
 		bindMenus('#menuId');
-		asynLoadHost('#hostId', loadProcs);
+		asynLoadHost('#hostId');
+		$('#name').keyup(updatePath);
+		$('#name').change(updatePath);
+		$('#more').click(switchModel);
+		$('.hid').hide();
 	});
 </script>
 </body>

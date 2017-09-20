@@ -43,11 +43,10 @@ public class Lucenetest {
 
 	public static void main(String[] args) throws IOException, ParseException {
 
-		Analyzer analyzer = new LogAnalyzer();
-		File file = new File("./index-1-unsave");
-		file.mkdirs();
-		FSDirectory open = FSDirectory.open(file.toPath());
-
+		// Analyzer analyzer = new LogAnalyzer();
+		// File file = new File("./index-1-unsave");
+		// file.mkdirs();
+		// FSDirectory open = FSDirectory.open(file.toPath());
 		// TieredMergePolicy mergePolicy = new TieredMergePolicy();
 		// IndexWriterConfig conf = new IndexWriterConfig(analyzer);
 		// conf.setOpenMode(OpenMode.CREATE_OR_APPEND);
@@ -83,19 +82,22 @@ public class Lucenetest {
 		// System.out.println(doc);
 		// }
 		// ramSearcher.getIndexReader().close();
-//http://www.itrip.com/login/index?redirect_url=http://pre.itrip.com//ulc/callback?requireToken=1?requireToken=1&allow=aoliday
-//http://www.itrip.com/login/index?redirect_url=http://pre.itrip.com//ulc/callback?requireToken=1?requireToken=1&allow=aoliday		
-		String x = "INFO 2017-09-08 21:35:54 (rid:508c1a68abc259357975171da34ec9a2) [TimingLogFilter.java:59] 104.199.238.87 160 <-- http://www.bestrip.com/itrip_shop/getUserDiscountLimit.do?callback=jQuery181012331813352981413_1504876492215&_=1504877754345 11 (rid:508c1a68abc259357975171da34ec9a2) (host:not_init) ";
+		// http://www.itrip.com/login/index?redirect_url=http://pre.itrip.com//ulc/callback?requireToken=1?requireToken=1&allow=aoliday
+		// http://www.itrip.com/login/index?redirect_url=http://pre.itrip.com//ulc/callback?requireToken=1?requireToken=1&allow=aoliday
+		String x = "{orderId=320232635, itemId=973129, supplier=2138} INFO 2017-09-20 10:28:59 [InterfaceBookingTask.java:47] 接口预定[320232635/973129]开始...";
 
-		AnalyzerUtil.displayToken("/data/work/itrip_openapi_admin/tomcat7/logs/db.log", new LogAnalyzer());
-		AnalyzerUtil.displayToken(x, new LogAnalyzer());
-//		String temp = "";
-//		String path = "./2.log";
-//		BufferedReader br = new BufferedReader(new FileReader(new File(path)));
-//		while ( (temp = br.readLine()) != null) {
-//			AnalyzerUtil.displayToken(temp, new MyAnalyzer());
-//		}
-//		br.close();
+		String str = AnalyzerUtil.displayToken("/data/work/itrip_openapi_admin/tomcat7/logs/db.log", new LogAnalyzer());
+		String str2 = AnalyzerUtil.displayToken(x, new LogAnalyzer());
+		System.out.println(str);
+		System.out.println(str2);
+		// String temp = "";
+		// String path = "./2.log";
+		// BufferedReader br = new BufferedReader(new FileReader(new
+		// File(path)));
+		// while ( (temp = br.readLine()) != null) {
+		// AnalyzerUtil.displayToken(temp, new MyAnalyzer());
+		// }
+		// br.close();
 
 	}
 }

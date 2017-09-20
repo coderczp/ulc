@@ -33,7 +33,9 @@ import com.czp.ulc.core.bean.IndexMeta;
 import com.czp.ulc.core.bean.LuceneFile;
 import com.czp.ulc.core.dao.LuceneFileDao;
 import com.czp.ulc.main.Application;
+import com.czp.ulc.module.lucene.AnalyzerUtil;
 import com.czp.ulc.module.lucene.DocField;
+import com.czp.ulc.module.lucene.LogAnalyzer;
 import com.czp.ulc.module.lucene.LuceneSearcher;
 import com.czp.ulc.module.lucene.SearchCallback;
 import com.czp.ulc.util.OSUtil;
@@ -46,6 +48,7 @@ import com.czp.ulc.util.OSUtil;
  * @version:1.0
  */
 @RestController
+@RequestMapping("/q")
 public class SearchController {
 
 	@Autowired
@@ -62,12 +65,17 @@ public class SearchController {
 		return (JSONObject) JSONObject.toJSON(res);
 	}
 
+	@RequestMapping("/token")
+	public String token(@RequestParam String str) throws Exception {
+		return AnalyzerUtil.displayToken(str, new LogAnalyzer());
+	}
+
 	@RequestMapping("/meta")
 	public JSONObject meta() throws Exception {
 		LuceneFile lFile = lFileDao.queryEarliestFile(null);
 		IndexMeta meta = getSearcher().getMeta();
 		JSONObject json = OSUtil.collectVMInfo();
-		JSONObject metaJson =  (JSONObject) JSONObject.toJSON(meta);
+		JSONObject metaJson = (JSONObject) JSONObject.toJSON(meta);
 		json.putAll(metaJson);
 		if (lFile != null) {
 			json.put("minFile", new File(lFile.getPath()).getName());
@@ -144,7 +152,8 @@ public class SearchController {
 				if (line != null)
 					lines.add(line);
 
-				return hasAdd.get() <= cdt.getSize();
+				// return hasAdd.get() <= cdt.getSize();
+				return hasAdd.get() < 1000;
 			}
 
 			@Override

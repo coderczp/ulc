@@ -158,9 +158,12 @@ public class DeployController {
 			String file = tarFile.getAbsolutePath();
 			String projectName = proc.getName();
 			String path = proc.getPath();
+			if (!path.endsWith("/"))
+				path = path.concat("/");
 
+			String name = tarFile.getName();
 			SimpleDateFormat spf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-			String destPath = path;
+			String destPath = path.concat(name.substring(name.indexOf("_") + 1));
 
 			DeployRecord record = new DeployRecord();
 			record.setAuthor(user);
@@ -199,15 +202,15 @@ public class DeployController {
 
 				updateStatus(id, "文件上传成功,准备重启");
 				String cmd = String.format("cd %s;./service.sh all", path);
-				LOG.info("upload file success,will exe:{}",cmd);
+				LOG.info("upload file success,will exe:{}", cmd);
 				channel = (ChannelExec) session.openChannel("exec");
 				List<String> exe = connMgr.doExe(host.getName(), cmd, session);
 				if (exe.isEmpty()) {
 					updateStatus(id, "部署失败", "请检查工程目录是否有lock");
 				} else {
 					String log = exe.toString();
-					if (log.length() > 65535) {
-						log = log.substring(0, 65535);
+					if (log.length() > 6000) {
+						log = log.substring(0, 6000);
 					}
 					updateStatus(id, "部署完成", log);
 				}
@@ -215,7 +218,7 @@ public class DeployController {
 				LOG.error("error", e);
 				StringWriter s = new StringWriter();
 				e.printStackTrace(new PrintWriter(s));
-				updateStatus(id,"部署失败,内部错误", s.toString());
+				updateStatus(id, "部署失败,内部错误", s.toString());
 			} finally {
 				if (ch != null)
 					ch.disconnect();

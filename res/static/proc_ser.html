@@ -50,22 +50,9 @@
 	</div>
 </body>
 <script type="text/javascript">
-
-	function loadHost(){
-		$.get('./host/list', function(d) {
-			var html = '<option value="">-all--</option>';
-			for ( var i in d) {
-				var host = d[i];
-				html += '<option value='+host.name+'>' + host.name
-						+ '</option>';
-			}
-			$('#host').html(html);
-		});
-	}
-	
 	function doSearch() {
-		var host = $('#host').val();
-		$.get('./proc/list?host=' + host, function(data) {
+		var host =$("#host").find("option:selected").text();
+		$.get('./cmd/list?host=' + host, function(data) {
 			if (!data || data.length == 0) {
 				$('#result').html('no result');
 			} else {
@@ -99,7 +86,7 @@
 		btn.attr({
 			"disabled" : "disabled"
 		});
-		$.get('./proc/restart?host=' + host + '&path=' + path, function(data) {
+		$.get('./cmd/restart?host=' + host + '&path=' + path, function(data) {
 			alert(data.join('\n'));
 			btn.text('Restart');
 			btn.removeAttr("disabled");
@@ -108,7 +95,7 @@
 	
 	$(function() {
 		bindMenus('#menuId');
-		loadHost();
+		asynLoadHost('#host');
 		$('#host').change(doSearch);
 		$('#search').click(doSearch);
 	});

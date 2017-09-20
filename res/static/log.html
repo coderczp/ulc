@@ -27,6 +27,7 @@
 	text-overflow: ellipsis;
 	/*background: #993366;*/
 	word-spacing: 1px;
+	text-align: left;
 }
 
 .keyword {
@@ -177,15 +178,14 @@ code {
 				'loadLine' : $('#loadLine').is(':checked')
 			};
 			var host = $('#host').val();
-			var proc = $('#proc').val();
-			var file = $('#file').val();
+			var proc = $('#procId').val();
+			var file = $('#fileId').val();
 			if (host != 'all')
 				json.host = host;
 			if (proc != 'all')
 				json.proc = proc;
 			if (file != 'all')
 				json.file = file;
-			console.log(json);
 			return json;
 		}
 
@@ -200,7 +200,7 @@ code {
 			$('#time').html('');
 			$('#result').html('loading..........');
 
-			$.post('./search', {
+			$.post('./q/search', {
 				'json' : JSON.stringify(json)
 			}, function(resp) {
 				var html = '';
@@ -209,17 +209,14 @@ code {
 				var tip = 'ULC从[' + cc + ']中找到[' + mc + ']条数据,耗时:' + t + 'ms';
 				$('#time').html(tip);
 
-				var div_st = '<div class="lines col-sm-8">';
+				var div_st = '<div class="lines">';
 				for ( var host in data) {
 					var files = data[host];
 					for ( var file in files) {
 						html += buildLink(host, file) + div_st;
 						var lines = files[file];
-						for ( var k in lines) {
-							var tmp = lines[k];
-							html += tmp + '<br>';
-						}
-						html += '</div><br/>';
+						html += lines.join('<br/>');
+						html += '</div>';
 					}
 				}
 				if (html) {
@@ -239,7 +236,7 @@ code {
 			var file0 = file.replace(consts.work, '');
 			var file1 = file0.replace(consts.dir, '');
 			var func = "loadFile('" + host + "','" + file + "')";
-			return "<div class='col-sm-8' style='font-size:large;'><a style='text-decoration:underline' onclick="+func+">"
+			return "<div style='font-size:large;'><a style='text-decoration:underline' onclick="+func+">"
 					+ host + file1 + "</a></div>";
 		}
 
@@ -249,7 +246,7 @@ code {
 			json.file = file;
 			json.size = 500;
 			var str = encodeURIComponent(JSON.stringify(json));
-			window.open("/ulc/getFile?json=" + str);
+			window.open("./q/getFile?json=" + str);
 		}
 
 		$(function(){

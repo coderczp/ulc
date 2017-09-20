@@ -55,7 +55,7 @@
 		var mb = 1024 * 1024;
 		
 		function loadMeta(){
-			$.get('./meta', function(resp) {
+			$.get('./q/meta', function(resp) {
 				var html = "";
 				var bytes = resp.bytes;
 				var mbSize = 0, gbSize = 0;

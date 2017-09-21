@@ -54,8 +54,11 @@
           </div>
           <div class="form-group">
             <button onclick="search()" class="form-control">Query</button>
+            <input type="checkbox" id="more">
+            more
+          </div>
+          <div class="form-group">
             <button onclick="addProc()" class="form-control hid">Add</button>
-            <input type="checkbox" id="more"> 更多
           </div>
         </div>
       </div>
@@ -72,8 +75,7 @@
                 <th>管理</th>
               </tr>
             </thead>
-            <tbody id="record">
-            </tbody>
+            <tbody id="record"></tbody>
           </table>
         </div>
       </div>
@@ -102,44 +104,54 @@
 			$('.hid').hide();
 	}
 
-	function manage(type, id) {
+	function manage(id) {
 		if (!confirm("确认操作?"))
 			return;
-
+		var sel = $(event.target);
+		var type = sel.val();
 		var arg = {
-			"type" : type,
 			"id" : id,
+			"type" : type,
 		};
 
-		var btn = $(event.target);
-		btn.text('waiting....');
-		btn.attr({
+		sel.attr({
 			"disabled" : "disabled"
 		});
 		$.get('./proc/mgr', arg, function(data) {
 			alert(data.join('\n'));
-			btn.text(type);
-			btn.removeAttr("disabled");
+			sel.removeAttr("disabled");
 		});
+	}
+
+	function buildSelect(map, id) {
+		var html = '<select onchange="manage(' + id + ')">';
+		for ( var key in map) {
+			var value = map[key];
+			html += '<option value="' + key + '">' + value + '</option>';
+		}
+		html += '</select>'
+		return html;
 	}
 
 	function buildTable(data) {
 		var html = '';
+		var map = {
+			'stop' : 'Stop',
+			'restart' : 'Restart',
+			'start' : 'Start',
+			'remove' : 'Remove'
+		};
 		for ( var i in data) {
 			var proc = data[i];
 			var id = proc.id;
 			var name = proc.name;
 			var path = proc.path;
 			var shell = proc.shell;
+			var sel = buildSelect(map, id);
 			var host = mapHostIdToName(proc.hostId);
-			var del = buildBtn('remove', 'Remove', [ id ]);
-			var stop = buildBtn('manage', 'Stop', [ 'stop', id ]);
-			var start = buildBtn('manage', 'Start', [ 'start', id ]);
-			var restart = buildBtn('manage', 'Restart', [ 'restart', id ]);
 
 			html += "<tr>" + tr(name) + tr(host) + tr(path, 'hid')
-					+ tr(shell, 'hid') + tr(restart + stop + start)
-					+ tr(del, 'hid') + "</tr>";
+					+ tr(shell, 'hid') + tr(sel) + "</tr>";
 		}
 		$('#record').html(html);
 	}

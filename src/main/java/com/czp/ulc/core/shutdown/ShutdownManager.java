@@ -15,7 +15,6 @@ import sun.misc.SignalHandler;
  * @Author:coder_czp@126.com
  * @version:1.0
  */
-@SuppressWarnings("restriction")
 public class ShutdownManager extends Thread implements SignalHandler {
 
 	private volatile boolean hasExecute = false;
@@ -66,7 +65,7 @@ public class ShutdownManager extends Thread implements SignalHandler {
 	}
 
 	@Override
-	public void run() {
+	public synchronized void run() {
 		hasExecute = true;
 		log.info("start call ShutdownCallback");
 		for (ShutdownCallback call : callbacks) {
@@ -77,6 +76,7 @@ public class ShutdownManager extends Thread implements SignalHandler {
 				log.error("fail to call:{}", call, e);
 			}
 		}
+		callbacks.clear();
 		log.info("success to call all ShutdownCallback");
 	}
 

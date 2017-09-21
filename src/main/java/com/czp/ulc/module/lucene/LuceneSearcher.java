@@ -20,7 +20,7 @@ public class LuceneSearcher {
 
 	private IndexMetaDao metaDao;
 	private MemIndexBuilder memSer;
-	private ParallelSearch parallelFileSearch;
+	private FileParallelSearch parallelFileSearch;
 
 	public void setMetaDao(IndexMetaDao metaDao) {
 		this.metaDao = metaDao;
@@ -30,7 +30,7 @@ public class LuceneSearcher {
 		this.memSer = memSer;
 	}
 
-	public void setParallelFileSearch(ParallelSearch parallelFileSearch) {
+	public void setParallelFileSearch(FileParallelSearch parallelFileSearch) {
 		this.parallelFileSearch = parallelFileSearch;
 	}
 

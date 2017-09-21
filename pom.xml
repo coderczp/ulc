@@ -5,7 +5,7 @@
 	<artifactId>ulc</artifactId>
 	<packaging>jar</packaging>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>ulc Maven Webapp</name>
+	<name>ulc</name>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -95,6 +95,11 @@
 			<groupId>com.jcraft</groupId>
 			<artifactId>jsch</artifactId>
 			<version>0.1.53</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.sgroschupf</groupId>
+			<artifactId>zkclient</artifactId>
+			<version>0.1</version>
 		</dependency>
 		<!-- <dependency> <groupId>org.rocksdb</groupId> <artifactId>rocksdbjni</artifactId> 
 			<version>5.2.1</version> </dependency> -->

@@ -42,7 +42,7 @@ public class LuceneModule implements IModule {
 
 		FileIndexBuilder fileBuilder = new FileIndexBuilder(srcDir, indexDir, analyzer, metaDao, lFileDao);
 		MemIndexBuilder memSer = new MemIndexBuilder(fileBuilder, analyzer);
-		ParallelSearch pFileSearch = new ParallelSearch(lFileDao);
+		FileParallelSearch pFileSearch = new FileParallelSearch(lFileDao);
 		LuceneSearcher searcher = new LuceneSearcher();
 		searcher.setParallelFileSearch(pFileSearch);
 		searcher.setMetaDao(metaDao);

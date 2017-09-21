@@ -44,7 +44,7 @@ import com.czp.ulc.web.QueryCondtion;
  * @Author:jeff.cao@aoliday.com
  * @version:1.0
  */
-public class ParallelSearch {
+public class FileParallelSearch {
 
 	/** 包装原始的IndexSearcher支持检测索引文件是否修改 */
 	private static class IndexSearcherWrapper {
@@ -68,9 +68,9 @@ public class ParallelSearch {
 	private String prefix = IndexFileNames.SEGMENTS + "_";
 	private SoftRefMap<File, IndexSearcherWrapper> dirMap = new SoftRefMap<>();
 
-	private static final Logger LOG = LoggerFactory.getLogger(ParallelSearch.class);
+	private static final Logger LOG = LoggerFactory.getLogger(FileParallelSearch.class);
 
-	public ParallelSearch(LuceneFileDao lFileDao) {
+	public FileParallelSearch(LuceneFileDao lFileDao) {
 		this.lFileDao = lFileDao;
 		int threadSize = LuceneConfig.PARALLEL_SEARCH_THREADS;
 		this.worker = ThreadPools.getInstance().newPool("ParallelSearch", threadSize);

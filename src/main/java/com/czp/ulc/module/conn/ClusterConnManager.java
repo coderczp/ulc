@@ -54,5 +54,14 @@ public class ClusterConnManager extends ConnectManager implements ZkListener {
 	private void doLoadBalance() {
 		ZkClient zkClient = zkMgr.getZkClient();
 		List<String> nodes = zkClient.getChildren(ZkManager.NODE_PATH);
+		if (nodes.size() == 1) {
+			super.onStart();
+			return;
+		}
+		doSharing(zkClient, nodes);
+	}
+
+	private void doSharing(ZkClient zkClient, List<String> nodes) {
+
 	}
 }

@@ -48,7 +48,7 @@ public class ZkManager {
 		}
 		zkClient = new ZkClient(zkServer, Integer.valueOf(connTimeout));
 		LOG.info("start cluster model zk:{}", zkServer);
-		registMySelfToNode();
+		registCurrentHostToNode();
 	}
 
 	public ZkClient getZkClient() {
@@ -58,7 +58,7 @@ public class ZkManager {
 	/***
 	 * 把自己注册到zk
 	 */
-	private void registMySelfToNode() {
+	private void registCurrentHostToNode() {
 		String host = Utils.innerInetIp();
 		long time = System.currentTimeMillis();
 		String nodePath = buildZkPath(NODE_PATH, host);

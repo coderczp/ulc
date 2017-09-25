@@ -60,7 +60,7 @@ public class FileIndexBuilder {
 	private AtomicBoolean hasFlushed = new AtomicBoolean();
 	private ConcurrentHashMap<File, IndexWriter> indexMap = new ConcurrentHashMap<>();
 
-	public static final String HOST = Utils.getHostName();
+	public static final String HOST = Utils.innerInetIp();
 	public static final Charset UTF8 = Charset.forName("UTF-8");
 	public static final String LINE_SPLITER = Utils.getLineSpliter();
 	private static final Logger log = LoggerFactory.getLogger(FileIndexBuilder.class);

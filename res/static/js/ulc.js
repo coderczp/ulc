@@ -52,7 +52,7 @@ function bindProcs(procSelectId) {
 	var proc = $(procSelectId);
 	if (!proc)
 		alert('ULC not found file select');
-	$.get('./proc/list', function(procs) {
+	$.get('./proc/listByName', function(procs) {
 		var html = '<option value="all">all</option>';
 		for ( var i in procs) {
 			var item = procs[i];

@@ -1,20 +1,14 @@
 package com.czp.ulc.module.conn;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
 import org.springframework.stereotype.Service;
 
-import com.czp.ulc.core.ThreadPools;
-import com.czp.ulc.core.bean.HostBean;
 import com.czp.ulc.core.dao.HostDao;
 import com.czp.ulc.core.dao.KeywordRuleDao;
 import com.czp.ulc.core.dao.MonitoConfigDao;
 import com.czp.ulc.core.message.MessageCenter;
+import com.czp.ulc.core.zk.ZkManager;
 import com.czp.ulc.module.IModule;
 import com.czp.ulc.module.alarm.AlarmSender;
 
@@ -26,7 +20,7 @@ import com.czp.ulc.module.alarm.AlarmSender;
  * @version 0.0.1
  */
 @Service
-public class ConnectionModule implements IModule, Runnable {
+public class ConnectionModule implements IModule {
 
 	@Autowired
 	private HostDao hostDao;
@@ -40,18 +34,31 @@ public class ConnectionModule implements IModule, Runnable {
 	@Autowired
 	private KeywordRuleDao keyDao;
 
-	private ConnectManager conMgr;
+	@Autowired
+	private ZkManager zkManager;
 
-	private static Logger LOG = LoggerFactory.getLogger(ConnectionModule.class);
+	private ConnectManager conMgr;
 
 	@Override
 	public boolean start(SingletonBeanRegistry ctx) {
-		conMgr = new ConnectManager(mqCenter, cfgDao);
+
+		if (zkManager.isClusterModel()) {
+			conMgr = new ClusterConnManager();
+		} else {
+			conMgr = new ConnectManager();
+		}
+
+		conMgr.setCfgDao(cfgDao);
+		conMgr.setHostDao(hostDao);
+		conMgr.setMqCenter(mqCenter);
+
+		mqCenter.addConcumer(conMgr);
 		mqCenter.addConcumer(AlarmSender.getInstance());
 		mqCenter.addConcumer(new ErrorLogHandler(keyDao, mqCenter));
 
 		ctx.registerSingleton("connectManager", conMgr);
-		ThreadPools.getInstance().run("conn-moudle-start", this, true);
+		conMgr.onStart();
+
 		return true;
 	}
 
@@ -63,19 +70,6 @@ public class ConnectionModule implements IModule, Runnable {
 	@Override
 	public String name() {
 		return "Connection Manager Module";
-	}
-
-	@Override
-	public void run() {
-		Map<String, Object> param = new HashMap<>();
-		param.put("status", HostBean.STATUS_MONITOR);
-		for (HostBean host : hostDao.list(param)) {
-			try {
-				conMgr.connect(host);
-			} catch (Exception e) {
-				LOG.info("connect err:" + host, e);
-			}
-		}
 	}
 
 	@Override

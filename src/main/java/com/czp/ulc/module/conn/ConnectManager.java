@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import com.czp.ulc.core.ThreadPools;
 import com.czp.ulc.core.bean.HostBean;
+import com.czp.ulc.core.dao.HostDao;
 import com.czp.ulc.core.dao.MonitoConfigDao;
 import com.czp.ulc.core.message.MessageCenter;
 import com.czp.ulc.core.message.MessageListener;
@@ -33,6 +34,7 @@ import com.jcraft.jsch.Session;
  */
 public class ConnectManager implements MessageListener<HostBean> {
 
+	private HostDao hostDao;
 	private MessageCenter mqCenter;
 	private MonitoConfigDao cfgDao;
 
@@ -43,11 +45,20 @@ public class ConnectManager implements MessageListener<HostBean> {
 
 	private static Logger LOG = LoggerFactory.getLogger(ConnectManager.class);
 
-	public ConnectManager(MessageCenter mqCenter, MonitoConfigDao cfgDao) {
+	public ConnectManager() {
 		notFound.add("host not found");
-		this.cfgDao = cfgDao;
+	}
+
+	public void setHostDao(HostDao hostDao) {
+		this.hostDao = hostDao;
+	}
+
+	public void setMqCenter(MessageCenter mqCenter) {
 		this.mqCenter = mqCenter;
-		mqCenter.addConcumer(this);
+	}
+
+	public void setCfgDao(MonitoConfigDao cfgDao) {
+		this.cfgDao = cfgDao;
 	}
 
 	public Map<String, List<String>> exeInAll(String cmd) {
@@ -116,7 +127,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 			session.connect(5000);
 			LOG.info("success connect:{}", bean);
 			maps.put(bean.getName(), session);
-			
+
 			if (bean.getStatus() == HostBean.STATUS_MONITOR) {
 				startMonitor(bean);
 			}
@@ -200,6 +211,23 @@ public class ConnectManager implements MessageListener<HostBean> {
 
 	public boolean isShutdown() {
 		return shutdown;
+	}
+
+	/***
+	 * 异步链接所有被监控的机器
+	 */
+	public void onStart() {
+		ThreadPools.getInstance().run("conn-moudle-start", () -> {
+			Map<String, Object> param = new HashMap<>();
+			param.put("status", HostBean.STATUS_MONITOR);
+			for (HostBean host : hostDao.list(param)) {
+				try {
+					connect(host);
+				} catch (Exception e) {
+					LOG.info("connect err:" + host, e);
+				}
+			}
+		}, true);
 	}
 
 	@Override

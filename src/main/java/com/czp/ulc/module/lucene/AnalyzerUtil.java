@@ -28,7 +28,7 @@ public class AnalyzerUtil {
 	 */
 	public static String displayToken(String str, Analyzer analyzer) {
 		try {
-			TokenStream stream = analyzer.tokenStream("log", new StringReader(str));
+			TokenStream stream = analyzer.tokenStream("f", new StringReader(str));
 			CharTermAttribute cta = stream.addAttribute(CharTermAttribute.class);
 			StringBuilder info = new StringBuilder();
 			stream.reset();

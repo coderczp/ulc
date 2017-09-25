@@ -1,13 +1,18 @@
 package com.czp.ulc.module.lucene;
 
 import java.io.IOException;
+import java.util.Stack;
 
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
+import org.apache.lucene.util.AttributeSource;
 
 /**
- * 对日志格式进行处理 <li>创建人：Jeff.cao</li> <li>创建时间：2017年4月1日 下午5:09:32</li>
+ * 对日志格式进行处理
+ * <li>创建人：Jeff.cao</li>
+ * <li>创建时间：2017年4月1日 下午5:09:32</li>
  * 
  * @version 0.0.1
  */
@@ -18,7 +23,11 @@ public class LogTokenFilter extends TokenFilter {
 	private char[] host = "host:".toCharArray();
 	private char[] java = ".java".toCharArray();
 	private char[] exception = "exception".toCharArray();
+
+	private AttributeSource.State current;
+	private Stack<char[]> remain = new Stack<char[]>();
 	private final CharTermAttribute termAttr = addAttribute(CharTermAttribute.class);
+	private final PositionIncrementAttribute pos = addAttribute(PositionIncrementAttribute.class);
 
 	protected LogTokenFilter(TokenStream input) {
 		super(input);
@@ -26,6 +35,15 @@ public class LogTokenFilter extends TokenFilter {
 
 	@Override
 	public boolean incrementToken() throws IOException {
+
+		if (!remain.isEmpty()) {
+			char[] syn = remain.pop();
+			restoreState(current);
+			termAttr.copyBuffer(syn, 0, syn.length);
+			pos.setPositionIncrement(0); // Set position increment to 0
+			return true;
+		}
+
 		if (!this.input.incrementToken())
 			return false;
 
@@ -33,6 +51,12 @@ public class LogTokenFilter extends TokenFilter {
 		int len = termAttr.length();
 		int start = 0;
 		int end = len;
+
+		// 处理orderid=320232635
+		if (processKeyVal(buffer, start, end)) {
+			current = captureState();
+			return true;
+		}
 
 		// 移除前后的非数字或字符如: :1378#->1378
 		if (!Character.isLetterOrDigit(buffer[0])) {
@@ -48,17 +72,17 @@ public class LogTokenFilter extends TokenFilter {
 		if (javaIndex != -1) {
 			end = javaIndex;
 		}
-		//处理rid:xxx ->xxx
+		// 处理rid:xxx ->xxx
 		int startIndex = startWith(buffer, start, end, rid);
 		if (startIndex > 0) {
-			start = startIndex+1;
+			start = startIndex + 1;
 		}
-		
+
 		int hoststartIndex = startWith(buffer, start, end, host);
 		if (hoststartIndex > 0) {
-			start = hoststartIndex+1;
+			start = hoststartIndex + 1;
 		}
-		
+
 		// 将com.alibaba.fastjson.jsonexception处理为jsonexception
 		int exeIndex = endWith(buffer, start, end, exception);
 		if (exeIndex != -1) {
@@ -75,6 +99,21 @@ public class LogTokenFilter extends TokenFilter {
 			return true;
 		}
 		return true;
+	}
+
+	// 将 orderid=320232635转化为 [orderid=320232635,320232635]
+	private boolean processKeyVal(char[] buffer, int start, int end) {
+		for (int i = start; i < end; i++) {
+			char c = buffer[i];
+			if (c == '=') {
+				int size_val = end - i - 1;
+				char[] value = new char[size_val];
+				System.arraycopy(buffer, i + 1, value, 0, size_val);
+				remain.push(value);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private int endWith(char[] buffer, int start, int end, char[] target) {

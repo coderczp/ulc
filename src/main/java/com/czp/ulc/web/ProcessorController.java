@@ -68,6 +68,11 @@ public class ProcessorController {
 
 	@RequestMapping("/list")
 	public List<ProcessorBean> list(ProcessorBean arg) {
+		return dao.list(arg);
+	}
+
+	@RequestMapping("/listByName")
+	public List<ProcessorBean> listByName(ProcessorBean arg) {
 		return dao.query(arg);
 	}
 

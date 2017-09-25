@@ -86,10 +86,12 @@ public class Lucenetest {
 		// http://www.itrip.com/login/index?redirect_url=http://pre.itrip.com//ulc/callback?requireToken=1?requireToken=1&allow=aoliday
 		String x = "{orderId=320232635, itemId=973129, supplier=2138} INFO 2017-09-20 10:28:59 [InterfaceBookingTask.java:47] 接口预定[320232635/973129]开始...";
 
-		String str = AnalyzerUtil.displayToken("/data/work/itrip_openapi_admin/tomcat7/logs/db.log", new LogAnalyzer());
+		String str = AnalyzerUtil.displayToken("/var/www/data/work/itrip_mobile/tomcat7/logs/db.log", new LogAnalyzer());
 		String str2 = AnalyzerUtil.displayToken(x, new LogAnalyzer());
+		String str3 = AnalyzerUtil.displayToken(x, new StandardAnalyzer());
 		System.out.println(str);
 		System.out.println(str2);
+		System.out.println(str3);
 		// String temp = "";
 		// String path = "./2.log";
 		// BufferedReader br = new BufferedReader(new FileReader(new

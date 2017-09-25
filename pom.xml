@@ -113,7 +113,6 @@
 					<artifactId>log4j</artifactId>
 				</exclusion>
 			</exclusions>
-			<scope>test</scope>
 		</dependency>
 	</dependencies>
 	<build>

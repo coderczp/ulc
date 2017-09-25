@@ -18,9 +18,12 @@ import com.czp.ulc.core.mybatis.DynamicSql;
  */
 public interface ProcessorDao extends BaseDao<ProcessorBean>{
 
-	@SelectProvider(type = DynamicSql.class, method = "queryProc")
+	@SelectProvider(type = DynamicSql.class, method = "queryProcGoupByName")
 	List<ProcessorBean> query(ProcessorBean arg);
 
 	@SelectProvider(type = DynamicSql.class, method = "getProcById")
 	ProcessorBean get(Integer id);
+	
+	@SelectProvider(type = DynamicSql.class, method = "listProc")
+	List<ProcessorBean> list(ProcessorBean arg);
 }

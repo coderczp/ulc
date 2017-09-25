@@ -33,6 +33,17 @@ import com.czp.ulc.web.QueryCondtion;
  */
 public class DynamicSql {
 
+	public String listProc(ProcessorBean arg) {
+		String where = "where 1=1";
+		if (Utils.notEmpty(arg.getHostId()))
+			where += " AND hostId=" + arg.getHostId();
+		if (Utils.notEmpty(arg.getName()))
+			where += " AND name like '%" + arg.getName() + "%'";
+		if (Utils.notEmpty(arg.getPath()))
+			where += " AND path like '" + arg.getPath() + "%'";
+		return String.format("select * from processor %s", where);
+	}
+
 	public String queryMenus(UserMenu arg) {
 		return "select menu.* from menu inner join user_menu on menu.id=user_menu.menu_id where user_menu.mail='"
 				+ arg.getMail() + "'";
@@ -51,15 +62,8 @@ public class DynamicSql {
 		return "SELECT * FROM host_bean where id=" + id;
 	}
 
-	public String queryProc(ProcessorBean arg) {
-		String where = "where 1=1";
-		if (Utils.notEmpty(arg.getHostId()))
-			where += " AND hostId=" + arg.getHostId();
-		if (Utils.notEmpty(arg.getName()))
-			where += " AND name like '%" + arg.getName() + "%'";
-		if (Utils.notEmpty(arg.getPath()))
-			where += " AND path like '" + arg.getPath() + "%'";
-		return String.format("select * from processor %s", where);
+	public String queryProcGoupByName(ProcessorBean arg) {
+		return String.format("%s group by name", listProc(arg));
 	}
 
 	public String queryEarliestFile(String host) {

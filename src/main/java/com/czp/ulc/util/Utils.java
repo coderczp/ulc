@@ -16,7 +16,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.Inet4Address;
-import java.net.UnknownHostException;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.nio.ByteBuffer;
 import java.security.Key;
 import java.security.SecureRandom;
@@ -24,6 +25,7 @@ import java.util.Base64;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class Utils {
 
+	private static String INNER_IP = null;
 	public static final String KEY_ALGORITHM = "DES";
 	public static final String key = "A1B2C3D4E5F60708";
 	public static final String CIPHER_ALGORITHM = "DES/ECB/PKCS5Padding";
@@ -125,7 +128,7 @@ public class Utils {
 			throw new RuntimeException(e);
 		}
 	}
-	
+
 	public static String decryptAuth(String text, String key, String charset) {
 		try {
 			byte[] keyBase64DecodeBytes = Base64.getDecoder().decode(key);
@@ -135,7 +138,7 @@ public class Utils {
 			Cipher cipher = Cipher.getInstance("DES");
 			cipher.init(Cipher.DECRYPT_MODE, secretKey);
 			byte[] textBytes = new sun.misc.BASE64Decoder().decodeBuffer(text);// Base64.getDecoder().decode(text);
-//			System.out.println(new String(textBytes));
+			// System.out.println(new String(textBytes));
 			byte[] bytes = cipher.doFinal(textBytes);
 			return new String(bytes, charset);
 		} catch (Exception e) {
@@ -247,12 +250,38 @@ public class Utils {
 		return System.getProperty("os.name").toLowerCase().contains("windows") ? "\n" : "\r";
 	}
 
-	public static String getHostName() {
+	/***
+	 * 获取内网IP
+	 * 
+	 * @return
+	 */
+	public static String innerInetIp() {
 		try {
-			return Inet4Address.getLocalHost().getHostName();
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
+			if (INNER_IP != null)
+				return INNER_IP;
+
+			synchronized (Utils.class) {
+				if (INNER_IP == null) {
+					InetAddress ip = null;
+					Enumeration<InetAddress> addrs;
+					String lpIp = InetAddress.getLocalHost().getHostAddress();
+					Enumeration<NetworkInterface> networks = NetworkInterface.getNetworkInterfaces();
+					while (networks.hasMoreElements()) {
+						addrs = networks.nextElement().getInetAddresses();
+						while (addrs.hasMoreElements()) {
+							ip = addrs.nextElement();
+							if (ip != null && ip instanceof Inet4Address && ip.isSiteLocalAddress()
+									&& !ip.getHostAddress().equals(lpIp)) {
+								INNER_IP = ip.getHostAddress();
+							}
+						}
+					}
+					INNER_IP = lpIp;
+				}
+			}
+			return INNER_IP;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
 		}
-		return "unknow_host";
 	}
 }

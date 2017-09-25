@@ -1,5 +1,7 @@
 package com.czp.ulc.core.zk;
 
+import java.nio.ByteBuffer;
+import java.util.Objects;
 import java.util.Vector;
 
 import javax.annotation.PostConstruct;
@@ -11,6 +13,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
+
+import com.czp.ulc.util.Utils;
 
 /**
  * 请添加描述
@@ -27,6 +31,9 @@ public class ZkManager {
 
 	private ZkClient zkClient;
 
+	/** 分片节点根路径 */
+	public static final String NODE_PATH = "/node/";
+
 	private Vector<ZkListener> listeners = new Vector<ZkListener>();
 
 	private static final Logger LOG = LoggerFactory.getLogger(ZkManager.class);
@@ -40,10 +47,50 @@ public class ZkManager {
 			return;
 		}
 		zkClient = new ZkClient(zkServer, Integer.valueOf(connTimeout));
+		LOG.info("start cluster model zk:{}", zkServer);
+		registMySelfToNode();
+	}
+
+	public ZkClient getZkClient() {
+		return zkClient;
+	}
+
+	/***
+	 * 把自己注册到zk
+	 */
+	private void registMySelfToNode() {
+		String host = Utils.innerInetIp();
+		long time = System.currentTimeMillis();
+		String nodePath = buildZkPath(NODE_PATH, host);
+		byte[] data = ByteBuffer.allocate(8).putLong(time).array();
+		zkClient.createEphemeralSequential(nodePath, data);
+		LOG.info("success  to node path: {}", nodePath);
+	}
+
+	/***
+	 * 构建zk路径
+	 * 
+	 * @param root
+	 * @param path
+	 * @return
+	 */
+	public static String buildZkPath(String root, String... path) {
+		Objects.requireNonNull(path, "path is required");
+		StringBuilder sb = new StringBuilder(root);
+		int i = 0, len = path.length, size = len - 1;
+		while (i < size) {
+			String item = path[i++];
+			sb.append(item);
+			if (!item.endsWith("/"))
+				sb.append("/");
+		}
+		sb.append(path[i]);
+		return sb.toString();
 	}
 
 	/***
 	 * 是否是集群模式
+	 * 
 	 * @return
 	 */
 	public boolean isClusterModel() {

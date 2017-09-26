@@ -5,6 +5,7 @@ import java.io.File;
 import org.apache.lucene.analysis.Analyzer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import com.czp.ulc.core.dao.IndexMetaDao;
@@ -24,6 +25,9 @@ import com.czp.ulc.module.IModule;
 public class LuceneModule implements IModule {
 
 	@Autowired
+	private Environment env;
+
+	@Autowired
 	private IndexMetaDao metaDao;
 
 	@Autowired
@@ -34,10 +38,10 @@ public class LuceneModule implements IModule {
 
 	@Override
 	public boolean start(SingletonBeanRegistry ctx) {
-		LuceneConfig.init();
+		LuceneConfig.config(env);
 
-		File srcDir = LuceneConfig.UNCOMP_DIR;
-		File indexDir = LuceneConfig.INDEX_DIR;
+		File srcDir = LuceneConfig.getDataDir();
+		File indexDir = LuceneConfig.getIndexDir();
 		Analyzer analyzer = LuceneConfig.ANALYZER;
 
 		FileIndexBuilder fileBuilder = new FileIndexBuilder(srcDir, indexDir, analyzer, metaDao, lFileDao);

@@ -41,7 +41,7 @@ public class DynamicSql {
 			where += " AND name like '%" + arg.getName() + "%'";
 		if (Utils.notEmpty(arg.getPath()))
 			where += " AND path like '" + arg.getPath() + "%'";
-		return String.format("select * from processor %s", where);
+		return String.format("select * from processor %s order by id asc", where);
 	}
 
 	public String queryMenus(UserMenu arg) {

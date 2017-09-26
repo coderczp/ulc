@@ -25,11 +25,12 @@ import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.context.embedded.EmbeddedServletContainerInitializedEvent;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.event.ApplicationContextEvent;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.ContextStoppedEvent;
 import org.springframework.core.env.ConfigurableEnvironment;
@@ -55,7 +56,7 @@ import com.czp.ulc.web.AccessFilter;
 @EnableAutoConfiguration
 @ComponentScan(value = { "com.czp.ulc" })
 public class Application extends WebMvcConfigurerAdapter
-		implements ShutdownCallback, BeanDefinitionRegistryPostProcessor, ApplicationListener<ApplicationContextEvent> {
+		implements ShutdownCallback, BeanDefinitionRegistryPostProcessor, ApplicationListener<ApplicationEvent> {
 
 	private Environment envBean;
 	private TreeSet<IModule> modules = new TreeSet<>();
@@ -116,8 +117,7 @@ public class Application extends WebMvcConfigurerAdapter
 				is.close();
 			}
 
-			ConfigurableEnvironment env = (ConfigurableEnvironment) envBean;
-			Map<String, Object> map = env.getSystemProperties();
+			Map<String, Object> map = getProperty(envBean);
 			for (Entry<Object, Object> entry : config.entrySet()) {
 				map.put(entry.getKey().toString(), entry.getValue());
 			}
@@ -126,14 +126,24 @@ public class Application extends WebMvcConfigurerAdapter
 		}
 	}
 
+	private Map<String, Object> getProperty(Environment envBean) {
+		ConfigurableEnvironment env = (ConfigurableEnvironment) envBean;
+		Map<String, Object> map = env.getSystemProperties();
+		return map;
+	}
+
 	@Override
 	public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry arg0) throws BeansException {
 	}
 
 	@Override
-	public void onApplicationEvent(ApplicationContextEvent event) {
+	public void onApplicationEvent(ApplicationEvent event) {
 		modules = sortByOrder(context.getBeansOfType(IModule.class));
-		if (event instanceof ContextRefreshedEvent) {
+		if (event instanceof EmbeddedServletContainerInitializedEvent) {
+			EmbeddedServletContainerInitializedEvent tevent = (EmbeddedServletContainerInitializedEvent) event;
+			int port = tevent.getEmbeddedServletContainer().getPort();
+			getProperty(envBean).put("server.port", port);
+		} else if (event instanceof ContextRefreshedEvent) {
 			startModule();
 		} else if (event instanceof ContextStoppedEvent) {
 			stopModule();

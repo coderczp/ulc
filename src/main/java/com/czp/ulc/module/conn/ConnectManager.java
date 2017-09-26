@@ -34,14 +34,17 @@ import com.jcraft.jsch.Session;
  */
 public class ConnectManager implements MessageListener<HostBean> {
 
-	private HostDao hostDao;
-	private MessageCenter mqCenter;
-	private MonitoConfigDao cfgDao;
+	protected HostDao hostDao;
+	protected MessageCenter mqCenter;
+	protected MonitoConfigDao cfgDao;
 
-	private JSch jSch = new JSch();
-	private volatile boolean shutdown = false;
-	private List<String> notFound = new ArrayList<String>();
-	private Map<String, Session> maps = new ConcurrentHashMap<>();
+	protected JSch jSch = new JSch();
+	protected volatile boolean shutdown = false;
+	protected List<String> notFound = new ArrayList<String>();
+	protected Map<String, Session> maps = new ConcurrentHashMap<>();
+
+	/** 不需要自动重练的链接 */
+	protected Map<String, Boolean> notReConn = new ConcurrentHashMap<>();
 
 	private static Logger LOG = LoggerFactory.getLogger(ConnectManager.class);
 
@@ -59,6 +62,10 @@ public class ConnectManager implements MessageListener<HostBean> {
 
 	public void setCfgDao(MonitoConfigDao cfgDao) {
 		this.cfgDao = cfgDao;
+	}
+
+	public boolean isNotReConn(String hostName) {
+		return notReConn.containsKey(hostName);
 	}
 
 	public Map<String, List<String>> exeInAll(String cmd) {
@@ -112,7 +119,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 	public synchronized void connect(HostBean bean) {
 		Session session = maps.get(bean.getName());
 		if (session != null && session.isConnected()) {
-			LOG.info("host:{} has connected");
+			LOG.info("host:{} has connected", bean.getHost());
 			return;
 		}
 		buildAndCacheSession(bean);
@@ -127,6 +134,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 			session.connect(5000);
 			LOG.info("success connect:{}", bean);
 			maps.put(bean.getName(), session);
+			notReConn.remove(bean.getName());
 
 			if (bean.getStatus() == HostBean.STATUS_MONITOR) {
 				startMonitor(bean);
@@ -177,18 +185,20 @@ public class ConnectManager implements MessageListener<HostBean> {
 	 * @param server
 	 */
 	public synchronized void disconnect(HostBean server) {
-		Session session = maps.get(server.getId());
+		Session session = getSession(server);
 		if (session != null) {
+			notReConn.put(server.getName(), true);
 			session.disconnect();
+			LOG.info("disconnect  {}", server);
 		}
 	}
 
 	@Override
 	public boolean onMessage(HostBean message, Map<String, Object> ext) {
-		Integer id = message.getId();
-		if (!maps.containsKey(id))
+		if (!maps.containsKey(message.getName()))
 			return false;
 
+		Integer id = message.getId();
 		String type = String.valueOf(ext.get("type"));
 		if ("update".equals(type)) {
 			disconnect(message);
@@ -207,6 +217,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 			maps.remove(item.getKey());
 			item.getValue().disconnect();
 		}
+		notReConn.clear();
 	}
 
 	public boolean isShutdown() {

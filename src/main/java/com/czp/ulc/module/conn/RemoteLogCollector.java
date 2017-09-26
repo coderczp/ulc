@@ -235,7 +235,12 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorConf
 	 * 网络断开后自动重连
 	 */
 	protected void doRetryConnect() {
-		if (!connManager.isShutdown() && retryTimes++ < maxRetryTimes) {
+		if (connManager.isNotReConn(server.getName()))
+			return;
+		if (connManager.isShutdown())
+			return;
+
+		if (retryTimes++ < maxRetryTimes) {
 			LOG.info("retry connect:{}, times:{}", server, retryTimes);
 			Utils.sleep(3000);
 			run();

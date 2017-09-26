@@ -1,6 +1,5 @@
 package com.czp.ulc.core.zk;
 
-import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.Vector;
 
@@ -13,8 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
-
-import com.czp.ulc.util.Utils;
 
 /**
  * 请添加描述
@@ -32,7 +29,7 @@ public class ZkManager {
 	private ZkClient zkClient;
 
 	/** 分片节点根路径 */
-	public static final String NODE_PATH = "/node/";
+	public static final String ROOT_PATH = "/nodes";
 
 	private Vector<ZkListener> listeners = new Vector<ZkListener>();
 
@@ -48,25 +45,41 @@ public class ZkManager {
 		}
 		zkClient = new ZkClient(zkServer, Integer.valueOf(connTimeout));
 		LOG.info("start cluster model zk:{}", zkServer);
-		registCurrentHostToNode();
+		makeRootNodeIfRequired();
 	}
 
 	public ZkClient getZkClient() {
 		return zkClient;
 	}
 
-	/***
-	 * 把自己注册到zk
-	 */
-	private void registCurrentHostToNode() {
-		String host = Utils.innerInetIp();
-		long time = System.currentTimeMillis();
-		String nodePath = buildZkPath(NODE_PATH, host);
-		byte[] data = ByteBuffer.allocate(8).putLong(time).array();
-		zkClient.createEphemeralSequential(nodePath, data);
-		LOG.info("success  to node path: {}", nodePath);
+	private void makeRootNodeIfRequired() {
+		try {
+			String rootNode = ROOT_PATH;
+			if (!zkClient.exists(rootNode)) {
+				zkClient.createPersistent(rootNode);
+				LOG.info("success to create root node");
+			}
+		} catch (Throwable e) {
+			LOG.error("fail to create root node,maybe exist {}", e.getMessage());
+		}
 	}
 
+	/***
+	 * 构建zk路径
+	 * 
+	 * @param root
+	 * @param path
+	 * @return
+	 */
+	public static String buildnNodePath(String... path) {
+		Objects.requireNonNull(path, "path is required");
+		StringBuilder sb = new StringBuilder(ROOT_PATH);
+		for (String string : path) {
+			sb.append("/").append(string);
+		}
+		return sb.toString();
+	}
+	
 	/***
 	 * 构建zk路径
 	 * 
@@ -77,14 +90,9 @@ public class ZkManager {
 	public static String buildZkPath(String root, String... path) {
 		Objects.requireNonNull(path, "path is required");
 		StringBuilder sb = new StringBuilder(root);
-		int i = 0, len = path.length, size = len - 1;
-		while (i < size) {
-			String item = path[i++];
-			sb.append(item);
-			if (!item.endsWith("/"))
-				sb.append("/");
+		for (String string : path) {
+			sb.append("/").append(string);
 		}
-		sb.append(path[i]);
 		return sb.toString();
 	}
 

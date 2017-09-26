@@ -1,7 +1,10 @@
 package com.czp.ulc.module.conn;
 
+import java.util.Objects;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import com.czp.ulc.core.dao.HostDao;
@@ -26,6 +29,9 @@ public class ConnectionModule implements IModule {
 	private HostDao hostDao;
 
 	@Autowired
+	private Environment env;
+
+	@Autowired
 	private MonitoConfigDao cfgDao;
 
 	@Autowired
@@ -43,7 +49,9 @@ public class ConnectionModule implements IModule {
 	public boolean start(SingletonBeanRegistry ctx) {
 
 		if (zkManager.isClusterModel()) {
-			conMgr = new ClusterConnManager();
+			String port = env.getProperty("server.port");
+			Objects.requireNonNull(port, "server.port not found");
+			conMgr = new ClusterConnManager(port, zkManager);
 		} else {
 			conMgr = new ConnectManager();
 		}

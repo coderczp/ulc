@@ -116,23 +116,15 @@ public class ClusterConnManager extends ConnectManager implements ZkListener {
 	 */
 	private void doLoadBalance() {
 		List<String> nodes = zkClient.getChildren(ZkManager.ROOT_PATH);
-		if (nodes.size() == 1) {
-			monitorHosts = queryAllHosts();
-			asynConnect(monitorHosts);
-			return;
-		}
-		doSharding(nodes);
-	}
-
-	private void doSharding(List<String> nodes) {
 		monitorHosts = getCurrentNodeMonitorHosts(nodes);
 		asynConnect(monitorHosts);
 	}
-
+	
 	private List<HostBean> getCurrentNodeMonitorHosts(List<String> nodes) {
 		int nodeOrder = getCurrentNodeOrder(nodes);
 		List<HostBean> hosts = sharding(nodes.size()).get(nodeOrder);
 		Assert.notEmpty(hosts, "current node shard result is empty");
+		LOG.info("current node shard result size:{}", hosts.size());
 		return hosts;
 	}
 

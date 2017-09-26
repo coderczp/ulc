@@ -185,8 +185,8 @@ public class ConnectManager implements MessageListener<HostBean> {
 	 * @param server
 	 */
 	public synchronized void disconnect(HostBean server) {
-		Session session = getSession(server);
-		if (session != null) {
+		Session session = maps.get(server.getName());
+		if (session != null && session.isConnected()) {
 			notReConn.put(server.getName(), true);
 			session.disconnect();
 			LOG.info("disconnect  {}", server);
@@ -195,15 +195,15 @@ public class ConnectManager implements MessageListener<HostBean> {
 
 	@Override
 	public boolean onMessage(HostBean message, Map<String, Object> ext) {
-		if (!maps.containsKey(message.getName()))
+		String name = message.getName();
+		if (!maps.containsKey(name))
 			return false;
 
-		Integer id = message.getId();
 		String type = String.valueOf(ext.get("type"));
 		if ("update".equals(type)) {
 			disconnect(message);
 		} else if ("delete".equals(type)) {
-			Session sesssion = maps.remove(id);
+			Session sesssion = maps.remove(name);
 			if (sesssion != null)
 				sesssion.disconnect();
 		}

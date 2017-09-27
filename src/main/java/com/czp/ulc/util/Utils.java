@@ -273,6 +273,7 @@ public class Utils {
 							if (ip != null && ip instanceof Inet4Address && ip.isSiteLocalAddress()
 									&& !ip.getHostAddress().equals(lpIp)) {
 								INNER_IP = ip.getHostAddress();
+								break;
 							}
 						}
 					}

@@ -70,6 +70,11 @@ public class SearchController {
 		return AnalyzerUtil.displayToken(str, new LogAnalyzer());
 	}
 
+	@RequestMapping("/file")
+	public String listFile() throws Exception {
+		return "";
+	}
+	
 	@RequestMapping("/meta")
 	public JSONObject meta() throws Exception {
 		LuceneFile lFile = lFileDao.queryEarliestFile(null);

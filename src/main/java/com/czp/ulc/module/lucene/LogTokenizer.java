@@ -9,7 +9,7 @@ import org.apache.lucene.analysis.util.CharTokenizer;
  * @copyright coder_czp@126.com
  *
  */
-public class LowerWhitespaceTokenizer extends CharTokenizer {
+public class LogTokenizer extends CharTokenizer {
 
 	@Override
 	protected boolean isTokenChar(int ch) {

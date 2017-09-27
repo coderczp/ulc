@@ -45,7 +45,7 @@ public class LogAnalyzer extends Analyzer {
 
 	@Override
 	protected TokenStreamComponents createComponents(final String fieldName) {
-		LowerWhitespaceTokenizer source = new LowerWhitespaceTokenizer();
+		LogTokenizer source = new LogTokenizer();
 		TokenStream tok = new StopFilter(source, stopWords);
 		return new TokenStreamComponents(source, new LogTokenFilter(tok));
 	}

@@ -76,6 +76,7 @@ public class ClusterConnManager extends ConnectManager implements ZkListener {
 				while (waitDel.hasNext()) {
 					HostBean host = waitDel.next();
 					if (!hosts.contains(host)) {
+						LOG.info("remove {}", host);
 						disconnect(host);
 						waitDel.remove();
 					}
@@ -119,7 +120,7 @@ public class ClusterConnManager extends ConnectManager implements ZkListener {
 		monitorHosts = getCurrentNodeMonitorHosts(nodes);
 		asynConnect(monitorHosts);
 	}
-	
+
 	private List<HostBean> getCurrentNodeMonitorHosts(List<String> nodes) {
 		int nodeOrder = getCurrentNodeOrder(nodes);
 		List<HostBean> hosts = sharding(nodes.size()).get(nodeOrder);

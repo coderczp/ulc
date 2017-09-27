@@ -63,7 +63,14 @@ public class DynamicSql {
 	}
 
 	public String queryProcGoupByName(ProcessorBean arg) {
-		return String.format("%s group by name", listProc(arg));
+		String where = "where 1=1";
+		if (Utils.notEmpty(arg.getHostId()))
+			where += " AND hostId=" + arg.getHostId();
+		if (Utils.notEmpty(arg.getName()))
+			where += " AND name like '%" + arg.getName() + "%'";
+		if (Utils.notEmpty(arg.getPath()))
+			where += " AND path like '" + arg.getPath() + "%'";
+		return String.format("select * from processor %s group by name order by id asc", where);
 	}
 
 	public String queryEarliestFile(String host) {

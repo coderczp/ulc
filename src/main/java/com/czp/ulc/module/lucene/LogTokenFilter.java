@@ -40,7 +40,7 @@ public class LogTokenFilter extends TokenFilter {
 			char[] syn = remain.pop();
 			restoreState(current);
 			termAttr.copyBuffer(syn, 0, syn.length);
-			pos.setPositionIncrement(0); // Set position increment to 0
+			pos.setPositionIncrement(0);
 			return true;
 		}
 

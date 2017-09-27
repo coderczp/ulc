@@ -28,7 +28,7 @@ import com.czp.ulc.module.conn.ConnectManager;
  * @version:1.0
  */
 @Controller
-public class IndexController {
+public class HomeController {
 
 	@Autowired
 	private MessageCenter mqServer;

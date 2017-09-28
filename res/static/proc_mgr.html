@@ -59,7 +59,7 @@
           </div>
           <div class="form-group">
             <button onclick="addProc()" class="form-control hid">Add</button>
-            <label id="tip"></label>
+            <label><span class="badge" id="tip"></span></label>
           </div>
         </div>
       </div>
@@ -121,7 +121,7 @@
 		$.get('./proc/mgr', arg, function(data) {
 			alert(data.join('\n'));
 			sel.removeAttr("disabled");
-			$('#tip').text();
+			$('#tip').text('');
 		});
 	}
 
@@ -140,8 +140,9 @@
 		var map = {
 			'stop' : 'Stop',
 			'restart' : 'Restart',
+			'frestart' : 'ForeRes',
 			'start' : 'Start',
-			'remove' : 'Remove'
+			'remove' : 'Remove',
 		};
 		for ( var i in data) {
 			var proc = data[i];

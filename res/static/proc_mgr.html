@@ -59,7 +59,9 @@
           </div>
           <div class="form-group">
             <button onclick="addProc()" class="form-control hid">Add</button>
-            <label><span class="badge" id="tip"></span></label>
+            <label>
+              <span class="badge" id="tip"></span>
+            </label>
           </div>
         </div>
       </div>
@@ -105,10 +107,14 @@
 	}
 
 	function manage(id) {
-		if (!confirm("确认操作?"))
-			return;
+
 		var sel = $(event.target);
 		var type = sel.val();
+		if (type == 'all')
+			return;
+
+		if (!confirm("确认操作?"))
+			return;
 		var arg = {
 			"id" : id,
 			"type" : type,
@@ -117,10 +123,11 @@
 		sel.attr({
 			"disabled" : "disabled"
 		});
-		$('#tip').text(type + 'ing.....');
+		$('#tip').text('正在执行:'+type);
 		$.get('./proc/mgr', arg, function(data) {
 			alert(data.join('\n'));
 			sel.removeAttr("disabled");
+			sel.val("all");
 			$('#tip').text('');
 		});
 	}
@@ -138,11 +145,12 @@
 	function buildTable(data) {
 		var html = '';
 		var map = {
-			'stop' : 'Stop',
-			'restart' : 'Restart',
-			'frestart' : 'ForeRes',
-			'start' : 'Start',
-			'remove' : 'Remove',
+			'all' : '请选择',
+			'stop' : '停止',
+			'restart' : '重启',
+			'frestart' : '强制重启',
+			'start' : '启动',
+			'remove' : '删除',
 		};
 		for ( var i in data) {
 			var proc = data[i];

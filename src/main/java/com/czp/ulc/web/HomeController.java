@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.czp.ulc.core.message.MessageCenter;
 import com.czp.ulc.core.shutdown.ShutdownManager;
 import com.czp.ulc.module.conn.ConnectManager;
+import com.czp.ulc.module.conn.RemoteLogCollector;
 
 /**
  * Function:配置首页
@@ -39,6 +40,13 @@ public class HomeController {
 	@RequestMapping("/")
 	public String index() {
 		return "index.html";
+	}
+
+	@ResponseBody
+	@RequestMapping("/pause")
+	public String pause() {
+		RemoteLogCollector.pause = !RemoteLogCollector.pause;
+		return "change:" + RemoteLogCollector.pause;
 	}
 
 	@ResponseBody

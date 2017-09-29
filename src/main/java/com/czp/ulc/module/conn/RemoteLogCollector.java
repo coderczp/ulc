@@ -51,6 +51,8 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorConf
 	protected int maxRetryTimes = 50;
 	protected volatile boolean isRunning = true;
 
+	public static volatile boolean pause = false;
+
 	protected ConnectManager connManager;
 	protected MessageCenter messageCenter;
 	private static Logger LOG = LoggerFactory.getLogger(RemoteLogCollector.class);
@@ -118,6 +120,10 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorConf
 
 				if (isExcludeFile(nowFile, excludeFiles, map)) {
 					LOG.debug("skip:{}{}{}", server.getName(), nowFile, line);
+					continue;
+				}
+				if (pause) {
+					System.out.println(server.toString().concat(nowFile).concat(line));
 					continue;
 				}
 				messageCenter.push(new Message(new ReadResult(server, nowFile, line)));

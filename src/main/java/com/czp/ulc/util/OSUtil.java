@@ -1,5 +1,7 @@
 package com.czp.ulc.util;
 
+import java.io.File;
+
 import com.alibaba.fastjson.JSONObject;
 
 /**
@@ -13,6 +15,8 @@ import com.alibaba.fastjson.JSONObject;
 public class OSUtil {
 
 	private static long MB_SIZE = 1024 * 1024;
+
+	private static long GB_SIZE = MB_SIZE * 1024;
 
 	/***
 	 * 收集当前虚拟机的信息
@@ -28,14 +32,19 @@ public class OSUtil {
 		long freeMem = rt.freeMemory();
 		long maxMem = rt.maxMemory();
 
+		File file = new File("/");
+		long freeSpace = file.getFreeSpace() / GB_SIZE;
+		long totalSpace = file.getTotalSpace() / GB_SIZE;
+
 		json.put("memTotal", totalMem / MB_SIZE);
 		json.put("freeMem", freeMem / MB_SIZE);
 		json.put("maxMem", maxMem / MB_SIZE);
+		json.put("diskSize", totalSpace);
+		json.put("diskFree", freeSpace);
 		json.put("thread", nThread);
 		json.put("cpus", cpus);
 
 		return json;
 	}
-	
-	
+
 }

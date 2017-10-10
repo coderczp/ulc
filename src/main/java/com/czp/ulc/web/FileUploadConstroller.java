@@ -5,8 +5,6 @@ import java.io.FilenameFilter;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -68,9 +66,11 @@ public class FileUploadConstroller {
 	}
 
 	private Path createPath(String fileName) {
-		SimpleDateFormat spf = new SimpleDateFormat("yyyyMMddHHmmss");
-		String path = String.format("%s_%s", spf.format(new Date()), fileName);
-		return new File(base, path).toPath();
+		// SimpleDateFormat spf = new SimpleDateFormat("yyyyMMddHHmmss");
+		// String path = String.format("%s_%s", spf.format(new Date()),
+		// fileName);
+		// return new File(base, path).toPath();
+		return new File(base, fileName).toPath();
 	}
 
 	public static File getPath(String name) {

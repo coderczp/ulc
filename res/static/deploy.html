@@ -115,8 +115,7 @@
 			for ( var i in d) {
 				var file = d[i];
 				var project = getProject(file);
-				var time = file.substring(0, file.indexOf("_"));
-				html += buildOpt(file, project + "[" + time + "]");
+				html += buildOpt(file, project);
 			}
 			$('#tar').html(html);
 		});

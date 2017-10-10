@@ -93,6 +93,12 @@
 	}
 
 	function remove(id) {
+		if (!confirm("确认删除?"))
+			return;
+		$.get('./proc/del?id=' + id, function(data) {
+			alert(data);
+			search();
+		});
 	}
 
 	function updatePath() {
@@ -112,6 +118,8 @@
 		var type = sel.val();
 		if (type == 'all')
 			return;
+		if(type == 'remove')
+			return remove(id);
 
 		if (!confirm("确认操作?"))
 			return;
@@ -123,7 +131,7 @@
 		sel.attr({
 			"disabled" : "disabled"
 		});
-		$('#tip').text('正在执行:'+type);
+		$('#tip').text('正在执行:' + type);
 		$.get('./proc/mgr', arg, function(data) {
 			alert(data.join('\n'));
 			sel.removeAttr("disabled");
@@ -148,9 +156,10 @@
 			'all' : '请选择',
 			'stop' : '停止',
 			'restart' : '重启',
-			'frestart' : '强制重启',
 			'start' : '启动',
 			'remove' : '删除',
+			'frestart' : '强制重启',
+			'tarlog' : '压缩日志',
 		};
 		for ( var i in data) {
 			var proc = data[i];
@@ -165,6 +174,7 @@
 					+ tr(shell, 'hid') + tr(sel) + "</tr>";
 		}
 		$('#record').html(html);
+		switchModel();
 	}
 
 	function loadProcs() {

@@ -5,10 +5,7 @@ import java.util.List;
 
 import javax.validation.Valid;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
 import org.springframework.util.Assert;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,7 +17,8 @@ import com.czp.ulc.core.bean.HostBean;
 import com.czp.ulc.core.bean.ProcessorBean;
 import com.czp.ulc.core.dao.HostDao;
 import com.czp.ulc.core.dao.ProcessorDao;
-import com.czp.ulc.module.conn.ConnectManager;
+import com.czp.ulc.web.cmd.CmdHandlerManager;
+import com.czp.ulc.web.cmd.ICommandHandler;
 
 /**
  * function
@@ -41,9 +39,11 @@ public class ProcessorController {
 	private ProcessorDao dao;
 
 	@Autowired
-	private ApplicationContext context;
+	private CmdHandlerManager manager;
 
-	private static final Logger LOG = LoggerFactory.getLogger(ProcessorController.class);
+	public ProcessorController() {
+
+	}
 
 	@RequestMapping("/add")
 	public ProcessorBean addConfigFile(@Valid ProcessorBean bean, BindingResult result) {
@@ -57,13 +57,16 @@ public class ProcessorController {
 	}
 
 	@RequestMapping("/del")
-	public ProcessorBean del(ProcessorBean arg) {
+	public String del(ProcessorBean arg) {
 		Assert.notNull(arg.getId(), "id is required");
 		ProcessorBean inDb = dao.selectOne(arg);
-		if (inDb == null && dao.delete(arg) > 0) {
+		if (inDb == null) {
+			throw new RuntimeException("no such bean");
+		}
+		if (dao.delete(inDb) < 1) {
 			throw new RuntimeException("del bean fail");
 		}
-		return arg;
+		return "success";
 	}
 
 	@RequestMapping("/list")
@@ -79,37 +82,25 @@ public class ProcessorController {
 	@RequestMapping("/mgr")
 	public List<String> manage(int id, @RequestParam String type) {
 		ArrayList<String> res = new ArrayList<String>(1);
+		ICommandHandler handler = manager.getHandler(type);
+		if (handler == null) {
+			res.add("unsupport command:" + type);
+			return res;
+		}
+
 		ProcessorBean proc = dao.get(id);
 		if (proc == null) {
-			res.add("unsupport command:" + type);
-		} else if (type.equals("stop") || type.equals("start") || type.equals("restart") || type.equals("frestart")) {
-			HostBean hostBean = hDao.get(proc.getHostId());
-			if (hostBean == null) {
-				res.add("host not exist");
-			} else {
-				String delLock = "";
-				if(type.equals("frestart")){
-					delLock = "rm -f ./lock;";
-					type = "restart";
-				}
-				String path = proc.getPath();
-				String fmt = "cd %s;%s./service.sh %s";
-				String host = hostBean.getName();
-				String cmd = String.format(fmt, path, delLock, type);
-				LOG.info("start execute cmd:{}", cmd);
-				List<String> exe = getConnMgr().exe(host, cmd);
-				if (exe.isEmpty()) {
-					exe.add("工程目录下有lock,可能其他人在操作");
-				}
-				return exe;
-			}
-		} else {
-			res.add("unsupport command:" + type);
+			res.add("processor not found:" + id);
+			return res;
 		}
-		return res;
-	}
+		HostBean host = hDao.get(proc.getHostId());
+		if (host == null) {
+			res.add("host not found:" + proc.getHostId());
+			return res;
+		}
 
-	private ConnectManager getConnMgr() {
-		return context.getBean(ConnectManager.class);
+		String result = handler.handler(type, proc, host);
+		res.add(result);
+		return res;
 	}
 }

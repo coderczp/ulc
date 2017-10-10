@@ -105,11 +105,16 @@ public class DeployController {
 
 			@Override
 			public boolean accept(File dir, String name) {
-				boolean b = name.endsWith(".tar") || name.endsWith(".gz");
+				boolean b = name.endsWith(".tar") || name.endsWith(".gz") || name.endsWith(".zip");
 				return query == null ? b : (b && name.contains(query));
 			}
 		};
 		File[] listFiles = FileUploadConstroller.listFiles(filter);
+		List<String> files = sortByModifyTime(size, listFiles);
+		return files;
+	}
+
+	private List<String> sortByModifyTime(int size, File[] listFiles) {
 		MiniHeap<File> maxFiles = new MiniHeap<>(size, new Comparator<File>() {
 
 			@Override

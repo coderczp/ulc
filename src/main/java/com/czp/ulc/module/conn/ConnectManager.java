@@ -49,7 +49,7 @@ public class ConnectManager implements MessageListener<HostBean> {
 	private static Logger LOG = LoggerFactory.getLogger(ConnectManager.class);
 
 	public ConnectManager() {
-		notFound.add("host not found");
+		notFound.add("host not connect");
 	}
 
 	public void setHostDao(HostDao hostDao) {

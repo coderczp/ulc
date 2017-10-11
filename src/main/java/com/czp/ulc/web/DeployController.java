@@ -183,15 +183,12 @@ public class DeployController {
 			HttpSession session = req.getSession();
 			String user = session.getAttribute("user").toString();
 
-			String file = tarFile.getAbsolutePath();
 			String projectName = proc.getName();
 			String path = proc.getPath();
 			if (!path.endsWith("/"))
 				path = path.concat("/");
 
-			String name = tarFile.getName();
 			SimpleDateFormat spf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-			String destPath = path.concat(name.substring(name.indexOf("_") + 1));
 
 			DeployRecord record = new DeployRecord();
 			record.setAuthor(user);
@@ -202,7 +199,7 @@ public class DeployController {
 
 			int res = dDao.insertUseGeneratedKeys(record);
 			if (res > 0) {
-				doDeploy(path, host, proc, file, destPath, record.getId());
+				doDeploy(path, host, proc, tarFile, record.getId());
 			} else {
 				throw new RuntimeException("添加部署记录失败,请重试");
 			}
@@ -215,18 +212,20 @@ public class DeployController {
 		return json;
 	}
 
-	private void doDeploy(String path, HostBean host, ProcessorBean proc, String file, String destFile, Integer id) {
+	private void doDeploy(String path, HostBean host, ProcessorBean proc, File file, Integer id) {
 		service.execute(() -> {
 			ChannelSftp ch = null;
 			ChannelExec channel = null;
 			ConnectManager connMgr = getConnMgr();
 			try {
+				String destFile = String.format("%s/%s", proc.getPath(),file.getName());
 				updateStatus(id, proc, "正在连接服务器");
 				Session session = createSession(host);
 				updateStatus(id, proc, "开始上传文件");
 				ch = (ChannelSftp) session.openChannel("sftp");
 				ch.connect(1000 * 120);
-				ch.put(file, destFile);
+				ch.put(file.getAbsolutePath(), destFile);
+				LOG.info("scp:{} to:{}",file,destFile);
 
 				updateStatus(id, proc, "文件上传成功,准备重启");
 				String cmd = String.format("cd %s;./service.sh all", path);
@@ -239,6 +238,7 @@ public class DeployController {
 					public void onResponse(String line) {
 						pushLog2Queue(proc, line, "");
 						exe.add(line);
+						exe.add("\n");
 					}
 
 					@Override

@@ -5,6 +5,7 @@ import java.io.FilenameFilter;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -57,7 +58,7 @@ public class FileUploadConstroller {
 		} else {
 			InputStream in = file.getInputStream();
 			Path target = createPath(fileName.trim());
-			Files.copy(in, target);
+			Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
 			res.put("code", 200);
 			res.put("path", target.toFile().getName());
 			in.close();
@@ -70,7 +71,8 @@ public class FileUploadConstroller {
 		// String path = String.format("%s_%s", spf.format(new Date()),
 		// fileName);
 		// return new File(base, path).toPath();
-		return new File(base, fileName).toPath();
+		File file = new File(base, fileName);
+		return file.toPath();
 	}
 
 	public static File getPath(String name) {

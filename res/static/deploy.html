@@ -41,13 +41,14 @@
         <div id="result">
           工程名
           <input type="text" size="8" id="filter" placeholder="输入tar名" onkeyup="updateTar()">
-          <select id="tar"></select>
+          <select id="tar" onchange="updaPath()"></select>
           选择主机
           <select id="hostId" onchange="loadProc()"></select>
           选择工程
           <select id="proc"></select>
           <button id="deploy" onclick="deploy()">发布</button>
           <a href="/ulc/tar.exe">前端打包工具</a>
+          <button onclick="loadRecord()">刷新</button>
         </div>
         <div id="list" class="table-responsive">
           <table class="table table-striped">
@@ -98,6 +99,10 @@
 		return fileName.substring(0, fileName.lastIndexOf("."));
 	}
 
+	function updaPath(){
+		loadHostForProject();
+	}
+	
 	function loadFiles(filter) {
 		var arg = {
 			"size" : 30,

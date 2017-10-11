@@ -58,9 +58,8 @@
                 <th>服务</th>
                 <th>主机</th>
                 <th>人员</th>
-                <th>状态</th>
-                <th>日期</th>
                 <th>进度</th>
+                <th>日期</th>
                 <th>日志</th>
               </tr>
             </thead>
@@ -71,29 +70,23 @@
       </div>
     </div>
   </div>
-  <!-- Modal -->
-  <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-          <h4 class="modal-title">Deploy log</h4>
+  <nav class="navbar navbar-default navbar-fixed-bottom">
+    <div class="container">
+      <div class="panel panel-danger" id="logDetail">
+        <div class="panel-heading">
+          <button onclick="closeLog()">close</button>
+          <label id="status">日志</label>
+          <img id="loading" src="/ulc/img/wait.gif" style="width: 30px; height: 30px;" />
         </div>
-        <div class="modal-body">
-          <div class="div">
-            <textarea id="logDetail" rows="20" cols="75" style="background: black; color: white;"></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <div class="panel-body">
+          <textarea id="logTextarea" style="min-width: 100%; min-height: 300px; background-color: black; color: white;">doing</textarea>
         </div>
       </div>
     </div>
-  </div>
-  <!-- /.modal -->
+  </nav>
 </body>
 <script type="text/javascript">
-	var waitImg = '<img src="/ulc/img/wait.gif" style="width: 30px; height: 30px;"/>';
+    var isDeployDone = false; 
 
 	function updateTar() {
 		var val = $('#filter').val();
@@ -101,8 +94,8 @@
 			loadFiles(val);
 	}
 
-	function getProject(file) {
-		return file.substring(file.indexOf('_') + 1, file.lastIndexOf("."));
+	function getProject(fileName) {
+		return fileName.substring(0, fileName.lastIndexOf("."));
 	}
 
 	function loadFiles(filter) {
@@ -114,10 +107,24 @@
 			var html = '';
 			for ( var i in d) {
 				var file = d[i];
-				var project = getProject(file);
-				html += buildOpt(file, project);
+				html += buildOpt(file, file);
 			}
 			$('#tar').html(html);
+			loadHostForProject();
+		});
+	}
+
+	function loadHostForProject() {
+		var tarName = $("#tar").find("option:selected").text();
+		var projectName = getProject(tarName);
+		$.get('./proc/getProcHosts?procName=' + projectName, function(hosts) {
+			var html = '';
+			for ( var i in hosts) {
+				var host = hosts[i];
+				html += buildOpt(host.id, host.name);
+			}
+			$('#hostId').html(html);
+			loadProc();
 		});
 	}
 
@@ -128,45 +135,35 @@
 				var record = d[i];
 				var id = record.id;
 				var rlog = record.log;
-				var prg = isFinish(record) ? "完成" : waitImg;
 				var log = "<button onclick='loadLog(" + id + ")'>日志</button>";
 
 				html += "<tr><td>" + record.id + "</td><td>" + record.project
 						+ "</td><td>" + record.host + "</td><td>"
 						+ record.author + "</td><td>" + record.status
-						+ "</td><td>" + record.time + "</td><td>" + prg
-						+ "</td><td>" + log + "</td></tr>";
+						+ "</td><td>" + record.time + "</td><td>" + log
+						+ "</td></tr>";
 			}
 			$('#record').html(html);
 		});
 	}
 
-	function openLog(log) {
-		try {
-			$('#logDetail').html(log);
-			$('#myModal').modal('show');
-		} catch (e) {
-			console.log(e)
-		}
-	}
-
-	function loadLog(id) {
-		$.get('./project/queryLog?id=' + id, function(d) {
-			openLog(d);
-		});
-	}
-
 	function loadProc() {
 		var hostId = $('#hostId').val();
+		var tarName = $("#tar").find("option:selected").text();
 		$.get('./project/getProc?hostId=' + hostId, function(procs) {
 			var html = "";
+			var selectId = -1;
 			for ( var i in procs) {
 				var item = procs[i];
 				var id = item.id;
 				var name = item.name;
 				html += buildOpt(id, name);
+				if (tarName.indexOf(name) > -1)
+					selectId = id;
 			}
 			$('#proc').html(html);
+			if (selectId != -1)
+				$("#proc").val(selectId);
 		});
 	}
 
@@ -191,42 +188,10 @@
 		});
 	}
 
-	function findTd(id, d) {
-		$("#record > tr").each(function() {
-			var cid = $(this).children('td:eq(0)').text();
-			if (cid == id) {
-				statusTd = $(this).children('td:eq(4)');
-				logTd = $(this).children('td:eq(7)');
-				prgTd = $(this).children('td:eq(6)');
-				statusTd.text(d.status);
-			}
-		});
-	}
-
-	var statusTd, logTd, prgTd;
-	function doCheck(id) {
-		$.get('./project/check?id=' + id, function(d) {
-			if (!statusTd) {
-				findTd(id, d);
-			}
-			statusTd.text(d.status);
-			if (!isFinish(d)) {
-				window.setTimeout(doCheck, 1000, id);
-			} else {
-				prgTd.html("完成");
-				openLog(d.log)
-			}
-		});
-	}
-
 	function isFinish(redocrd) {
 		var status = redocrd.status;
 		if (status)
 			return status.match('部署完成|部署失败|部署成功') != null;
-	}
-
-	function startCheck(id) {
-		window.setTimeout(doCheck, 1000, id);
 	}
 
 	function deploy() {
@@ -242,21 +207,87 @@
 			if (a == false)
 				return;
 		}
-		$.post('./project/deploy', {
-			"tar" : $('#tar').val(),
-			"procId" : $('#proc').val(),
-			"hostId" : $('#hostId').val(),
-		}, function(d) {
-			if (d.code == 200)
-				startCheck(d.id);
-			loadRecord();
+		var data = {
+				"tar" : tar,
+				"procId" : proc,
+				"hostId" : host,
+		};
+		$.ajax({
+			data : data,
+			type : "POST",
+			dataType:'json',
+			url : "./project/deploy",
+			success : function(data) {
+				if(data.error){
+				  openLog(data.info);
+				}else{
+				 loadRecord();
+				}
+			},
+			error:function(XMLHttpRequest, textStatus, errorThrown){
+			   alert(textStatus);	
+			}
 		});
-		$("#imgWait").show();
+		startLongPolling(proc,tar,hostName);
+	}
+
+	function openLog(log) {
+		appendLog(log);
+		$("#logDetail").show(500);
+	}
+
+	function closeLog() {
+		$("#logDetail").hide(500);
+		$("#logTextarea").text('');
+	}
+
+	function loadLog(id) {
+		$.get('./project/queryLog?id=' + id, openLog);
+	}
+
+	function appendLog(log) {
+		var txtAr = $("#logTextarea");
+		var obj = txtAr [0]; 
+		var old = txtAr.text();
+		txtAr.text(old + '\n' + log);
+		obj.scrollTop = obj.scrollHeight
+	}
+
+	/**长轮询**/
+	function startLongPolling(procId,tar,hostName) {
+		openLog('正在执行');
+		$('#loading').show();
+		$('#status').text('正在发布'+tar+'到'+hostName);
+		var url = './project/check?procId=' + procId;
+		var getting = {
+			url : url,
+			type :'get',
+			timeout : 600000,
+			success : function(res) {
+				isDeployDone = res.match('部署完成|部署失败|部署成功');
+				$('#loading').hide();
+				appendLog(res);
+				loadRecord();
+				if(isDeployDone){
+					$('#status').text(tar+'成功发布到'+hostName);
+				}
+			},
+			error : function(XMLHttpRequest, textStatus, errorThrown) {
+				alert(textStatus);
+			},
+			complete : function(XMLHttpRequest,status){ 
+				//status还有success,error等值的情况status=='timeout'
+				if(!isDeployDone)
+				　$.ajax(getting);
+			　　}
+		};
+		$.ajax(getting);
 	}
 
 	$(function() {
+		$("#logDetail").hide();
+		$('#loading').hide();
 		bindMenus('#menuId');
-		asynLoadHost('#hostId');
 		loadFiles();
 		loadRecord();
 	});

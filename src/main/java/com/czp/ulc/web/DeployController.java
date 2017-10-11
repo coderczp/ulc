@@ -8,10 +8,13 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.annotation.PreDestroy;
 import javax.servlet.http.HttpServletRequest;
@@ -35,6 +38,7 @@ import com.czp.ulc.core.dao.HostDao;
 import com.czp.ulc.core.dao.IDeployRecordDao;
 import com.czp.ulc.core.dao.ProcessorDao;
 import com.czp.ulc.module.conn.ConnectManager;
+import com.czp.ulc.module.conn.IExeCallBack;
 import com.czp.ulc.util.MiniHeap;
 import com.czp.ulc.util.Utils;
 import com.jcraft.jsch.ChannelExec;
@@ -65,6 +69,8 @@ public class DeployController {
 
 	private Map<String, Session> maps = new ConcurrentHashMap<>();
 
+	private ConcurrentHashMap<Integer, BlockingQueue<String>> logMap = new ConcurrentHashMap<>();
+
 	private static final Logger LOG = LoggerFactory.getLogger(WebErrorHandler.class);
 
 	private ExecutorService service = ThreadPools.getInstance().newPool("deploy-worker", 2);
@@ -79,11 +85,25 @@ public class DeployController {
 	}
 
 	@RequestMapping("/check")
-	public Object check(int id) {
-		DeployRecord record = new DeployRecord();
-		record.setId(id);
-		record = dDao.selectOne(record);
-		return record;
+	public Object check(int procId) {
+		try {
+			while (!logMap.containsKey(procId)) {
+				synchronized (logMap) {
+					logMap.wait();
+				}
+			}
+
+			BlockingQueue<String> queue = logMap.get(procId);
+			String log = queue.take();
+			StringBuilder sb = new StringBuilder(log);
+			while (!queue.isEmpty()) {
+				sb.append(queue.poll());
+			}
+			return sb;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return "time out";
+		}
 	}
 
 	@RequestMapping("/queryLog")
@@ -143,17 +163,20 @@ public class DeployController {
 	@PostMapping("/deploy")
 	public Object deploy(HttpServletRequest req, @RequestParam String tar, int hostId, int procId) {
 
+		if (logMap.containsKey(procId))
+			throw new RuntimeException(tar + " 发布中,不允许并行发布");
+
 		File tarFile = FileUploadConstroller.getPath(tar);
 		if (!tarFile.exists()) {
-			throw new RuntimeException(tar + " not exist,please upload frist");
+			throw new RuntimeException(tar + " 找不到,请上传");
 		}
 		HostBean host = dao.get(hostId);
 		if (host == null) {
-			throw new RuntimeException("host not exist,please check");
+			throw new RuntimeException("所选主机为配置");
 		}
 		ProcessorBean proc = pDao.get(procId);
 		if (proc == null) {
-			throw new RuntimeException("project not exist,please check");
+			throw new RuntimeException("所选工程未配置");
 		}
 		JSONObject json = new JSONObject();
 		try {
@@ -179,7 +202,7 @@ public class DeployController {
 
 			int res = dDao.insertUseGeneratedKeys(record);
 			if (res > 0) {
-				doDeploy(path, host, file, destPath, record.getId());
+				doDeploy(path, host, proc, file, destPath, record.getId());
 			} else {
 				throw new RuntimeException("添加部署记录失败,请重试");
 			}
@@ -192,45 +215,59 @@ public class DeployController {
 		return json;
 	}
 
-	private void doDeploy(String path, HostBean host, String file, String destFile, Integer id) {
+	private void doDeploy(String path, HostBean host, ProcessorBean proc, String file, String destFile, Integer id) {
 		service.execute(() -> {
 			ChannelSftp ch = null;
 			ChannelExec channel = null;
 			ConnectManager connMgr = getConnMgr();
 			try {
-				updateStatus(id, "开始上传文件");
+				updateStatus(id, proc, "正在连接服务器");
 				Session session = createSession(host);
-				updateStatus(id, "正在连接服务器");
+				updateStatus(id, proc, "开始上传文件");
 				ch = (ChannelSftp) session.openChannel("sftp");
 				ch.connect(1000 * 120);
 				ch.put(file, destFile);
 
-				updateStatus(id, "文件上传成功,准备重启");
+				updateStatus(id, proc, "文件上传成功,准备重启");
 				String cmd = String.format("cd %s;./service.sh all", path);
 				LOG.info("upload file success,will exe:{}", cmd);
 				channel = (ChannelExec) session.openChannel("exec");
-				List<String> exe = connMgr.doExe(host.getName(), cmd, session);
-				if (exe.isEmpty()) {
-					updateStatus(id, "部署失败", "请检查工程目录是否有lock");
-				} else {
-					String log = exe.toString();
-					if (log.length() > 6000) {
-						log = log.substring(0, 6000);
+				List<String> exe = new LinkedList<>();
+				connMgr.doExeWithProcess(host.getName(), cmd, session, new IExeCallBack() {
+
+					@Override
+					public void onResponse(String line) {
+						pushLog2Queue(proc, line, "");
+						exe.add(line);
 					}
-					updateStatus(id, "部署完成", log);
+
+					@Override
+					public void onError(String err) {
+						if (err.length() > 0)
+							pushLog2Queue(proc, err, "请检查工程目录是否有lock");
+						// updateStatus(id, proc, "部署失败", "请检查工程目录是否有lock");
+					}
+				});
+
+				String log = exe.toString();
+				if (log.length() > 6000) {
+					log = log.substring(0, 6000);
 				}
+				updateStatus(id, proc, "部署完成", log);
 			} catch (Throwable e) {
 				LOG.error("error", e);
 				StringWriter s = new StringWriter();
 				e.printStackTrace(new PrintWriter(s));
-				updateStatus(id, "部署失败,内部错误", s.toString());
+				updateStatus(id, proc, "部署失败,内部错误", s.toString());
 			} finally {
+				logMap.remove(proc.getId());
 				if (ch != null)
 					ch.disconnect();
 				if (channel != null)
 					channel.disconnect();
 			}
 		});
+
 	}
 
 	public synchronized Session createSession(HostBean bean) throws JSchException {
@@ -252,7 +289,26 @@ public class DeployController {
 		return context.getBean(ConnectManager.class);
 	}
 
-	private DeployRecord updateStatus(Integer id, String status, String log) {
+	private void pushLog2Queue(ProcessorBean proc, String status, String log) {
+		Integer pid = proc.getId();
+		BlockingQueue<String> queue = logMap.get(pid);
+		if (queue == null) {
+			synchronized (logMap) {
+				if (!logMap.containsKey(pid)) {
+					logMap.put(pid, new LinkedBlockingQueue<>(10000));
+					logMap.notifyAll();
+				}
+			}
+		}
+		queue = logMap.get(pid);
+		if (status.length() > 0)
+			queue.add(status);
+		if (log.length() > 0)
+			queue.add(log);
+	}
+
+	private DeployRecord updateStatus(Integer id, ProcessorBean proc, String status, String log) {
+		pushLog2Queue(proc, status, log);
 		DeployRecord record = new DeployRecord();
 		record.setStatus(status);
 		record.setLog(log);
@@ -261,7 +317,7 @@ public class DeployController {
 		return record;
 	}
 
-	private DeployRecord updateStatus(Integer id, String status) {
-		return updateStatus(id, status, "");
+	private DeployRecord updateStatus(Integer id, ProcessorBean proc, String status) {
+		return updateStatus(id, proc, status, "");
 	}
 }

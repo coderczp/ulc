@@ -33,6 +33,11 @@ import com.czp.ulc.web.QueryCondtion;
  */
 public class DynamicSql {
 
+	public String queryProcHost(String procName) {
+		return String.format("select a.name,a.id from processor b,host_bean a where a.id = b.hostId and b.name='%s'",
+				procName);
+	}
+
 	public String listProc(ProcessorBean arg) {
 		String where = "where 1=1";
 		if (Utils.notEmpty(arg.getHostId()))

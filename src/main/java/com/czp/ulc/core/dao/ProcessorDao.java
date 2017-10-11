@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.apache.ibatis.annotations.SelectProvider;
 
+import com.czp.ulc.core.bean.HostBean;
 import com.czp.ulc.core.bean.ProcessorBean;
 import com.czp.ulc.core.mybatis.BaseDao;
 import com.czp.ulc.core.mybatis.DynamicSql;
@@ -26,4 +27,7 @@ public interface ProcessorDao extends BaseDao<ProcessorBean>{
 	
 	@SelectProvider(type = DynamicSql.class, method = "listProc")
 	List<ProcessorBean> list(ProcessorBean arg);
+	
+	@SelectProvider(type = DynamicSql.class, method = "queryProcHost")
+	List<HostBean> queryProcHost(String procName);
 }

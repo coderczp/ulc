@@ -1,6 +1,8 @@
 package com.czp.ulc.module.conn;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -86,6 +88,29 @@ public class ConnectManager implements MessageListener<HostBean> {
 		if (session == null)
 			return notFound;
 		return doExe(hostName, cmd, session);
+	}
+
+	public void doExeWithProcess(String hostName, String cmd, Session session, IExeCallBack cb) {
+		try {
+			ByteArrayOutputStream err = new ByteArrayOutputStream();
+			ChannelExec channel = (ChannelExec) session.openChannel("exec");
+			channel.setCommand(cmd);
+			channel.setInputStream(null);
+			channel.setErrStream(err);
+			channel.connect();
+
+			String line;
+			BufferedReader br = new BufferedReader(new InputStreamReader(channel.getInputStream()));
+			while ((line = br.readLine()) != null) {
+				cb.onResponse(line);
+			}
+			channel.disconnect();
+			cb.onError(err.toString());
+			LOG.info("sucess to execute:{} in host:{}", cmd, hostName);
+		} catch (Exception e) {
+			LOG.error("execute error:" + cmd, e);
+			cb.onError("server error,try again," + e);
+		}
 	}
 
 	public List<String> doExe(String hostName, String cmd, Session session) {

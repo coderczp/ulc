@@ -118,7 +118,7 @@
 		var type = sel.val();
 		if (type == 'all')
 			return;
-		if(type == 'remove')
+		if (type == 'remove')
 			return remove(id);
 
 		if (!confirm("确认操作?"))
@@ -132,7 +132,7 @@
 			"disabled" : "disabled"
 		});
 		$('#tip').text('正在执行:' + type);
-		$.get('./proc/mgr', arg, function(data) {
+		$.get('./proc/exe', arg, function(data) {
 			alert(data.join('\n'));
 			sel.removeAttr("disabled");
 			sel.val("all");
@@ -159,6 +159,7 @@
 			'start' : '启动',
 			'remove' : '删除',
 			'frestart' : '强制重启',
+			'deploy' : '强制部署',
 			'tarlog' : '压缩日志',
 		};
 		for ( var i in data) {

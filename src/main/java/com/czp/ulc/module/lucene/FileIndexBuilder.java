@@ -124,7 +124,7 @@ public class FileIndexBuilder {
 						String line = data[3];
 						String srcFile = data[2];
 						long time = Long.valueOf(data[0]);
-						doAddIndex(host, srcFile, line, time);
+						addIndex(host, srcFile, line, time);
 					}
 					boolean delete = file.delete();
 					long end = System.currentTimeMillis();
@@ -191,7 +191,7 @@ public class FileIndexBuilder {
 	private void asynAddDoc(String host, String file, String line, long now, RollingWriterResult result) {
 		worker.execute(() -> {
 			try {
-				doAddIndex(host, file, line, now);
+				addIndex(host, file, line, now);
 				if (result.isFileChanged()) {
 					commitIndex(result.getLastFile());
 				}
@@ -201,7 +201,7 @@ public class FileIndexBuilder {
 		});
 	}
 
-	private void doAddIndex(String host, String file, String line, long now) throws IOException {
+	private void addIndex(String host, String file, String line, long now) throws IOException {
 		lineCount.getAndIncrement();
 		Date day = Utils.toDay(now);
 		SimpleDateFormat sp = new SimpleDateFormat(LuceneConfig.FORMAT);

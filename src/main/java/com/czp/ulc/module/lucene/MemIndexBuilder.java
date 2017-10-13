@@ -176,7 +176,7 @@ public class MemIndexBuilder implements MessageListener<ReadResult> {
 			if (pv != null) {
 				json.put(host, pv + 1);
 			} else {
-				json.put(host, 1l);
+				json.put(host, 1L);
 			}
 		}
 		long end = System.currentTimeMillis();

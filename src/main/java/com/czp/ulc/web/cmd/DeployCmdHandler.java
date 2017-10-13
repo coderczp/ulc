@@ -22,7 +22,7 @@ public class DeployCmdHandler extends AbstractCmdHandler {
 	@Override
 	protected String buildShellCmd(String type, ProcessorBean proc) {
 		String path = proc.getPath();
-		return String.format("cd %s;./service.sh all", path);
+		return String.format("cd %s;rm -rf lock;./service.sh all", path);
 	}
 
 }

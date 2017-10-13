@@ -79,7 +79,7 @@ public class ZkManager {
 		}
 		return sb.toString();
 	}
-	
+
 	/***
 	 * 构建zk路径
 	 * 
@@ -116,7 +116,8 @@ public class ZkManager {
 
 	@PreDestroy
 	public void onStop() {
-		if (zkClient != null)
+		if (zkClient != null) {
 			zkClient.close();
+		}
 	}
 }

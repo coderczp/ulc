@@ -45,7 +45,7 @@ public class AccessFilter implements Filter {
 	public static final String CALLBACK = "/callback";
 	private static final String TOKEN_NAME = "account";
 	private static final int COOK_TIMEOUT = 60 * 60 * 24 * 10;
-	private static final long AUTH_TIMEOUT = 1000 * 60 * 60 * 24 * 30l;
+	private static final long AUTH_TIMEOUT = 1000 * 60 * 60 * 24 * 30L;
 	private static Logger LOG = LoggerFactory.getLogger(AccessFilter.class);
 	private static String[] deviceArray = new String[] { "android", "mac os", "windows phone" };
 

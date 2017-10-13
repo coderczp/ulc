@@ -19,6 +19,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.core.ArgInvalideException;
 import com.czp.ulc.core.bean.HostBean;
@@ -80,12 +81,53 @@ public class HostController {
 	}
 
 	@RequestMapping("/list")
-	public List<HostBean> list(String json) {
-		List<HostBean> list = (json != null) ? dao.list(JSONObject.parseObject(json)) : dao.list(null);
-		for (HostBean hostBean : list) {
-			hostBean.setPwd(null);
-		}
+	public List<HostBean> list(HostBean bean) {
+		List<HostBean> list = dao.listSpec("id,name,host", bean);
 		return list;
+	}
+	
+	@RequestMapping("/listSpec")
+	public Object listSpec(HostBean bean) {
+		JSONArray items = new JSONArray();
+		ConnectManager mgr = getConnMgr();
+		List<HostBean> list = dao.listSpec("name,host", bean);
+		for (HostBean hostBean : list) {
+			List<String> res = mgr.exe(hostBean.getName(), "cat /proc/cpuinfo| grep 'processor'| wc -l;cat /etc/issue; cat /proc/meminfo|head -n2;df -h");
+			JSONObject host = (JSONObject) JSONObject.toJSON(hostBean);
+			if (res.size()>4) {
+				/*****
+				 * <pre>
+				 *  
+				8
+				CentOS release 6.8 (Final)
+				Kernel \r on an \m
+				
+				MemTotal:       32747444 kB
+				MemFree:          228056 kB
+				Filesystem            Size  Used Avail Use% Mounted on
+				/dev/mapper/          3.6T  3.2T  275G  93% /
+				tmpfs                  16G     0   16G   0% /dev/shm
+				/dev/sda2             477M   48M  404M  11% /boot
+				/dev/sda1             200M  264K  200M   1% /boot/efi
+				 * <pre>
+				 */
+				String os = res.get(1);
+				String cpus = res.get(0);
+				host.put("os", os);
+				host.put("cpus", cpus);
+				try {
+					String memFree = res.get(5).split(" +")[1];
+					String memTotal = res.get(4).split(" +")[1];
+					host.put("mem_free", Integer.valueOf(memFree)/1024);
+					host.put("mem_total", Integer.valueOf(memTotal)/1024);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				
+			}
+			items.add(host);
+		}
+		return items;
 	}
 
 	private void notifyConnectChange(HostBean bean, String type) {

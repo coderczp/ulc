@@ -33,30 +33,33 @@
   <!--导航-->
   <div class="container-fluid" style="margin-top: 50px">
     <div class="panel panel-success">
-      <div class="form-inline" role="form">
-        <div class="form-group">
-          <input id='name' type="text" class="form-control" placeholder="name">
-        </div>
-        <div class="form-group">
-          <input id='host' type="text" class="form-control" placeholder="host">
-        </div>
-        <div class="form-group">
-          <input id='port' type="text" class="form-control" placeholder="port">
-        </div>
-        <div class="form-group">
-          <input id='user' type="text" class="form-control" placeholder="user">
-        </div>
-        <div class="form-group">
-          <input id='pwd' type="text" class="form-control" placeholder="password">
-        </div>
-        <div class="form-group">
-          <select id="monitor" class="form-control">
-            <option value="0">监控</option>
-            <option value="1">不监控</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <button onclick="addHost()" class="form-control">submit</button>
+      <div class="panel-heading">
+        <div class="form-inline" role="form">
+          <div class="form-group">
+            <input id='name' type="text" class="form-control" placeholder="name">
+          </div>
+          <div class="form-group">
+            <input id='host' type="text" class="form-control" placeholder="host">
+          </div>
+          <div class="form-group">
+            <input id='port' type="text" class="form-control" placeholder="port">
+          </div>
+          <div class="form-group">
+            <input id='user' type="text" class="form-control" placeholder="user">
+          </div>
+          <div class="form-group">
+            <input id='pwd' type="text" class="form-control" placeholder="password">
+          </div>
+          <div class="form-group">
+            <select id="monitor" class="form-control">
+              <option value="0">监控</option>
+              <option value="1">不监控</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <button onclick="addHost()" class="form-control">Add</button>
+            <button onclick="loadHosts()" class="form-control">Query</button>
+          </div>
         </div>
       </div>
       <div class="panel-body">
@@ -66,8 +69,10 @@
               <tr>
                 <th>name</th>
                 <th>host</th>
-                <th>port</th>
-                <th>user</th>
+                <th>os</th>
+                <th>cpus</th>
+                <th>mem-total(Mb)</th>
+                <th>mem-free(mb)</th>
                 <th>monitor</th>
                 <th>op</th>
               </tr>
@@ -89,28 +94,8 @@
 		alert('not support');
 	}
 
-	function loadHosts() {
-		$.get('./host/list', function(d) {
-			var html = '';
-			for ( var i in d) {
-				var host = d[i];
-				var id = host.id;
-				var ip = host.host;
-				var port = host.port;
-				var name = host.name;
-				var user = host.user;
-				var status = host.status == 0 ? '监控' : '不监控';
-				var del = "<button onclick='remove(" + id + ")'>删除</button>";
-
-				html += "<tr>" + tr(name) + tr(ip) + tr(port) + tr(user)
-						+ tr(status) + tr(del) + "</tr>";
-			}
-			$('#record').html(html);
-		});
-	}
-
-	function addHost() {
-		var param = {
+	function gerParam() {
+		return {
 			"pwd" : $('#pwd').val().trim(),
 			"name" : $('#name').val().trim(),
 			"host" : $('#host').val().trim(),
@@ -118,6 +103,38 @@
 			"user" : $('#user').val().trim(),
 			"status" : $('#monitor').val(),
 		};
+	}
+
+	function loadHosts() {
+		var param = gerParam();
+		$.get('./host/listSpec', param,
+				function(d) {
+					var html = '';
+					for ( var i in d) {
+						var host = d[i];
+						var id = host.id;
+						var ip = host.host;
+						var name = host.name;
+						var os = host.os;
+						var cpus = host.cpus;
+						var mem_all = host.mem_total;
+						var mem_free = host.mem_free;
+						var status = host.status == 0 ? '监控' : '不监控';
+						var del = "<button onclick='remove(" + id
+								+ ")'>删除</button>";
+						var rate = '[' + ((mem_free / mem_all).toFixed(2))
+								* 100 + '%]';
+
+						html += "<tr>" + tr(name) + tr(ip) + tr(os) + tr(cpus)
+								+ tr(mem_all) + tr(mem_free + rate)
+								+ tr(status) + tr(del) + "</tr>";
+					}
+					$('#record').html(html);
+				});
+	}
+
+	function addHost() {
+		var param = gerParam();
 		if (!param.name)
 			return alert('name is empty');
 		if (!param.host)

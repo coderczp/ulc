@@ -109,8 +109,9 @@ public class Application extends WebMvcConfigurerAdapter
 			File[] listFiles = file.listFiles();
 			Properties config = new Properties();
 			for (File item : listFiles) {
-				if (!item.toString().endsWith(".properties"))
+				if (!item.toString().endsWith(".properties")) {
 					continue;
+				}
 				FileSystemResource resTmp = new FileSystemResource(item);
 				InputStream is = resTmp.getInputStream();
 				config.load(is);
@@ -177,8 +178,9 @@ public class Application extends WebMvcConfigurerAdapter
 
 	@Override
 	public void onSystemExit() {
-		if (context == null)
+		if (context == null) {
 			return;
+		}
 		stopModule();
 
 	}

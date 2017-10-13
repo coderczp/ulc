@@ -34,8 +34,20 @@ import com.czp.ulc.web.QueryCondtion;
 public class DynamicSql {
 
 	public String queryProcHost(String procName) {
-		return String.format("select a.name,a.id from processor b,host_bean a where a.id = b.hostId and b.name='%s'",
-				procName);
+		return "select distinct(a.name), a.id from processor b,host_bean a where a.id = b.hostId and b.name like '%" + procName
+				+ "%'";
+	}
+
+	public String listSpecHost(String cols, HostBean arg) {
+		String where = "where 1=1";
+		if (Utils.notEmpty(arg.getId()))
+			where += " AND hostId=" + arg.getId();
+		if (Utils.notEmpty(arg.getName()))
+			where += " AND name like '%" + arg.getName() + "%'";
+		if (Utils.notEmpty(arg.getHost()))
+			where += " AND host= '" + arg.getHost() + "'";
+		String sql = String.format("select %s from host_bean %s", cols, where);
+		return sql;
 	}
 
 	public String listProc(ProcessorBean arg) {

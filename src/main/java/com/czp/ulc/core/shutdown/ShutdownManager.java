@@ -83,8 +83,9 @@ public class ShutdownManager extends Thread implements SignalHandler {
 	@Override
 	public void handle(Signal arg0) {
 		log.info("recive signal:{}", arg0);
-		if (!hasExecute)
+		if (!hasExecute) {
 			run();
+		}
 	}
 
 }

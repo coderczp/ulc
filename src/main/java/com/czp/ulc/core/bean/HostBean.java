@@ -42,7 +42,7 @@ public class HostBean implements Serializable {
 	@NotEmpty(message = "pwd isempty")
 	private String pwd;
 
-	private int port = DEFAULT_PORT;
+	private Integer port;
 
 	private int status = STATUS_NO_MONITOR;
 
@@ -64,11 +64,11 @@ public class HostBean implements Serializable {
 		this.status = status;
 	}
 
-	public int getPort() {
+	public Integer getPort() {
 		return port;
 	}
 
-	public void setPort(int port) {
+	public void setPort(Integer port) {
 		this.port = port;
 	}
 
@@ -120,20 +120,26 @@ public class HostBean implements Serializable {
 
 	@Override
 	public boolean equals(Object obj) {
-		if (this == obj)
+		if (this == obj) {
 			return true;
-		if (obj == null)
+		}
+		if (obj == null) {
 			return false;
-		if (getClass() != obj.getClass())
+		}
+		if (getClass() != obj.getClass()) {
 			return false;
+		}
 		HostBean other = (HostBean) obj;
 		if (host == null) {
-			if (other.host != null)
+			if (other.host != null) {
 				return false;
-		} else if (!host.equals(other.host))
+			}
+		} else if (!host.equals(other.host)) {
 			return false;
-		if (port != other.port)
+		}
+		if (!port.equals(other.port)) {
 			return false;
+		}
 		return true;
 	}
 

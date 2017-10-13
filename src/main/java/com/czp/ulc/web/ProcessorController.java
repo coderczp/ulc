@@ -78,13 +78,7 @@ public class ProcessorController {
 	public List<HostBean> getProcHosts(String procName) {
 		List<HostBean> hosts = dao.queryProcHost(procName);
 		if (hosts.isEmpty()) {
-			hosts = hDao.list(null);
-		}
-		for (HostBean hostBean : hosts) {
-			hostBean.setUser(null);
-			hostBean.setPwd(null);
-			hostBean.setHost(null);
-			hostBean.setPort(0);
+			hosts = hDao.listSpec("name,id", null);
 		}
 		return hosts;
 	}

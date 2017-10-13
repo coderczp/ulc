@@ -58,7 +58,7 @@ public class FileParallelSearch {
 			this.indexFile = indexFile;
 		}
 
-		public boolean isOverdue() {
+		public boolean isChanged() {
 			return indexFile.lastModified() > lastModifyTime;
 		}
 	}
@@ -82,8 +82,8 @@ public class FileParallelSearch {
 			try {
 				QueryCondtion cdt = search.getQuery();
 				Set<String> feilds = search.getFeilds();
-				Query realQuery = removeHostCondtion(search);
-				IndexSearcher searcher = getCachedSearch(indexFile, host);
+				Query realQuery = removeHostParam(search);
+				IndexSearcher searcher = getCachedSearcher(indexFile, host);
 				TopDocs docs = searcher.search(realQuery, cdt.getSize());
 				matchs.getAndAdd(docs.totalHits);
 				for (ScoreDoc scoreDoc : docs.scoreDocs) {
@@ -133,16 +133,16 @@ public class FileParallelSearch {
 
 	}
 
-	private IndexSearcher getCachedSearch(File file, String host) {
+	private IndexSearcher getCachedSearcher(File file, String host) {
 		try {
 			IndexSearcherWrapper searcher = dirMap.get(file);
-			if (searcher != null && !searcher.isOverdue()) {
+			if (searcher != null && !searcher.isChanged()) {
 				return searcher.search;
 			}
 			// 锁住目录
 			synchronized (file) {
 				// 关闭过期目录
-				if (searcher != null && searcher.isOverdue()) {
+				if (searcher != null && searcher.isChanged()) {
 					dirMap.remove(file).search.getIndexReader().close();
 				}
 				if (!dirMap.containsKey(file)) {
@@ -225,11 +225,11 @@ public class FileParallelSearch {
 			try {
 				String host = luceneFile.getServer();
 				String path = luceneFile.getPath();
-				Query realQuery = removeHostCondtion(search);
-				IndexSearcher searcher = getCachedSearch(new File(path), host);
-				long mtatch = searcher.count(realQuery);
-				json.put(host, mtatch + json.getOrDefault(host, 0l));
-				count.getAndAdd(mtatch);
+				Query realQuery = removeHostParam(search);
+				IndexSearcher searcher = getCachedSearcher(new File(path), host);
+				long match = searcher.count(realQuery);
+				json.put(host, match + json.getOrDefault(host, 0L));
+				count.getAndAdd(match);
 				lock.countDown();
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -243,7 +243,7 @@ public class FileParallelSearch {
 	 * @param search
 	 * @return
 	 */
-	private Query removeHostCondtion(SearchCallback search) {
+	private Query removeHostParam(SearchCallback search) {
 		return search.getQuery().buildFileIndexQuery();
 	}
 }

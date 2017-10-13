@@ -50,8 +50,9 @@ public class DaemonTimer implements Runnable {
 
 	public void addTask(Runnable runnable, int peroid) {
 		tasks.add(new TimerTask(runnable, peroid));
-		if (!timerThread.isAlive())
+		if (!timerThread.isAlive()) {
 			timerThread.start();
+		}
 	}
 
 	/**
@@ -61,7 +62,7 @@ public class DaemonTimer implements Runnable {
 	 */
 	public void removeTask(Runnable runnable) {
 		Iterator<TimerTask> it = tasks.iterator();
-		while(it.hasNext()) {
+		while (it.hasNext()) {
 			TimerTask item = it.next();
 			if (item.task.equals(runnable)) {
 				it.remove();

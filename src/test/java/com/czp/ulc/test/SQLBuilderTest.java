@@ -40,6 +40,7 @@ public class SQLBuilderTest {
 		HostBean param = new HostBean();
 		param.setId(123);
 		param.setUser("user");
+		param.setPort(HostBean.DEFAULT_PORT);
 		String sql = dynamicSql.updateHost(param);
 		System.out.println(sql);
 		assertTrue("create updateHost sql error", sql.contains("user="));

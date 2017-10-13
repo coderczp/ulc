@@ -93,9 +93,9 @@ public class MybatisAutoConfiguration {
 
 	private Resource[] getMappers() throws Exception {
 		File file = new File(env.getProperty("mybatis.mapper.path"));
-		if (file.isFile())
+		if (file.isFile()){
 			return new Resource[] { new FileSystemResource(file.getAbsolutePath()) };
-
+		} 
 		File[] files = file.getParentFile().listFiles();
 		Resource[] resources = new Resource[files.length];
 		for (int i = 0; i < resources.length; i++) {

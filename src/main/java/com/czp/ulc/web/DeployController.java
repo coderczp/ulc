@@ -41,7 +41,6 @@ import com.czp.ulc.module.conn.ConnectManager;
 import com.czp.ulc.module.conn.IExeCallBack;
 import com.czp.ulc.util.MiniHeap;
 import com.czp.ulc.util.Utils;
-import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
@@ -215,41 +214,48 @@ public class DeployController {
 	private void doDeploy(String path, HostBean host, ProcessorBean proc, File file, Integer id) {
 		service.execute(() -> {
 			ChannelSftp ch = null;
-			ChannelExec channel = null;
 			ConnectManager connMgr = getConnMgr();
 			try {
-				String destFile = String.format("%s/%s", proc.getPath(),file.getName());
-				updateStatus(id, proc, "正在连接服务器");
-				Session session = createSession(host);
-				updateStatus(id, proc, "开始上传文件");
-				ch = (ChannelSftp) session.openChannel("sftp");
-				ch.connect(1000 * 120);
-				ch.put(file.getAbsolutePath(), destFile);
-				LOG.info("scp:{} to:{}",file,destFile);
+				String destFile = String.format("%s/%s", proc.getPath(), file.getName());
+				List<String> result = new LinkedList<>();
+				updateStatus(id, proc, "检查工程环境");
+				String checkCmd = String.format("cd %s;ls |grep lock |grep -v '.lock'", path);
+				LOG.info("will exe:{}", checkCmd);
+				List<String> checkRes = connMgr.exe(host.getName(), checkCmd);
+				if (checkRes.size() > 0) {
+					result.add("工程目录下有lock,可能上次重启失败,请处理");
+				} else {
+					int connectTimeout = 1000 * 180;
+					long start = System.currentTimeMillis();
+					updateStatus(id, proc, "正在连接服务器");
+					Session session = createSession(host);
+					updateStatus(id, proc, "开始上传文件,最多等待180秒");
+					ch = (ChannelSftp) session.openChannel("sftp");
+					ch.connect(connectTimeout);
+					ch.put(file.getAbsolutePath(), destFile);
+					LOG.info("scp:{} to:{}", file, destFile);
+					long end = System.currentTimeMillis();
+					updateStatus(id, proc,String.format("文件上传成功,耗时:%s秒", (start - end) / 1000));
+					String cmd = String.format("cd %s;./service.sh all", path);
+					LOG.info("upload file success,will exe:{}", cmd);
+					connMgr.doExeWithProcess(host.getName(), cmd, session, new IExeCallBack() {
 
-				updateStatus(id, proc, "文件上传成功,准备重启");
-				String cmd = String.format("cd %s;./service.sh all", path);
-				LOG.info("upload file success,will exe:{}", cmd);
-				channel = (ChannelExec) session.openChannel("exec");
-				List<String> exe = new LinkedList<>();
-				connMgr.doExeWithProcess(host.getName(), cmd, session, new IExeCallBack() {
+						@Override
+						public void onResponse(String line) {
+							pushLog2Queue(proc, line, "");
+							result.add(line);
+							result.add("\n");
+						}
 
-					@Override
-					public void onResponse(String line) {
-						pushLog2Queue(proc, line, "");
-						exe.add(line);
-						exe.add("\n");
-					}
-
-					@Override
-					public void onError(String err) {
-						if (err.length() > 0)
-							pushLog2Queue(proc, err, "请检查工程目录是否有lock");
-						// updateStatus(id, proc, "部署失败", "请检查工程目录是否有lock");
-					}
-				});
-
-				String log = exe.toString();
+						@Override
+						public void onError(String err) {
+							if (err.length() > 0)
+								pushLog2Queue(proc, err, "发生错误");
+							result.add("发生错误:" + err);
+						}
+					});
+				}
+				String log = result.toString();
 				if (log.length() > 6000) {
 					log = log.substring(0, 6000);
 				}
@@ -258,13 +264,12 @@ public class DeployController {
 				LOG.error("error", e);
 				StringWriter s = new StringWriter();
 				e.printStackTrace(new PrintWriter(s));
-				updateStatus(id, proc, "部署失败,内部错误", s.toString());
+				String info = s.toString();
+				updateStatus(id, proc, "部署失败,内部错误", info);
 			} finally {
 				logMap.remove(proc.getId());
 				if (ch != null)
 					ch.disconnect();
-				if (channel != null)
-					channel.disconnect();
 			}
 		});
 

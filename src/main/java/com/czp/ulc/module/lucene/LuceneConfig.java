@@ -23,7 +23,7 @@ public class LuceneConfig {
 	/** 索引根目录 */
 	private static File indexDir;
 
-	/** 未压缩文件目录 */
+	/** 待索引的文件目录 */
 	private static File dataDir;
 
 	/** 索引文件目录日期格式 */

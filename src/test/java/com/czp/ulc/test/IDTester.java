@@ -28,7 +28,7 @@ import com.czp.ulc.util.IdGnerator;
 public class IDTester {
 
 	public static void main(String[] args) {
-         System.out.println(new Date(1504886400000l).toLocaleString());
+         System.out.println(new Date(1504886400000L).toLocaleString());
 
 	}
 	

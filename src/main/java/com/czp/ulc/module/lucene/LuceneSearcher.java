@@ -46,7 +46,9 @@ public class LuceneSearcher {
 
 	public IndexMeta getMeta() {
 		IndexMeta count = metaDao.count(null);
-		if(count==null)return new IndexMeta();
+		if (count == null) {
+			return new IndexMeta();
+		}
 		return count;
 	}
 

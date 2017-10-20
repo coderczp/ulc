@@ -90,9 +90,10 @@ public class HostController {
 	public Object listSpec(HostBean bean) {
 		JSONArray items = new JSONArray();
 		ConnectManager mgr = getConnMgr();
-		List<HostBean> list = dao.listSpec("name,host", bean);
+		List<HostBean> list = dao.listSpec("name,host,status", bean);
+		String cmd = "cat /proc/cpuinfo| grep 'processor'| wc -l;cat /etc/issue; cat /proc/meminfo|head -n2;df -h";
 		for (HostBean hostBean : list) {
-			List<String> res = mgr.exe(hostBean.getName(), "cat /proc/cpuinfo| grep 'processor'| wc -l;cat /etc/issue; cat /proc/meminfo|head -n2;df -h");
+			List<String> res = mgr.exe(hostBean.getName(), cmd);
 			JSONObject host = (JSONObject) JSONObject.toJSON(hostBean);
 			if (res.size()>4) {
 				/*****

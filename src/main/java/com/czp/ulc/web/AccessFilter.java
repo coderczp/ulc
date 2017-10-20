@@ -183,8 +183,9 @@ public class AccessFilter implements Filter {
 
 	private boolean isSkipUrl(String url) {
 		for (String string : skipUrls) {
-			if (url.contains(string))
+			if (url.contains(string)){
 				return true;
+			}	
 		}
 		return false;
 	}

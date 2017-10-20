@@ -205,8 +205,8 @@ public class FileIndexBuilder {
 		lineCount.getAndIncrement();
 		Date day = Utils.toDay(now);
 		SimpleDateFormat sp = new SimpleDateFormat(LuceneConfig.FORMAT);
-
 		Document doc = new Document();
+		doc.add(new LongPoint(DocField.TIME, now));
 		doc.add(new LongPoint(DocField.TIME, now));
 		doc.add(new TextField(DocField.LINE, line, Field.Store.YES));
 		doc.add(new TextField(DocField.FILE, file, Field.Store.YES));

@@ -2,8 +2,14 @@ package com.czp.ulc.test;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.RandomAccessFile;
 import java.nio.file.Files;
 
+import org.junit.Test;
+
+import com.czp.ulc.module.conn.MyBufferReader;
+import com.czp.ulc.module.lucene.RollingWriteResult;
 import com.czp.ulc.module.lucene.RollingWriter;
 
 /**
@@ -16,16 +22,40 @@ import com.czp.ulc.module.lucene.RollingWriter;
 
 public class AnsyAppendWriterTest {
 
+	@Test
 	public void testSyncWrite() throws Exception {
 		long st = System.currentTimeMillis();
-		RollingWriter writer = new RollingWriter(new File("log"));
-		BufferedReader lines = Files.newBufferedReader(new File("./3.log").toPath());
-		String line = null;
+		File baseDir = new File("data");
+		baseDir.mkdirs();
+		
+		RollingWriter writer = new RollingWriter(baseDir,1024*1024*10L);
+		BufferedReader lines = Files.newBufferedReader(new File("index/data/31.log").toPath());
+		String line = null,lastLine = null;
+		RollingWriteResult append = null;
 		while ((line = lines.readLine()) != null) {
-			writer.append(line.getBytes());
+			byte[] bytes = line.getBytes();
+			append = writer.append(bytes);
+			System.out.println(append);
+			lastLine = line;
 		}
 		lines.close();
 		writer.close();
 		System.out.println("nio:" + (System.currentTimeMillis() - st));
+		System.out.println(lastLine);
+		RandomAccessFile f = new RandomAccessFile(append.getCurrentFile(), "r");
+		f.seek(append.getPostion());
+		byte[] b = new byte[lastLine.length()];
+		f.read(b, 0, b.length);
+		System.out.println(new String(b));
+		f.close();
+	}
+	
+	public static void main(String[] args) throws Exception {
+		MyBufferReader mb = new MyBufferReader(new FileReader("src/main/resources/db.properties"));
+		String line = null;
+		while ((line = mb.readLine()) != null) {
+			System.out.print(line);
+		}
+		mb.close();
 	}
 }

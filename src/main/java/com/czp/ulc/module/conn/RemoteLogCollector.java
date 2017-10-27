@@ -105,7 +105,6 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorConf
 			int prefuxSize = "==>".length();
 			BufferedReader bufRead = new BufferedReader(new InputStreamReader(readResp));
 			while (isRunning && (line = bufRead.readLine()) != null) {
-				line = line.trim();
 				lineLen = line.length();
 				if (lineLen == 0) {
 					LOG.debug("read empty line:{}", line);

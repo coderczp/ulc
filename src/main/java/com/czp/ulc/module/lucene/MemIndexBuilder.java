@@ -84,7 +84,7 @@ public class MemIndexBuilder implements MessageListener<ReadResult> {
 			LOG.debug("recive message:{}", event);
 
 			String file = event.getFile();
-			String line = event.getLine().trim();
+			String line = event.getLine();
 			String host = event.getHost().getName();
 			if (file.isEmpty() || line.isEmpty()) {
 				LOG.info("empty file:[{}] line:[{}]", file, line);

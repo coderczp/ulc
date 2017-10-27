@@ -14,6 +14,8 @@ public interface DocField {
 	String LINE = "l";
 	String HOST = "h";
 	String PROC = "p";
+	String POSTION = "q";
+	String DATA_FILE = "k";
 	String[] NO_LINE_FEILD = { TIME, FILE, HOST, PROC };
-	String[] ALL_FEILD = { TIME, FILE, LINE, HOST, PROC };
+	String[] ALL_FEILD = { TIME, FILE, LINE, HOST, PROC,POSTION,DATA_FILE};
 }

@@ -66,15 +66,16 @@ public class DeployController {
 	@Autowired
 	private ApplicationContext context;
 
+	private JSch jSch = new JSch();
+	
 	private Map<String, Session> maps = new ConcurrentHashMap<>();
-
-	private ConcurrentHashMap<Integer, BlockingQueue<String>> logMap = new ConcurrentHashMap<>();
 
 	private static final Logger LOG = LoggerFactory.getLogger(WebErrorHandler.class);
 
 	private ExecutorService service = ThreadPools.getInstance().newPool("deploy-worker", 2);
+	
+	private ConcurrentHashMap<Integer, BlockingQueue<String>> logMap = new ConcurrentHashMap<>();
 
-	private JSch jSch = new JSch();
 
 	@PreDestroy
 	public synchronized void stop() {
@@ -128,7 +129,7 @@ public class DeployController {
 				return query == null ? b : (b && name.contains(query));
 			}
 		};
-		File[] listFiles = FileUploadConstroller.listFiles(filter);
+		File[] listFiles = FileUploadController.listFiles(filter);
 		List<String> files = sortByModifyTime(size, listFiles);
 		return files;
 	}
@@ -165,7 +166,7 @@ public class DeployController {
 		if (logMap.containsKey(procId))
 			throw new RuntimeException(tar + " 发布中,不允许并行发布");
 
-		File tarFile = FileUploadConstroller.getPath(tar);
+		File tarFile = FileUploadController.getPath(tar);
 		if (!tarFile.exists()) {
 			throw new RuntimeException(tar + " 找不到,请上传");
 		}

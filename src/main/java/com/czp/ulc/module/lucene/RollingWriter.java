@@ -23,21 +23,32 @@ import com.czp.ulc.util.Utils;
 public class RollingWriter implements AutoCloseable {
 
 	protected File baseDir;
+	protected String suffx;
+	protected long eachFileMaxSize;
+	protected FilenameFilter filter;
 	protected volatile File currentFile;
-	protected final RollingWriterResult unChange;
+	protected final RollingWriteResult result;
 	protected volatile BufferedOutputStream stream;
 	protected AtomicLong postion = new AtomicLong();
 
-	public static final String SUFFX = ".log";
-	public static final int EACH_FILE_SIZE = 1024 * 1024 * 200;
-	public static final FilenameFilter FILTER = Utils.newFilter(SUFFX);
 	protected static final Logger LOG = LoggerFactory.getLogger(RollingWriter.class);
 
 	public RollingWriter(File baseDir) {
+		this(baseDir, ".log", 1024 * 1024 * 200);
+	}
+
+	public RollingWriter(File baseDir, long maxSize) {
+		this(baseDir, ".log", maxSize);
+	}
+
+	public RollingWriter(File baseDir, String suffx, long maxSize) {
+		this.suffx = suffx;
 		this.baseDir = baseDir;
+		this.eachFileMaxSize = maxSize;
 		this.stream = getCurrentStream();
+		this.filter = Utils.newFilter(suffx);
 		// 初始化一个文件未修改的result,文件变更时重新new一个
-		this.unChange = new RollingWriterResult(false, currentFile);
+		this.result = new RollingWriteResult(false, currentFile, currentFile);
 	}
 
 	/***
@@ -47,17 +58,26 @@ public class RollingWriter implements AutoCloseable {
 	 */
 	protected File chooseFile() {
 		int num = 0;
-		for (File file : baseDir.listFiles(FILTER)) {
+		File[] files = baseDir.listFiles(filter);
+		if (files == null) {
+			synchronized (this) {
+				File file = new File(baseDir, String.format("%s%s", num, suffx));
+				if (!file.exists())
+					return file;
+			}
+		}
+		for (File file : files) {
 			String name = file.getName();
 			if (!isLogDataFile(name))
 				continue;
 
 			num = Math.max(num, getFileId(name));
-			// 不检测大小,因为进程异常退出后文件可能没有达到EACH_FILE_SIZE
-			// if (file.length() >= EACH_FILE_SIZE)
+			if (file.length() < eachFileMaxSize)
+				break;
 			num++;
 		}
-		return new File(baseDir, String.format("%s%s", num, SUFFX));
+
+		return new File(baseDir, String.format("%s%s", num, suffx));
 	}
 
 	/***
@@ -81,11 +101,15 @@ public class RollingWriter implements AutoCloseable {
 	}
 
 	public File[] getAllFiles() {
-		return baseDir.listFiles(FILTER);
+		return baseDir.listFiles(filter);
 	}
 
 	public File getCurrentFile() {
 		return currentFile;
+	}
+
+	public RollingWriteResult append(byte[] bytes) throws IOException {
+		return append(bytes, 0, bytes.length,false);
 	}
 
 	/***
@@ -95,20 +119,28 @@ public class RollingWriter implements AutoCloseable {
 	 * @return
 	 * @throws IOException
 	 */
-	public RollingWriterResult append(byte[] bytes) throws IOException {
-		if (postion.get() >= EACH_FILE_SIZE) {
+	public RollingWriteResult append(byte[] bytes, int offset, int len, boolean addLine) throws IOException {
+		long startPos = postion.get();
+		result.setPostion(startPos);
+		if (startPos >= eachFileMaxSize) {
 			synchronized (this) {
-				if (postion.get() >= EACH_FILE_SIZE) {
+				if (postion.get() >= eachFileMaxSize) {
+					stream.write(bytes, offset, len);
 					stream.close();
 					File tmp = currentFile;
 					stream = getCurrentStream();
-					return new RollingWriterResult(true, tmp);
+					result.setCurrentFile(currentFile);
+					return new RollingWriteResult(true, tmp, tmp);
 				}
 			}
 		}
-		stream.write(bytes);
-		postion.getAndAdd(bytes.length);
-		return unChange;
+		stream.write(bytes, offset, len);
+		if (addLine) {
+			len++;
+			stream.write('\n');
+		}
+		postion.getAndAdd(len);
+		return result;
 
 	}
 

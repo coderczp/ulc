@@ -25,11 +25,11 @@ import com.alibaba.fastjson.JSONObject;
  */
 @RestController
 @RequestMapping("/file")
-public class FileUploadConstroller {
+public class FileUploadController {
 
 	private static File base = new File("deploy");
 
-	public FileUploadConstroller() {
+	public FileUploadController() {
 		if (!base.exists())
 			base.mkdirs();
 	}

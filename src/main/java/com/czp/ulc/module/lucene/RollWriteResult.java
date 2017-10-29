@@ -10,14 +10,14 @@ import java.io.File;
  * @version 0.0.1
  */
 
-public class RollingWriteResult {
+public class RollWriteResult {
 
 	private volatile long postion;
 	private volatile File lastFile;
 	private volatile File currentFile;
 	private volatile boolean fileChanged;
 
-	public RollingWriteResult(boolean fileChanged, File lastFile,File currentFile) {
+	public RollWriteResult(boolean fileChanged, File lastFile,File currentFile) {
 		this.lastFile = lastFile;
 		this.fileChanged = fileChanged;
 		this.currentFile = currentFile;

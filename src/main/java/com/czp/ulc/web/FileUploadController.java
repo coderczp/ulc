@@ -30,12 +30,13 @@ public class FileUploadController {
 	private static File base = new File("deploy");
 
 	public FileUploadController() {
-		if (!base.exists())
-			base.mkdirs();
+		
 	}
 
 	@RequestMapping("/list")
 	public Object list() {
+		if (!base.exists())
+			base.mkdirs();
 		File[] listFiles = listFiles(null);
 		JSONArray files = new JSONArray();
 		for (File file : listFiles) {
@@ -50,6 +51,9 @@ public class FileUploadController {
 
 	@PostMapping("/upload")
 	public Object handleFileUpload(@RequestParam("file") MultipartFile file) throws Exception {
+		if (!base.exists())
+			base.mkdirs();
+		
 		JSONObject res = new JSONObject();
 		String fileName = file.getOriginalFilename();
 		if (fileName == null || fileName.isEmpty()) {

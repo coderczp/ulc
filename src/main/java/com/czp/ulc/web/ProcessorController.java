@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.czp.ulc.core.ArgInvalideException;
+import com.czp.ulc.core.ArgException;
 import com.czp.ulc.core.bean.HostBean;
 import com.czp.ulc.core.bean.ProcessorBean;
 import com.czp.ulc.core.dao.HostDao;
@@ -48,7 +48,7 @@ public class ProcessorController {
 	@RequestMapping("/add")
 	public ProcessorBean addConfigFile(@Valid ProcessorBean bean, BindingResult result) {
 		if (result.hasErrors()) {
-			throw new ArgInvalideException(result);
+			throw new ArgException(result);
 		}
 		if (dao.insertUseGeneratedKeys(bean) < 1) {
 			throw new RuntimeException("add bean fail");

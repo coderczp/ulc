@@ -43,6 +43,12 @@
 			<artifactId>mysql-connector-java</artifactId>
 			<!-- <version>5.1.30</version> -->
 		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.zeromq/jzmq -->
+		<dependency>
+			<groupId>org.zeromq</groupId>
+			<artifactId>jzmq</artifactId>
+			<version>3.1.0</version>
+		</dependency>
 		<dependency>
 			<groupId>com.github.luben</groupId>
 			<artifactId>zstd-jni</artifactId>
@@ -113,6 +119,15 @@
 					<artifactId>log4j</artifactId>
 				</exclusion>
 			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>de.flapdoodle.embed</groupId>
+			<artifactId>de.flapdoodle.embed.process</artifactId>
+			<version>1.50.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ehcache</groupId>
+			<artifactId>ehcache-clustered</artifactId>
 		</dependency>
 	</dependencies>
 	<build>

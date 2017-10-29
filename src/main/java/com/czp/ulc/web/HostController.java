@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.core.ArgInvalideException;
+import com.czp.ulc.core.ArgException;
 import com.czp.ulc.core.bean.HostBean;
 import com.czp.ulc.core.dao.HostDao;
 import com.czp.ulc.core.message.Message;
@@ -52,7 +52,7 @@ public class HostController {
 	@RequestMapping("/add")
 	public HostBean addHost(@Valid HostBean bean, BindingResult result) throws Exception {
 		if (result.hasErrors()) {
-			throw new ArgInvalideException(result);
+			throw new ArgException(result);
 		}
 		bean.setPwd(Utils.encrypt(bean.getPwd()));
 		getConnMgr().connect(bean);

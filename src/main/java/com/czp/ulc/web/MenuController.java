@@ -11,7 +11,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.czp.ulc.core.ArgInvalideException;
+import com.czp.ulc.core.ArgException;
 import com.czp.ulc.core.bean.Menu;
 import com.czp.ulc.core.bean.UserMenu;
 import com.czp.ulc.core.dao.MenuDao;
@@ -38,7 +38,7 @@ public class MenuController {
 	@RequestMapping("/add")
 	public UserMenu addConfigFile(@Valid UserMenu bean, BindingResult result) {
 		if (result.hasErrors()) {
-			throw new ArgInvalideException(result);
+			throw new ArgException(result);
 		}
 		if (uMdao.insertUseGeneratedKeys(bean) < 1) {
 			throw new RuntimeException("add bean fail");

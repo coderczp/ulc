@@ -12,6 +12,7 @@ import com.czp.ulc.core.dao.IndexMetaDao;
 import com.czp.ulc.core.dao.LuceneFileDao;
 import com.czp.ulc.core.message.MessageCenter;
 import com.czp.ulc.module.IModule;
+import com.czp.ulc.module.lucene.search.LocalIndexSearcher;
 
 /**
  * 请添加描述
@@ -47,7 +48,7 @@ public class LuceneModule implements IModule {
 		FileIndexBuilder fileBuilder = new FileIndexBuilder(srcDir, indexDir, analyzer, metaDao, lFileDao);
 		MemIndexBuilder memSer = new MemIndexBuilder(fileBuilder, analyzer);
 		FileParallelSearch pFileSearch = new FileParallelSearch(lFileDao);
-		LuceneSearcher searcher = new LuceneSearcher();
+		LocalIndexSearcher searcher = new LocalIndexSearcher();
 		searcher.setParallelFileSearch(pFileSearch);
 		searcher.setMetaDao(metaDao);
 		searcher.setMemSer(memSer);

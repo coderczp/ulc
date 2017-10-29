@@ -43,7 +43,8 @@ public class ErrorLogHandler implements MessageListener<ReadResult>, Runnable {
 		String lastFile;
 		HostBean host;
 
-		 MutilLineBean(HostBean host, String lastFile) {
+		 @SuppressWarnings("unused")
+		MutilLineBean(HostBean host, String lastFile) {
 			this.lastFile = lastFile;
 			this.host = host;
 		}

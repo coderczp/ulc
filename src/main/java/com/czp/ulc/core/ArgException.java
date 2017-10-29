@@ -12,13 +12,13 @@ package com.czp.ulc.core;
 import org.springframework.validation.BindingResult;
 
 /**
- * Function:统一参数错误
+ * Function:参数异常
  *
  * @date:2017年3月28日/下午2:05:51
  * @Author:jeff.cao@aoliday.com
  * @version:1.0
  */
-public class ArgInvalideException extends RuntimeException {
+public class ArgException extends RuntimeException {
 
 	private static final long serialVersionUID = 1L;
 
@@ -26,7 +26,7 @@ public class ArgInvalideException extends RuntimeException {
 
 	private int code = 1001;
 
-	public ArgInvalideException(BindingResult error) {
+	public ArgException(BindingResult error) {
 		super();
 		this.error = error;
 	}

@@ -27,7 +27,7 @@ import org.springframework.web.servlet.handler.AbstractHandlerExceptionResolver;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.czp.ulc.core.ArgInvalideException;
+import com.czp.ulc.core.ArgException;
 
 /**
  * Function:统一的错误处理器
@@ -48,8 +48,8 @@ public class WebErrorHandler extends AbstractHandlerExceptionResolver {
 		try {
 			JSONObject res = null;
 			Throwable real = err.getCause() == null ? err : err.getCause();
-			if (real instanceof ArgInvalideException) {
-				res = handleArgError((ArgInvalideException) real);
+			if (real instanceof ArgException) {
+				res = handleArgError((ArgException) real);
 			} else if (real instanceof BuilderException) {
 				res = handleBuilderError((BuilderException) real);
 			} else {
@@ -79,7 +79,7 @@ public class WebErrorHandler extends AbstractHandlerExceptionResolver {
 		return json;
 	}
 
-	private JSONObject handleArgError(ArgInvalideException err) {
+	private JSONObject handleArgError(ArgException err) {
 		StringBuilder info = new StringBuilder();
 		List<ObjectError> allErrors = err.getError().getAllErrors();
 		for (ObjectError item : allErrors) {

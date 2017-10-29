@@ -19,7 +19,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.czp.ulc.core.ArgInvalideException;
+import com.czp.ulc.core.ArgException;
 import com.czp.ulc.core.bean.KeywordRule;
 import com.czp.ulc.core.dao.KeywordRuleDao;
 
@@ -40,7 +40,7 @@ public class KeywordRuleController {
 	@RequestMapping("/add")
 	public KeywordRule add(@Valid KeywordRule rule, BindingResult result) throws Exception {
 		if (result.hasErrors()) {
-			throw new ArgInvalideException(result);
+			throw new ArgException(result);
 		}
 		dao.insertUseGeneratedKeys(rule);
 		return rule;

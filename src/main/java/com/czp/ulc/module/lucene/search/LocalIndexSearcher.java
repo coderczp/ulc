@@ -1,4 +1,4 @@
-package com.czp.ulc.module.lucene;
+package com.czp.ulc.module.lucene.search;
 
 import java.io.IOException;
 import java.util.Map;
@@ -7,6 +7,9 @@ import org.apache.lucene.analysis.Analyzer;
 
 import com.czp.ulc.core.bean.IndexMeta;
 import com.czp.ulc.core.dao.IndexMetaDao;
+import com.czp.ulc.module.lucene.FileParallelSearch;
+import com.czp.ulc.module.lucene.MemIndexBuilder;
+import com.czp.ulc.module.lucene.SearchCallback;
 
 /**
  * 整合内存和文件搜索
@@ -16,7 +19,7 @@ import com.czp.ulc.core.dao.IndexMetaDao;
  * @version 0.0.1
  */
 
-public class LuceneSearcher {
+public class LocalIndexSearcher {
 
 	private IndexMetaDao metaDao;
 	private MemIndexBuilder memSer;

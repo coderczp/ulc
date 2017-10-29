@@ -90,9 +90,10 @@ public class DynamicSql {
 		return String.format("select * from processor %s group by name order by id asc", where);
 	}
 
+	//for mysql5.7 this is incompatible with sql_mode=only_full_group_by
 	public String queryEarliestFile(String host) {
 		if (host == null)
-			return "select *,min(itime) from lucene_file";
+			return "select * from lucene_file order by itime limit 1";
 		else
 			return String.format("select *,min(itime) from lucene_file where host='%s'", host);
 	}

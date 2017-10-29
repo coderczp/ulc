@@ -13,9 +13,7 @@ import org.slf4j.LoggerFactory;
 import com.czp.ulc.util.Utils;
 
 /**
- * 请添加描述
- * <li>创建人：Jeff.cao</li>
- * <li>创建时间：2017年5月18日 上午9:25:45</li>
+ * 请添加描述 <li>创建人：Jeff.cao</li> <li>创建时间：2017年5月18日 上午9:25:45</li>
  * 
  * @version 0.0.1
  */
@@ -27,10 +25,9 @@ public class RollingWriter implements AutoCloseable {
 	protected long eachFileMaxSize;
 	protected FilenameFilter filter;
 	protected volatile File currentFile;
-	protected final RollingWriteResult result;
+	protected final RollWriteResult result;
 	protected volatile BufferedOutputStream stream;
 	protected AtomicLong postion = new AtomicLong();
-
 	protected static final Logger LOG = LoggerFactory.getLogger(RollingWriter.class);
 
 	public RollingWriter(File baseDir) {
@@ -41,14 +38,14 @@ public class RollingWriter implements AutoCloseable {
 		this(baseDir, ".log", maxSize);
 	}
 
-	public RollingWriter(File baseDir, String suffx, long maxSize) {
+	public RollingWriter(File baseDir,  String suffx, long maxSize) {
 		this.suffx = suffx;
 		this.baseDir = baseDir;
 		this.eachFileMaxSize = maxSize;
 		this.stream = getCurrentStream();
 		this.filter = Utils.newFilter(suffx);
 		// 初始化一个文件未修改的result,文件变更时重新new一个
-		this.result = new RollingWriteResult(false, currentFile, currentFile);
+		this.result = new RollWriteResult(false, currentFile, currentFile);
 	}
 
 	/***
@@ -61,7 +58,7 @@ public class RollingWriter implements AutoCloseable {
 		File[] files = baseDir.listFiles(filter);
 		if (files == null) {
 			synchronized (this) {
-				File file = new File(baseDir, String.format("%s%s", num, suffx));
+				File file = createFile(num);
 				if (!file.exists())
 					return file;
 			}
@@ -76,8 +73,11 @@ public class RollingWriter implements AutoCloseable {
 				break;
 			num++;
 		}
+		return createFile(num);
+	}
 
-		return new File(baseDir, String.format("%s%s", num, suffx));
+	private File createFile(int num) {
+		return new File(baseDir, String.format("data%s.%s", suffx, num));
 	}
 
 	/***
@@ -87,7 +87,7 @@ public class RollingWriter implements AutoCloseable {
 	 * @return
 	 */
 	private boolean isLogDataFile(String name) {
-		return Character.isDigit(name.charAt(0));
+		return Character.isDigit(name.charAt(name.length() - 1));
 	}
 
 	/**
@@ -97,7 +97,7 @@ public class RollingWriter implements AutoCloseable {
 	 * @return
 	 */
 	public int getFileId(String name) {
-		return Integer.parseInt(name.substring(0, name.indexOf(".")));
+		return Integer.parseInt(name.substring(name.lastIndexOf(".") + 1));
 	}
 
 	public File[] getAllFiles() {
@@ -108,8 +108,8 @@ public class RollingWriter implements AutoCloseable {
 		return currentFile;
 	}
 
-	public RollingWriteResult append(byte[] bytes) throws IOException {
-		return append(bytes, 0, bytes.length,false);
+	public RollWriteResult append(byte[] bytes) throws IOException {
+		return append(bytes, 0, bytes.length, false);
 	}
 
 	/***
@@ -119,7 +119,7 @@ public class RollingWriter implements AutoCloseable {
 	 * @return
 	 * @throws IOException
 	 */
-	public RollingWriteResult append(byte[] bytes, int offset, int len, boolean addLine) throws IOException {
+	public RollWriteResult append(byte[] bytes, int offset, int len, boolean addLine) throws IOException {
 		long startPos = postion.get();
 		result.setPostion(startPos);
 		if (startPos >= eachFileMaxSize) {
@@ -130,7 +130,7 @@ public class RollingWriter implements AutoCloseable {
 					File tmp = currentFile;
 					stream = getCurrentStream();
 					result.setCurrentFile(currentFile);
-					return new RollingWriteResult(true, tmp, tmp);
+					return new RollWriteResult(true, tmp, tmp);
 				}
 			}
 		}

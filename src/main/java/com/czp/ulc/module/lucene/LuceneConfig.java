@@ -1,6 +1,7 @@
 package com.czp.ulc.module.lucene;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.springframework.core.env.Environment;
@@ -8,9 +9,7 @@ import org.springframework.core.env.Environment;
 import com.czp.ulc.util.Utils;
 
 /**
- * Lucene相关配置
- * <li>创建人：Jeff.cao</li>
- * <li>创建时间：2017年9月11日 下午4:41:39</li>
+ * Lucene相关配置 <li>创建人：Jeff.cao</li> <li>创建时间：2017年9月11日 下午4:41:39</li>
  * 
  * @version 0.0.1
  */
@@ -34,6 +33,8 @@ public class LuceneConfig {
 
 	public static final int PARALLEL_SEARCH_THREADS = Utils.getCpus() + 4;
 
+	private static ThreadLocal<SimpleDateFormat> dateFmt = new ThreadLocal<>();
+
 	public static void config(Environment env) {
 		String rootPath = env.getProperty("index.root.path");
 		root = new File(rootPath);
@@ -41,6 +42,14 @@ public class LuceneConfig {
 		indexDir = new File(root, "index");
 		dataDir.mkdirs();
 		indexDir.mkdirs();
+	}
+
+	public static SimpleDateFormat getDateFmt() {
+		SimpleDateFormat fmt = dateFmt.get();
+		if (fmt == null) {
+			dateFmt.set(new SimpleDateFormat(FORMAT));
+		}
+		return dateFmt.get();
 	}
 
 	public static File getRoot() {

@@ -12,7 +12,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.czp.ulc.core.ArgInvalideException;
+import com.czp.ulc.core.ArgException;
 import com.czp.ulc.core.bean.MonitorConfig;
 import com.czp.ulc.core.dao.MonitoConfigDao;
 import com.czp.ulc.core.message.Message;
@@ -39,7 +39,7 @@ public class MonitoFileController {
 	@RequestMapping("/add")
 	public MonitorConfig addConfigFile(@Valid MonitorConfig bean, BindingResult result) {
 		if (result.hasErrors()) {
-			throw new ArgInvalideException(result);
+			throw new ArgException(result);
 		}
 		if (dao.insertUseGeneratedKeys(bean) > 0) {
 			notifyUpdate(bean, "update");

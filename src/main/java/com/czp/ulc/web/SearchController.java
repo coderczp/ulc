@@ -36,8 +36,8 @@ import com.czp.ulc.main.Application;
 import com.czp.ulc.module.lucene.AnalyzerUtil;
 import com.czp.ulc.module.lucene.DocField;
 import com.czp.ulc.module.lucene.LogAnalyzer;
-import com.czp.ulc.module.lucene.LuceneSearcher;
 import com.czp.ulc.module.lucene.SearchCallback;
+import com.czp.ulc.module.lucene.search.LocalIndexSearcher;
 import com.czp.ulc.util.OSUtil;
 
 /**
@@ -199,7 +199,7 @@ public class SearchController {
 	}
 
 	/** 不能用注入的方式,因为该类init是lucenmodule还没有加载 */
-	private LuceneSearcher getSearcher() {
-		return Application.getBean(LuceneSearcher.class);
+	private LocalIndexSearcher getSearcher() {
+		return Application.getBean(LocalIndexSearcher.class);
 	}
 }

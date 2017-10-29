@@ -1,14 +1,14 @@
 package com.czp.ulc.module.lucene;
 
-import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,8 +20,9 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.codecs.lucene50.Lucene50StoredFieldsFormat.Mode;
 import org.apache.lucene.codecs.lucene62.Lucene62Codec;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
+import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.LongPoint;
+import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -31,6 +32,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.czp.ulc.core.ProcessorUtil;
 import com.czp.ulc.core.ThreadPools;
 import com.czp.ulc.core.bean.IndexMeta;
 import com.czp.ulc.core.bean.LuceneFile;
@@ -45,13 +47,12 @@ import com.czp.ulc.util.Utils;
  * 
  * @version 0.0.1
  */
-public class FileIndexBuilder3 {
+public class FileIndexBuilder4 {
 
 	private File dataDir;
-	private File indexBaseDir;
+	private File baseDir;
 
 	private Analyzer analyzer;
-	private RollingWriter writer;
 	private IndexMetaDao metaDao;
 	private LuceneFileDao lFileDao;
 
@@ -59,81 +60,34 @@ public class FileIndexBuilder3 {
 	private AtomicLong lineCount = new AtomicLong();
 	private AtomicBoolean hasFlushed = new AtomicBoolean();
 	private ConcurrentHashMap<File, IndexWriter> indexMap = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<File, BufferedWriter> writers = new ConcurrentHashMap<>();
 
 	public static final String HOST = Utils.innerInetIp();
+	public static final long EACH_FILE_SIZE = 1024 * 1024 * 200;
 	public static final Charset UTF8 = Charset.forName("UTF-8");
 	public static final String LINE_SPLITER = Utils.getLineSpliter();
-	private static final Logger log = LoggerFactory.getLogger(FileIndexBuilder.class);
+	private static final Logger log = LoggerFactory.getLogger(FileIndexBuilder4.class);
 
 	/***
 	 * 
-	 * @param srcDir 原始文件的存放目录
-	 * @param indexDir 索引文件目录
-	 * @param analyzer 索引分析器
-	 * @param metaDao  meta信息dao
-	 * @param lFileDao Lucene文件dao
+	 * @param srcDir
+	 *            原始文件的存放目录
+	 * @param indexDir
+	 *            索引文件目录
+	 * @param analyzer
+	 *            索引分析器
+	 * @param metaDao
+	 *            meta信息dao
+	 * @param lFileDao
+	 *            Lucene文件dao
 	 */
-	public FileIndexBuilder3(File srcDir, File indexDir, Analyzer analyzer, IndexMetaDao metaDao,
-			LuceneFileDao lFileDao) {
+	public FileIndexBuilder4(File srcDir, File indexDir, Analyzer analyzer, IndexMetaDao metaDao, LuceneFileDao lFileDao) {
 		this.metaDao = metaDao;
 		this.dataDir = srcDir;
 		this.lFileDao = lFileDao;
 		this.analyzer = analyzer;
-		this.indexBaseDir = indexDir;
-		this.writer = new RollingWriter(dataDir);
+		this.baseDir = indexDir;
 		this.worker = ThreadPools.getInstance().newPool("lucene-file-index", 1);
-
-		this.repairFailFile(srcDir);
-	}
-
-	/***
-	 * 修复因为进程异常退出没有commit的数据
-	 * 
-	 * @param baseDir
-	 */
-	private void repairFailFile(File baseDir) {
-		LinkedList<File> files = new LinkedList<File>();
-		File curFile = writer.getCurrentFile();
-		for (File file : writer.getAllFiles()) {
-			if (file.equals(curFile))
-				continue;
-			files.add(file);
-		}
-		asynRepair(files);
-	}
-
-	/**
-	 * 异步修复未提交的索引
-	 * @param files
-	 */
-	private void asynRepair(final List<File> files) {
-		log.info("wait repair file size:{}", files.size());
-		ThreadPools.getInstance().run("repair-thread", () -> {
-			for (File file : files) {
-				log.info("repair log file:{}", file);
-				try (BufferedReader br = Files.newBufferedReader(file.toPath())) {
-					String readLine;
-					long now = System.currentTimeMillis();
-					while ((readLine = br.readLine()) != null) {
-						String[] data = decodeData(readLine);
-						if (data == null) {
-							log.error("fail to decode:{}",readLine);
-							continue;
-						}
-						String host = data[1];
-						String line = data[3];
-						String srcFile = data[2];
-						long time = Long.valueOf(data[0]);
-						addIndex(host, srcFile, line, time);
-					}
-					boolean delete = file.delete();
-					long end = System.currentTimeMillis();
-					log.info("repair:{} time:{}ms delete:{}", file, (end - now), delete);
-				} catch (Exception e) {
-					log.error("repair error:"+file, e);
-				}
-			}
-		}, true);
 	}
 
 	/****
@@ -147,76 +101,96 @@ public class FileIndexBuilder3 {
 	 * @throws Exception
 	 */
 	public boolean write(String host, String file, String line, long time) throws Exception {
-		String string = encodeData(host, file, line, time);
-		RollingWriteResult result = writer.append(string.getBytes(UTF8));
-		asynAddDoc(host, file, line, time, result);
-		return result.isFileChanged();
-	}
-
-	/***
-	 * 将主机文件名日志时间都编码到一行,异常退出时才能修复
-	 * @param host
-	 * @param file
-	 * @param line
-	 * @param now
-	 * @return
-	 */
-	private String encodeData(String host, String file, String line, long now) {
-		String time = String.valueOf(now);
-		int strLen = host.length() + file.length() + line.length() + time.length();
-		StringBuilder sb = new StringBuilder(strLen + 3);
-		sb.append(now).append("#");
-		sb.append(host).append("*");
-		sb.append(file).append("@");
-		sb.append(line).append(LINE_SPLITER);
-		return sb.toString();
-	}
-
-	private String[] decodeData(String line) {
-		int indexTime = line.indexOf("#");
-		int indexHost = line.indexOf("*");
-		int indexFile = line.indexOf("@");
-		if (indexTime < 0 || indexHost < 0 || indexFile < 0) {
-			log.error("error line:{}", line);
-			return null;
+		// 日志目录:
+		// --{host}:
+		// ---{proc}:
+		// -------log
+		// ---------{-db}.log if fileSize>200 rename->-{db}.log.1
+		// -------index
+		// ---------lucene_index_file
+		lineCount.getAndIncrement();
+		String proc = ProcessorUtil.getProc(host, file);
+		String fileName = file.substring(file.lastIndexOf(File.separator) + 1);
+		File logFile = new File(dataDir, String.format("%s/%s/log/%s", host, proc, fileName));
+		BufferedWriter writer = writers.get(logFile);
+		if (writer == null) {
+			synchronized (logFile) {
+				if (!writers.containsKey(file)) {
+					File dir = logFile.getParentFile();
+					if (dir.exists() == false) {
+						dir.mkdirs();
+					}
+					writer = Files.newBufferedWriter(logFile.toPath(), UTF8);
+					writers.put(logFile, writer);
+				}
+			}
 		}
-		String time = line.substring(0, indexTime);
-		String host = line.substring(indexTime + 1, indexHost);
-		String srcFile = line.substring(indexHost + 1, indexFile);
-		String data = line.substring(indexFile + 1, line.length());
-		return new String[] { time, host, srcFile, data };
+		boolean fileChange = logFile.length() >= EACH_FILE_SIZE;
+		if (fileChange) {
+			synchronized (logFile) {
+				writer.close();
+				int seqNum = 1;
+				// TODO seqNum存储到数据库
+				File dir = logFile.getParentFile();
+				File[] files = dir.listFiles();
+				for (File item : files) {
+					// name like db.log.1|db.log.2
+					String name = item.getName();
+					String tmp = name.substring(name.lastIndexOf(".") + 1);
+					if (!Character.isDigit(tmp.charAt(0)))
+						continue;
+					seqNum = Math.max(seqNum, Integer.parseInt(tmp));
+				}
+				File newFile = new File(logFile.getAbsolutePath() + "." + seqNum);
+				if (logFile.renameTo(newFile) == false) {
+					throw new RuntimeException("fail to rename:" + logFile + " to:" + newFile);
+				} else {
+					asynAddDoc(host, newFile, logFile);
+					writer = Files.newBufferedWriter(logFile.toPath(), UTF8);
+					writers.put(logFile, writer);
+				}
+			}
+		}
+		writer.write(line);
+		writer.write('\n');
+		return fileChange;
 	}
 
 	// 异步添加document
-	private void asynAddDoc(String host, String file, String line, long now, RollingWriteResult result) {
+	private void asynAddDoc(String host, File newFile, File logFile) {
 		worker.execute(() -> {
 			try {
-				addIndex(host, file, line, now);
-				if (result.isFileChanged()) {
-					commitIndex(result.getLastFile());
+				BasicFileAttributes attr = Files.readAttributes(logFile.toPath(), BasicFileAttributes.class);
+				long createTime = attr.creationTime().toMillis();
+				// 创建一个标志文件,索引完成后删除,以便进程异常退出时修复
+				File flagFile = new File(newFile + ".wait_index");
+				flagFile.createNewFile();
+
+				Date day = Utils.toDay(createTime);
+				FileReader reader = new FileReader(newFile);
+				SimpleDateFormat sp = LuceneConfig.getDateFmt();
+
+				Document doc = new Document();
+				doc.add(new TextField(DocField.LINE, reader));
+				doc.add(new LongPoint(DocField.TIME, day.getTime()));
+
+				// Field.Index.NOT_ANALYZED
+				doc.add(new StringField(DocField.FILE, newFile.toString(), Store.YES));
+				doc.add(new StringField(DocField.SRC_FILE_NAME, logFile.getName(), Store.YES));
+
+				File indexDir = createIndexDir(sp.format(day), host, day);
+				IndexWriter writer = getIndexWriter(analyzer, indexDir);
+				// 防止被flush线程关闭
+				if (!writer.isOpen()) {
+					writer = getIndexWriter(analyzer, indexDir);
 				}
+				writer.addDocument(doc);
+				commitIndex(newFile.length(), flagFile);
+				reader.close();
 			} catch (Exception e) {
 				log.error("add doc error", e);
 			}
 		});
-	}
-
-	private void addIndex(String host, String file, String line, long now) throws IOException {
-		lineCount.getAndIncrement();
-		Date day = Utils.toDay(now);
-		SimpleDateFormat sp = new SimpleDateFormat(LuceneConfig.FORMAT);
-		Document doc = new Document();
-		doc.add(new LongPoint(DocField.TIME, now));
-		doc.add(new TextField(DocField.LINE, line, Field.Store.YES));
-		doc.add(new TextField(DocField.FILE, file, Field.Store.YES));
-
-		File indexDir = createIndexDir(sp.format(day), host, day);
-		IndexWriter writer = getIndexWriter(analyzer, indexDir);
-		// 防止被flush线程关闭
-		if (!writer.isOpen()) {
-			writer = getIndexWriter(analyzer, indexDir);
-		}
-		writer.addDocument(doc);
 	}
 
 	/***
@@ -247,7 +221,7 @@ public class FileIndexBuilder3 {
 	 * @return
 	 */
 	private File createIndexDir(String dateStr, String server, Date date) {
-		File indexDir = new File(indexBaseDir, String.format("%s/%s", server, dateStr));
+		File indexDir = new File(baseDir, String.format("%s/%s", server, dateStr));
 		if (!indexDir.exists()) {
 			indexDir.mkdirs();
 			// 当前文件夹是新建的,添加数据库记录
@@ -311,8 +285,8 @@ public class FileIndexBuilder3 {
 	}
 
 	public void shutdown() {
-		writer.close();
 		worker.shutdown();
+		writers.forEach((k, v) -> Utils.close(v));
 		long docCount = flushIndex(indexMap);
 		updateMetaInfo(0, lineCount.getAndSet(0), docCount);
 	}
@@ -327,15 +301,14 @@ public class FileIndexBuilder3 {
 		return hasFlushed.getAndSet(false);
 	}
 
-	// 文件滚动时commit索引,完成后删除原文件
-	private void commitIndex(File srcFile) {
+	// 文件滚动时commit索引,完成后删除标记文件
+	private void commitIndex(long length, File flagFile) {
 		try {
-			long length = srcFile.length();
 			long docCount = flushIndex(indexMap);
-			boolean srcDelete = srcFile.delete();
 			hasFlushed.set(true);
+			boolean del = flagFile.delete();
 			updateMetaInfo(length, lineCount.getAndSet(0), docCount);
-			log.info("index file:{} size:{} del:{}", srcFile, length, srcDelete);
+			log.info("index file:{} size:{} delFlag:{}", flagFile, length, del);
 		} catch (Exception e) {
 			log.error(e.toString(), e);
 		}

@@ -26,7 +26,7 @@ import com.czp.ulc.core.bean.HostBean;
 import com.czp.ulc.core.dao.HostDao;
 import com.czp.ulc.core.message.Message;
 import com.czp.ulc.core.message.MessageCenter;
-import com.czp.ulc.module.conn.ConnectManager;
+import com.czp.ulc.module.conn.ConnectionManager;
 import com.czp.ulc.util.Utils;
 
 /**
@@ -60,8 +60,8 @@ public class HostController {
 		return bean;
 	}
 
-	private ConnectManager getConnMgr() {
-		return context.getBean(ConnectManager.class);
+	private ConnectionManager getConnMgr() {
+		return context.getBean(ConnectionManager.class);
 	}
 
 	@RequestMapping("/del")
@@ -89,7 +89,7 @@ public class HostController {
 	@RequestMapping("/listSpec")
 	public Object listSpec(HostBean bean) {
 		JSONArray items = new JSONArray();
-		ConnectManager mgr = getConnMgr();
+		ConnectionManager mgr = getConnMgr();
 		List<HostBean> list = dao.listSpec("name,host,status", bean);
 		String cmd = "cat /proc/cpuinfo| grep 'processor'| wc -l;cat /etc/issue; cat /proc/meminfo|head -n2;df -h";
 		for (HostBean hostBean : list) {

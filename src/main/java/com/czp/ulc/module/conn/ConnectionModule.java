@@ -43,7 +43,7 @@ public class ConnectionModule implements IModule {
 	@Autowired
 	private ZkManager zkManager;
 
-	private ConnectManager conMgr;
+	private ConnectionManager conMgr;
 
 	@Override
 	public boolean start(SingletonBeanRegistry ctx) {
@@ -53,7 +53,7 @@ public class ConnectionModule implements IModule {
 			Objects.requireNonNull(port, "server.port not found");
 			conMgr = new ClusterConnManager(port, zkManager);
 		} else {
-			conMgr = new ConnectManager();
+			conMgr = new ConnectionManager();
 		}
 
 		conMgr.setCfgDao(cfgDao);

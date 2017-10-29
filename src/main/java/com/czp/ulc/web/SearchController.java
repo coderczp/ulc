@@ -36,8 +36,8 @@ import com.czp.ulc.main.Application;
 import com.czp.ulc.module.lucene.AnalyzerUtil;
 import com.czp.ulc.module.lucene.DocField;
 import com.czp.ulc.module.lucene.LogAnalyzer;
-import com.czp.ulc.module.lucene.SearchCallback;
 import com.czp.ulc.module.lucene.search.LocalIndexSearcher;
+import com.czp.ulc.module.lucene.search.SearchCallback;
 import com.czp.ulc.util.OSUtil;
 
 /**

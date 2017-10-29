@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.czp.ulc.core.message.MessageCenter;
 import com.czp.ulc.core.shutdown.ShutdownManager;
-import com.czp.ulc.module.conn.ConnectManager;
+import com.czp.ulc.module.conn.ConnectionManager;
 import com.czp.ulc.module.conn.RemoteLogCollector;
 
 /**
@@ -52,7 +52,7 @@ public class HomeController {
 	@ResponseBody
 	@RequestMapping("/stop")
 	public String stop() {
-		context.getBean(ConnectManager.class).onExit();
+		context.getBean(ConnectionManager.class).onExit();
 		mqServer.stop();
 		ShutdownManager.getInstance().run();
 		SpringApplication.exit(context);

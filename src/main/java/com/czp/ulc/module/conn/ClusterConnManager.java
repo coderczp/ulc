@@ -1,6 +1,5 @@
 package com.czp.ulc.module.conn;
 
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -27,7 +26,7 @@ import com.czp.ulc.util.Utils;
  * @version 0.0.1
  */
 
-public class ClusterConnManager extends ConnectManager implements ZkListener {
+public class ClusterConnManager extends ConnectionManager implements ZkListener {
 
 	private String port;
 	private ZkManager zkMgr;
@@ -49,7 +48,7 @@ public class ClusterConnManager extends ConnectManager implements ZkListener {
 	@Override
 	public void onStart() {
 		zkMgr.addListenr(this);
-		registCurrentHostToNode();
+		registCurrentHostToZk();
 		doLoadBalance();
 		zkClient.subscribeChildChanges(ZkManager.ROOT_PATH, this);
 	}
@@ -98,12 +97,12 @@ public class ClusterConnManager extends ConnectManager implements ZkListener {
 	/***
 	 * 把自己注册到zk
 	 */
-	private void registCurrentHostToNode() {
+	private void registCurrentHostToZk() {
 		String host = Utils.innerInetIp();
 		String path = String.format("%s:%s", host, port);
 		currentPath = ZkManager.buildnNodePath(path);
 		long time = System.currentTimeMillis();
-		byte[] data = ByteBuffer.allocate(8).putLong(time).array();
+		byte[] data = Utils.longToBytes(time);
 		zkClient.createEphemeral(currentPath, data);
 		LOG.info("success  to node path: {}", currentPath);
 	}

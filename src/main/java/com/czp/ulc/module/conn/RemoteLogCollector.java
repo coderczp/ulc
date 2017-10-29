@@ -53,12 +53,12 @@ public class RemoteLogCollector implements Runnable, MessageListener<MonitorConf
 
 	public static volatile boolean pause = false;
 
-	protected ConnectManager connManager;
+	protected ConnectionManager connManager;
 	protected MessageCenter messageCenter;
 	private static Logger LOG = LoggerFactory.getLogger(RemoteLogCollector.class);
 	private static ConcurrentHashMap<Integer, Boolean> monitorHosts = new ConcurrentHashMap<>();
 
-	public RemoteLogCollector(HostBean server, MonitoConfigDao dao, ConnectManager connMgr, MessageCenter mqCenter) {
+	public RemoteLogCollector(HostBean server, MonitoConfigDao dao, ConnectionManager connMgr, MessageCenter mqCenter) {
 		this.mfdao = dao;
 		this.server = server;
 		this.connManager = connMgr;

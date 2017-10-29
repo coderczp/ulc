@@ -9,10 +9,9 @@ import com.czp.ulc.core.bean.IndexMeta;
 import com.czp.ulc.core.dao.IndexMetaDao;
 import com.czp.ulc.module.lucene.FileParallelSearch;
 import com.czp.ulc.module.lucene.MemIndexBuilder;
-import com.czp.ulc.module.lucene.SearchCallback;
 
 /**
- * 整合内存和文件搜索
+ * 整合本地内存和文件搜索
  * <li>创建人：Jeff.cao</li>
  * <li>创建时间：2017年9月11日 下午4:48:31</li>
  * 

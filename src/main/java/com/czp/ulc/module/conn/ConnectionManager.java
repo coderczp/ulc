@@ -34,7 +34,7 @@ import com.jcraft.jsch.Session;
  * @copyright coder_czp@126.com
  *
  */
-public class ConnectManager implements MessageListener<HostBean> {
+public class ConnectionManager implements MessageListener<HostBean> {
 
 	protected HostDao hostDao;
 	protected MessageCenter mqCenter;
@@ -48,9 +48,9 @@ public class ConnectManager implements MessageListener<HostBean> {
 	/** 不需要自动重练的链接 */
 	protected Map<String, Boolean> notReConn = new ConcurrentHashMap<>();
 
-	private static Logger LOG = LoggerFactory.getLogger(ConnectManager.class);
+	private static Logger LOG = LoggerFactory.getLogger(ConnectionManager.class);
 
-	public ConnectManager() {
+	public ConnectionManager() {
 		notFound.add("host not connect");
 	}
 

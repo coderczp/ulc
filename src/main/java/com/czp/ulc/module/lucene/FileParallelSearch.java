@@ -35,6 +35,7 @@ import com.czp.ulc.core.ThreadPools;
 import com.czp.ulc.core.bean.LuceneFile;
 import com.czp.ulc.core.cache.SoftRefMap;
 import com.czp.ulc.core.dao.LuceneFileDao;
+import com.czp.ulc.module.lucene.search.SearchCallback;
 import com.czp.ulc.web.QueryCondtion;
 
 /**

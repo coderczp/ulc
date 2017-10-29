@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import com.czp.ulc.core.message.MessageListener;
 import com.czp.ulc.module.conn.ReadResult;
+import com.czp.ulc.module.lucene.search.SearchCallback;
 import com.czp.ulc.util.Utils;
 import com.czp.ulc.web.QueryCondtion;
 

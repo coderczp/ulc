@@ -32,12 +32,12 @@ import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.czp.ulc.core.ProcessorUtil;
 import com.czp.ulc.core.ThreadPools;
 import com.czp.ulc.core.bean.IndexMeta;
 import com.czp.ulc.core.bean.LuceneFile;
 import com.czp.ulc.core.dao.IndexMetaDao;
 import com.czp.ulc.core.dao.LuceneFileDao;
+import com.czp.ulc.module.conn.ProcessorUtil;
 import com.czp.ulc.util.Utils;
 
 /**

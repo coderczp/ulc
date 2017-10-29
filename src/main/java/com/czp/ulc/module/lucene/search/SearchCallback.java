@@ -1,4 +1,4 @@
-package com.czp.ulc.module.lucene;
+package com.czp.ulc.module.lucene.search;
 
 import java.util.HashSet;
 import java.util.Set;

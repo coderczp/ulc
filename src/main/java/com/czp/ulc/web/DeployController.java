@@ -37,7 +37,7 @@ import com.czp.ulc.core.bean.ProcessorBean;
 import com.czp.ulc.core.dao.HostDao;
 import com.czp.ulc.core.dao.IDeployRecordDao;
 import com.czp.ulc.core.dao.ProcessorDao;
-import com.czp.ulc.module.conn.ConnectManager;
+import com.czp.ulc.module.conn.ConnectionManager;
 import com.czp.ulc.module.conn.IExeCallBack;
 import com.czp.ulc.util.MiniHeap;
 import com.czp.ulc.util.Utils;
@@ -215,7 +215,7 @@ public class DeployController {
 	private void doDeploy(String path, HostBean host, ProcessorBean proc, File file, Integer id) {
 		service.execute(() -> {
 			ChannelSftp ch = null;
-			ConnectManager connMgr = getConnMgr();
+			ConnectionManager connMgr = getConnMgr();
 			try {
 				String destFile = String.format("%s/%s", proc.getPath(), file.getName());
 				List<String> result = new LinkedList<>();
@@ -291,8 +291,8 @@ public class DeployController {
 		return session;
 	}
 
-	private ConnectManager getConnMgr() {
-		return context.getBean(ConnectManager.class);
+	private ConnectionManager getConnMgr() {
+		return context.getBean(ConnectionManager.class);
 	}
 
 	private void pushLog2Queue(ProcessorBean proc, String status, String log) {

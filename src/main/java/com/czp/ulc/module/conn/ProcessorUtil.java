@@ -1,4 +1,4 @@
-package com.czp.ulc.core;
+package com.czp.ulc.module.conn;
 
 /**
  * @dec Function

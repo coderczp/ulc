@@ -9,7 +9,7 @@ import org.springframework.context.ApplicationContext;
 
 import com.czp.ulc.core.bean.HostBean;
 import com.czp.ulc.core.bean.ProcessorBean;
-import com.czp.ulc.module.conn.ConnectManager;
+import com.czp.ulc.module.conn.ConnectionManager;
 
 /**
  * 请添加描述
@@ -25,8 +25,8 @@ public abstract class AbstractCmdHandler implements ICommandHandler {
 
 	protected static final Logger LOG = LoggerFactory.getLogger(AbstractCmdHandler.class);
 
-	protected ConnectManager getConnMgr() {
-		return context.getBean(ConnectManager.class);
+	protected ConnectionManager getConnMgr() {
+		return context.getBean(ConnectionManager.class);
 	}
 
 	@Override

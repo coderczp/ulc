@@ -3,14 +3,8 @@ package com.czp.ulc.module.mapreduce.rpc;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.rmi.Naming;
 import java.util.concurrent.ConcurrentHashMap;
-
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * 请添加描述
@@ -20,22 +14,10 @@ import org.slf4j.LoggerFactory;
  * @version 0.0.1
  */
 
-public class RpcClient {
-
-	private Context namingCtx;
-
-	private static final Logger LOG = LoggerFactory.getLogger(RpcClient.class);
+public class RpcClientProxy {
 
 	/** 缓存url对应的IServerCall */
 	private ConcurrentHashMap<String, ITransport> callSers = new ConcurrentHashMap<>();
-
-	public RpcClient() {
-		try {
-			namingCtx = new InitialContext();
-		} catch (NamingException e) {
-			throw new RuntimeException(e);
-		}
-	}
 
 	@SuppressWarnings("unchecked")
 	public <T> T getServer(String url, Class<T> itf) {
@@ -56,25 +38,14 @@ public class RpcClient {
 			synchronized (callSers) {
 				if (callServer == null) {
 					try {
-						callServer = (ITransport) namingCtx.lookup(url);
+						callServer = (ITransport) Naming.lookup(url);
 						callSers.put(url, callServer);
-					} catch (NamingException e) {
-						throw new RuntimeException("fail to found callser in:" + url, e);
+					} catch (Exception e) {
+						throw new RuntimeException("fail to found rmi ser in:" + url, e);
 					}
 				}
 			}
 		}
 		return callServer;
 	}
-
-	public boolean stop() {
-		try {
-			callSers.clear();
-			namingCtx.close();
-		} catch (NamingException e) {
-			LOG.error("rpc client close err", e);
-		}
-		return true;
-	}
-
 }

@@ -9,7 +9,7 @@ import com.czp.ulc.module.lucene.search.ILocalSearchCallback;
 import com.czp.ulc.module.lucene.search.LocalIndexSearcher;
 import com.czp.ulc.module.lucene.search.SearchResult;
 import com.czp.ulc.module.lucene.search.SearchTask;
-import com.czp.ulc.module.mapreduce.rpc.RpcClient;
+import com.czp.ulc.module.mapreduce.rpc.RpcClientProxy;
 
 /**
  * 集群模式下任务消费
@@ -25,13 +25,13 @@ public class SearchTaskConsumer implements Runnable {
 
 	private String mqSerAddr;
 
-	private RpcClient client;
+	private RpcClientProxy client;
 
 	private MapreduceModule mpr;
 
 	private static final Logger LOG = LoggerFactory.getLogger(SearchTaskConsumer.class);
 
-	public SearchTaskConsumer(String topic, String mqSerAddr, RpcClient client, MapreduceModule mpr) {
+	public SearchTaskConsumer(String topic, String mqSerAddr, RpcClientProxy client, MapreduceModule mpr) {
 		this.mpr = mpr;
 		this.topic = topic;
 		this.client = client;

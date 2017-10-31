@@ -1,6 +1,5 @@
 package com.czp.ulc.module.mapreduce;
 
-import java.net.URI;
 import java.nio.charset.Charset;
 import java.rmi.registry.LocateRegistry;
 import java.util.Objects;
@@ -22,8 +21,9 @@ import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.core.ThreadPools;
 import com.czp.ulc.module.IModule;
 import com.czp.ulc.module.lucene.search.SearchTask;
-import com.czp.ulc.module.mapreduce.rpc.RpcClient;
+import com.czp.ulc.module.mapreduce.rpc.RpcClientProxy;
 import com.czp.ulc.module.mapreduce.rpc.TransportImpl;
+import com.czp.ulc.util.Utils;
 
 /**
  * 请添加描述
@@ -46,7 +46,7 @@ public class MapreduceModule implements IModule {
 
 	private ZMQ.Context context;
 
-	private RpcClient rpcClient;
+	private RpcClientProxy rpcClient;
 	/***
 	 * 保存Mapreduce的ID,其他进程搜索返回时回写结果给当前进程
 	 */
@@ -67,7 +67,7 @@ public class MapreduceModule implements IModule {
 			Objects.requireNonNull(mqPullAddr, "mq.rep.server.address");
 			Objects.requireNonNull(mqPubAddr, "mq.pub.server.address");
 
-			rpcClient = new RpcClient();
+			rpcClient = new RpcClientProxy();
 
 			startRPCServer(rpcAddr);
 			startZMQPull(mqPullAddr);
@@ -89,23 +89,34 @@ public class MapreduceModule implements IModule {
 	 * @param mqPubTopic
 	 * @param rpcClient
 	 */
-	private void startZMQSUB(String mqPubAddr, RpcClient rpcClient, String mqPubTopic) {
+	private void startZMQSUB(String mqPubAddr, RpcClientProxy rpcClient, String mqPubTopic) {
 		SearchTaskConsumer task = new SearchTaskConsumer(mqPubTopic, mqPubAddr, rpcClient, this);
 		ThreadPools.getInstance().run("ZMQ-sub", task, true);
 	}
 
 	// rpcAddr:like rmi://127.0.0.1:8333/rpc
-	private void startRPCServer(String rpcAddr) throws Exception {
-		URI uri = new URI(rpcAddr);
-		rpcUrl = rpcAddr;
-		namingCtx = new InitialContext();
+	private void startRPCServer(String addr) throws Exception {
+		int ipStart = addr.indexOf("//");
+		int ipEnd = addr.indexOf(':', ipStart);
+		int portEnd = addr.indexOf('/', ipEnd);
+		String ip = addr.substring(ipStart + 2, ipEnd);
+		int port = Integer.parseInt(addr.substring(ipEnd + 1, portEnd));
+
+		if (!"*".equals(ip)) {
+			System.setProperty("java.rmi.server.hostname", ip);
+		} else {
+			// 如果指定bind*,则取内网ip
+			String webSerIp = Utils.innerInetIp();
+			addr = addr.replaceAll("\\*", webSerIp);
+		}
 		TransportImpl transport = new TransportImpl();
-
-		LocateRegistry.createRegistry(uri.getPort());
-		namingCtx.rebind(rpcUrl, transport);
-		LOG.info("rpc server listen at:{}", rpcUrl);
-
+		namingCtx = new InitialContext();
+		LocateRegistry.createRegistry(port);
+		namingCtx.rebind(addr, transport);
 		exportRPCServer(transport);
+		rpcUrl = addr;
+
+		LOG.info("rpc server listen at:{}", rpcUrl);
 	}
 
 	// 导出需要远程调用的服务
@@ -164,7 +175,6 @@ public class MapreduceModule implements IModule {
 		try {
 			zmqReq.close();
 			context.term();
-			rpcClient.stop();
 			namingCtx.close();
 		} catch (NamingException e) {
 			LOG.error("rpc close err", e);

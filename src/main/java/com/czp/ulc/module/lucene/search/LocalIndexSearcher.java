@@ -9,6 +9,7 @@ import com.czp.ulc.core.bean.IndexMeta;
 import com.czp.ulc.core.dao.IndexMetaDao;
 import com.czp.ulc.module.lucene.FileParallelSearch;
 import com.czp.ulc.module.lucene.MemIndexBuilder;
+import com.czp.ulc.module.mapreduce.MapreduceModule;
 
 /**
  * 整合本地内存和文件搜索
@@ -22,7 +23,12 @@ public class LocalIndexSearcher {
 
 	private IndexMetaDao metaDao;
 	private MemIndexBuilder memSer;
-	private FileParallelSearch parallelFileSearch;
+	private MapreduceModule mrModule;
+	private FileParallelSearch fileSearch;
+
+	public void setMrModule(MapreduceModule mrModule) {
+		this.mrModule = mrModule;
+	}
 
 	public void setMetaDao(IndexMetaDao metaDao) {
 		this.metaDao = metaDao;
@@ -32,18 +38,33 @@ public class LocalIndexSearcher {
 		this.memSer = memSer;
 	}
 
-	public void setParallelFileSearch(FileParallelSearch parallelFileSearch) {
-		this.parallelFileSearch = parallelFileSearch;
+	public FileParallelSearch getFileSearch() {
+		return fileSearch;
 	}
 
-	public void search(SearchCallback search) throws Exception {
-		long allDocs = getMeta().getDocs();
-		int memMatch = memSer.searchInRam(search);
-		if (memMatch >= search.getQuery().getSize()) {
-			search.onFinish(allDocs, memMatch);
+	public void setFileSearch(FileParallelSearch fileSearch) {
+		this.fileSearch = fileSearch;
+	}
+
+	/**
+	 * 异步搜索
+	 * 
+	 * @param task
+	 * @return
+	 * @throws IOException
+	 */
+	public void localSearch(SearchTask task) throws IOException {
+		int memReturn = memSer.searchInRam(task);
+		if (memReturn < task.getQuery().getSize()) {
+			fileSearch.search(task, memReturn);
 		} else {
-			parallelFileSearch.search(search, allDocs, memMatch);
+			task.getCallback().finish();
 		}
+	}
+
+	public void disturbSearch(SearchTask task) throws IOException {
+		mrModule.doRemoteSearch(task);
+		localSearch(task);
 	}
 
 	public IndexMeta getMeta() {
@@ -54,9 +75,9 @@ public class LocalIndexSearcher {
 		return count;
 	}
 
-	public Map<String, Long> count(SearchCallback search) throws IOException {
+	public Map<String, Long> count(SearchTask search) throws IOException {
 		Map<String, Long> count = memSer.count(search);
-		parallelFileSearch.count(search, count);
+		fileSearch.count(search, count);
 		return count;
 	}
 

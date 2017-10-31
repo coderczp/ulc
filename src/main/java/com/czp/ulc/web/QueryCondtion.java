@@ -12,13 +12,6 @@ package com.czp.ulc.web;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.document.LongPoint;
-import org.apache.lucene.search.Query;
-
-import com.czp.ulc.module.lucene.DocField;
-import com.czp.ulc.module.lucene.RangeQueryParser;
-import com.czp.ulc.util.Utils;
 import com.google.common.collect.Sets;
 
 /**
@@ -45,14 +38,12 @@ public class QueryCondtion {
 	/** 是否加载内容行 */
 	private boolean loadLine;
 
-	private Query query;
-
-	private Query fileQuery;
-
-	private Analyzer analyzer;
-
-	/** 开始时间 */
 	private long start = System.currentTimeMillis();
+
+	/***
+	 * 查询的域
+	 */
+	private Set<String> feilds = new HashSet<String>();
 
 	/** 查询的主机 */
 	private HashSet<String> hosts = new HashSet<String>();
@@ -60,17 +51,24 @@ public class QueryCondtion {
 	/** 结束时间 */
 	private long end = start;
 
-	public Analyzer getAnalyzer() {
-		return analyzer;
-	}
-
-	public void setAnalyzer(Analyzer analyzer) {
-		this.analyzer = analyzer;
-	}
-
 	public void setHost(String host) {
 		if (host != null && host.length() > 0)
 			this.hosts = Sets.newHashSet(host.split(","));
+	}
+
+
+	public void setFeilds(Set<String> feilds) {
+		this.feilds = feilds;
+	}
+	
+	public Set<String> getFeilds() {
+		return feilds;
+	}
+
+	public void addFeild(String... feild) {
+		for (String item : feild) {
+			feilds.add(item);
+		}
 	}
 
 	public String getQ() {
@@ -133,44 +131,4 @@ public class QueryCondtion {
 		this.end = end;
 	}
 
-	public Query getQuery() {
-		return query = query == null ? build(true) : query;
-	}
-
-	public Query buildFileIndexQuery() {
-		return fileQuery = fileQuery == null ? build(false) : fileQuery;
-	}
-
-	private Query build(boolean addHost) {
-		try {
-			RangeQueryParser parser = new RangeQueryParser(DocField.ALL_FEILD, analyzer);
-			parser.addSpecFied(DocField.TIME, LongPoint.class);
-			StringBuilder sb = new StringBuilder(String.format("%s:[%s TO %s]", DocField.TIME, start, end));
-			if (Utils.notEmpty(proc)) {
-				sb.append(String.format(" AND %s:%s", DocField.FILE, proc));
-			}
-			if (Utils.notEmpty(file)) {
-				sb.append(String.format(" AND %s:%s", DocField.FILE, file));
-			}
-			if (Utils.notEmpty(q)) {
-				sb.append(String.format(" AND %s:%s", DocField.LINE, q));
-			}
-			if (addHost) {
-				if (!hosts.isEmpty()) {
-					sb.append(String.format(" AND %s:(", DocField.HOST));
-					int size = hosts.size() - 1, i = 0;
-					for (String string : hosts) {
-						sb.append(string);
-						if (i++ < size) {
-							sb.append(" OR ");
-						}
-					}
-					sb.append(")");
-				}
-			}
-			return parser.parse(sb.toString());
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-	}
 }

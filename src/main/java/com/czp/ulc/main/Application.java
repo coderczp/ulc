@@ -14,8 +14,8 @@ import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.PriorityQueue;
 import java.util.Properties;
-import java.util.TreeSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +59,7 @@ public class Application extends WebMvcConfigurerAdapter
 		implements ShutdownCallback, BeanDefinitionRegistryPostProcessor, ApplicationListener<ApplicationEvent> {
 
 	private Environment envBean;
-	private TreeSet<IModule> modules = new TreeSet<>();
+	private PriorityQueue<IModule> modules = new PriorityQueue<>();
 
 	private static ConfigurableListableBeanFactory context;
 	private static Logger LOG = LoggerFactory.getLogger(Application.class);
@@ -140,6 +140,7 @@ public class Application extends WebMvcConfigurerAdapter
 	@Override
 	public void onApplicationEvent(ApplicationEvent event) {
 		modules = sortByOrder(context.getBeansOfType(IModule.class));
+		
 		if (event instanceof EmbeddedServletContainerInitializedEvent) {
 			EmbeddedServletContainerInitializedEvent tevent = (EmbeddedServletContainerInitializedEvent) event;
 			int port = tevent.getEmbeddedServletContainer().getPort();
@@ -151,10 +152,10 @@ public class Application extends WebMvcConfigurerAdapter
 		}
 	}
 
-	private TreeSet<IModule> sortByOrder(Map<String, IModule> beans) {
-		TreeSet<IModule> set = new TreeSet<IModule>(IModule.COMPER);
-		set.addAll(beans.values());
-		return set;
+	private PriorityQueue<IModule> sortByOrder(Map<String, IModule> beans) {
+		PriorityQueue<IModule> queue = new PriorityQueue<>(IModule.COMPER);
+		queue.addAll(beans.values());
+		return queue;
 	}
 
 	private synchronized void stopModule() {

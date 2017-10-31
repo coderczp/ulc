@@ -33,7 +33,9 @@ import org.slf4j.LoggerFactory;
 
 import com.czp.ulc.core.message.MessageListener;
 import com.czp.ulc.module.conn.ReadResult;
-import com.czp.ulc.module.lucene.search.SearchCallback;
+import com.czp.ulc.module.lucene.search.QueryBuilder;
+import com.czp.ulc.module.lucene.search.SearchResult;
+import com.czp.ulc.module.lucene.search.SearchTask;
 import com.czp.ulc.util.Utils;
 import com.czp.ulc.web.QueryCondtion;
 
@@ -120,33 +122,40 @@ public class MemIndexBuilder implements MessageListener<ReadResult> {
 	/***
 	 * 在内存中搜索
 	 * 
-	 * @param search
+	 * @param task
 	 * @param docCount
 	 * @return
 	 * @throws IOException
 	 */
-	public int searchInRam(SearchCallback search) throws IOException {
-		QueryCondtion cdt = search.getQuery();
-		Query query = cdt.getQuery();
+	public int searchInRam(SearchTask task) throws IOException {
+		QueryCondtion cdt = task.getQuery();
+		Query query = QueryBuilder.getMemQuery(analyzer, cdt);
+		int size = cdt.getSize();
+
 		IndexSearcher ramSearcher = getRamSearcher();
-		TopDocs docs = ramSearcher.search(query, cdt.getSize());
-		Set<String> feilds = search.getFeilds();
+		TopDocs docs = ramSearcher.search(query, size);
+		Set<String> feilds = cdt.getFeilds();
+		int total = docs.totalHits;
 		for (ScoreDoc scoreDoc : docs.scoreDocs) {
 			Document doc = ramSearcher.doc(scoreDoc.doc, feilds);
-			String file = doc.get(DocField.FILE);
-			String host = doc.get(DocField.HOST);
-			String line = doc.get(DocField.LINE);
-			if (!search.handle(host, file, line)) {
+			SearchResult res = new SearchResult();
+			res.setFile(doc.get(DocField.FILE));
+			res.setLine(doc.get(DocField.LINE));
+			res.setHost(doc.get(DocField.HOST));
+			res.setMatchCount(total);
+			res.setFinish(size-- > 0);
+			task.getCallback().handle(res);
+			if (size <= 0) {
 				break;
 			}
 		}
 		LOG.info("query {} return:{} in ram", query, docs.totalHits);
-		return docs.totalHits;
+		return total;
 	}
 
 	private IndexSearcher getRamSearcher() throws IOException {
 		DirectoryReader openIfChanged = DirectoryReader.openIfChanged(ramReader);
-		return new IndexSearcher(openIfChanged==null?ramReader:openIfChanged);
+		return new IndexSearcher(openIfChanged == null ? ramReader : openIfChanged);
 	}
 
 	private synchronized void swapRamWriterReader() throws IOException {
@@ -164,11 +173,11 @@ public class MemIndexBuilder implements MessageListener<ReadResult> {
 		return new IndexWriter(new RAMDirectory(), conf);
 	}
 
-	public Map<String, Long> count(SearchCallback search) throws IOException {
+	public Map<String, Long> count(SearchTask search) throws IOException {
 		long st = System.currentTimeMillis();
 		QueryCondtion query = search.getQuery();
 		IndexSearcher ramSearcher = getRamSearcher();
-		TopDocs result = ramSearcher.search(query.getQuery(), Integer.MAX_VALUE);
+		TopDocs result = ramSearcher.search(QueryBuilder.getMemQuery(analyzer, query), Integer.MAX_VALUE);
 		ConcurrentHashMap<String, Long> json = new ConcurrentHashMap<>();
 		for (ScoreDoc did : result.scoreDocs) {
 			Document doc = ramSearcher.doc(did.doc);

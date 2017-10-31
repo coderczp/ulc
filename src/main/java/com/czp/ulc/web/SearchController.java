@@ -36,8 +36,10 @@ import com.czp.ulc.main.Application;
 import com.czp.ulc.module.lucene.AnalyzerUtil;
 import com.czp.ulc.module.lucene.DocField;
 import com.czp.ulc.module.lucene.LogAnalyzer;
+import com.czp.ulc.module.lucene.search.ILocalSearchCallback;
 import com.czp.ulc.module.lucene.search.LocalIndexSearcher;
-import com.czp.ulc.module.lucene.search.SearchCallback;
+import com.czp.ulc.module.lucene.search.SearchResult;
+import com.czp.ulc.module.lucene.search.SearchTask;
 import com.czp.ulc.util.OSUtil;
 
 /**
@@ -58,7 +60,7 @@ public class SearchController {
 	public JSONObject count(@RequestParam String json) throws Exception {
 		long start = System.currentTimeMillis();
 		QueryCondtion cdt = createCdtFromJson(json);
-		SearchCallback search = new SearchCallback(cdt);
+		SearchTask search = new SearchTask(cdt);
 		Map<String, Long> res = getSearcher().count(search);
 		long now = System.currentTimeMillis();
 		res.put("time", (now - start));
@@ -74,7 +76,7 @@ public class SearchController {
 	public String listFile() throws Exception {
 		return "";
 	}
-	
+
 	@RequestMapping("/meta")
 	public JSONObject meta() throws Exception {
 		LuceneFile lFile = lFileDao.queryEarliestFile(null);
@@ -99,80 +101,90 @@ public class SearchController {
 		out.setContentType("text/plain;charset=utf-8");
 		PrintWriter writer = out.getWriter();
 
-		CountDownLatch lock = new CountDownLatch(1);
 		writer.println(String.format("host:%s,file:%s,keyword:%s", cdt.getHosts(), cdt.getFile(), cdt.getQ()));
-
-		getSearcher().search(new SearchCallback(cdt, DocField.ALL_FEILD) {
+		cdt.addFeild(DocField.ALL_FEILD);
+		SearchTask cb = new SearchTask(cdt);
+		CountDownLatch lock = new CountDownLatch(1);
+		
+		cb.setCallback(new ILocalSearchCallback() {
 
 			@Override
-			public boolean handle(String host, String file, String line) {
-				writer.println(line);
+			public boolean handle(SearchResult result) {
+				writer.print(result.getLine());
 				return true;
 			}
 
 			@Override
-			public void onFinish(long allDoc, long allMatch) {
-				writer.flush();
-				writer.close();
+			public void finish() {
 				lock.countDown();
 			}
 		});
-		lock.await(2, TimeUnit.MINUTES);
+		getSearcher().localSearch(cb);
+		lock.await(1, TimeUnit.MINUTES);
+		writer.flush();
+		writer.close();
 	}
 
 	private QueryCondtion createCdtFromJson(String json) {
-		QueryCondtion cdt = JSONObject.parseObject(json, QueryCondtion.class);
-		cdt.setAnalyzer(getSearcher().getAnalyzer());
-		return cdt;
+		return JSONObject.parseObject(json, QueryCondtion.class);
 	}
 
 	@RequestMapping("/search")
 	public Map<String, Object> search(@RequestParam String json, HttpServletRequest req, HttpServletResponse resp)
 			throws Exception {
 
+		JSONObject data = new JSONObject();
+		AtomicLong match = new AtomicLong();
+
+		long now = System.currentTimeMillis();
 		CountDownLatch lock = new CountDownLatch(1);
 		QueryCondtion cdt = createCdtFromJson(json);
 		Map<String, Object> res = new ConcurrentHashMap<>();
+		if (cdt.isLoadLine()) {
+			cdt.addFeild(DocField.ALL_FEILD);
+		} else {
+			cdt.addFeild(DocField.NO_LINE_FEILD);
+		}
 
-		getSearcher().search(new SearchCallback(cdt, cdt.isLoadLine() ? DocField.ALL_FEILD : DocField.NO_LINE_FEILD) {
-
-			JSONObject data = new JSONObject();
-			AtomicLong hasAdd = new AtomicLong();
-			long now = System.currentTimeMillis();
+		SearchTask cb = new SearchTask(cdt);
+		cb.setCallback(new ILocalSearchCallback() {
 
 			@Override
-			public boolean handle(String host, String file, String line) {
-				hasAdd.getAndIncrement();
-				JSONObject files = data.getJSONObject(host);
+			public boolean handle(SearchResult result) {
+				JSONObject files = data.getJSONObject(result.getHost());
 				if (files == null) {
 					files = new JSONObject();
-					data.put(host, files);
+					data.put(result.getHost(), files);
 				}
 
-				List<Object> lines = files.getJSONArray(file);
+				List<Object> lines = files.getJSONArray(result.getFile());
 				if (lines == null) {
 					lines = new LinkedList<>();
-					files.put(file, lines);
+					files.put(result.getFile(), lines);
 				}
-				if (line != null)
-					lines.add(line);
+				if (result.getLine() != null)
+					lines.add(result.getLine());
 
-				// return hasAdd.get() <= cdt.getSize();
-				return hasAdd.get() < 1000;
+				match.set(result.getMatchCount());
+
+				return true;
 			}
 
 			@Override
-			public void onFinish(long allDoc, long allMatch) {
-				long end = System.currentTimeMillis();
-				res.put("data", data);
-				res.put("docCount", allDoc);
-				res.put("lineCount", allDoc);
-				res.put("time", (end - now));
-				res.put("matchCount", allMatch);
+			public void finish() {
 				lock.countDown();
 			}
 		});
-		lock.await(10, TimeUnit.MINUTES);
+		getSearcher().disturbSearch(cb);
+		
+		long docCount = getSearcher().getMeta().getDocs();
+		long end = System.currentTimeMillis();
+		lock.await(1, TimeUnit.MINUTES);
+		res.put("data", data);
+		res.put("time", (end - now));
+		res.put("docCount", docCount);
+		res.put("lineCount", docCount);
+		res.put("matchCount", match.get());
 		return res;
 	}
 

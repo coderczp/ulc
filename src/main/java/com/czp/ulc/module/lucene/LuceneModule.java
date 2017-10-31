@@ -13,6 +13,7 @@ import com.czp.ulc.core.dao.LuceneFileDao;
 import com.czp.ulc.core.message.MessageCenter;
 import com.czp.ulc.module.IModule;
 import com.czp.ulc.module.lucene.search.LocalIndexSearcher;
+import com.czp.ulc.module.mapreduce.MapreduceModule;
 
 /**
  * 请添加描述
@@ -37,6 +38,11 @@ public class LuceneModule implements IModule {
 	@Autowired
 	private MessageCenter mqCenter;
 
+	@Autowired
+	private MapreduceModule mrModule;
+
+	private LocalIndexSearcher searcher;
+
 	@Override
 	public boolean start(SingletonBeanRegistry ctx) {
 		LuceneConfig.config(env);
@@ -47,11 +53,13 @@ public class LuceneModule implements IModule {
 
 		FileIndexBuilder fileBuilder = new FileIndexBuilder(srcDir, indexDir, analyzer, metaDao, lFileDao);
 		MemIndexBuilder memSer = new MemIndexBuilder(fileBuilder, analyzer);
-		FileParallelSearch pFileSearch = new FileParallelSearch(lFileDao);
-		LocalIndexSearcher searcher = new LocalIndexSearcher();
-		searcher.setParallelFileSearch(pFileSearch);
-		searcher.setMetaDao(metaDao);
+		FileParallelSearch pFileSearch = new FileParallelSearch(analyzer,lFileDao);
+
+		searcher = new LocalIndexSearcher();
+		searcher.setFileSearch(pFileSearch);
 		searcher.setMemSer(memSer);
+		searcher.setMetaDao(metaDao);
+		searcher.setMrModule(mrModule);
 
 		mqCenter.addConcumer(memSer);
 

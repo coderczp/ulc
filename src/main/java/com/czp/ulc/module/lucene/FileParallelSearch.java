@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexFileNames;
@@ -35,7 +36,9 @@ import com.czp.ulc.core.ThreadPools;
 import com.czp.ulc.core.bean.LuceneFile;
 import com.czp.ulc.core.cache.SoftRefMap;
 import com.czp.ulc.core.dao.LuceneFileDao;
-import com.czp.ulc.module.lucene.search.SearchCallback;
+import com.czp.ulc.module.lucene.search.QueryBuilder;
+import com.czp.ulc.module.lucene.search.SearchResult;
+import com.czp.ulc.module.lucene.search.SearchTask;
 import com.czp.ulc.web.QueryCondtion;
 
 /**
@@ -64,6 +67,7 @@ public class FileParallelSearch {
 		}
 	}
 
+	private Analyzer analyzer;
 	private LuceneFileDao lFileDao;
 	private ExecutorService worker;
 	private String prefix = IndexFileNames.SEGMENTS + "_";
@@ -71,27 +75,35 @@ public class FileParallelSearch {
 
 	private static final Logger LOG = LoggerFactory.getLogger(FileParallelSearch.class);
 
-	public FileParallelSearch(LuceneFileDao lFileDao) {
+	public FileParallelSearch( Analyzer analyzer,LuceneFileDao lFileDao) {
+		this.analyzer = analyzer;
 		this.lFileDao = lFileDao;
 		int threadSize = LuceneConfig.PARALLEL_SEARCH_THREADS;
 		this.worker = ThreadPools.getInstance().newPool("ParallelSearch", threadSize);
 	}
 
 	private void asynSearch(AtomicBoolean isBreak, AtomicLong matchs, AtomicInteger waitSeachNum, File indexFile,
-			SearchCallback search, String host, long total) {
+			SearchTask task, String host) {
 		worker.execute(() -> {
 			try {
-				QueryCondtion cdt = search.getQuery();
-				Set<String> feilds = search.getFeilds();
-				Query realQuery = removeHostParam(search);
+				QueryCondtion cdt = task.getQuery();
+				Set<String> feilds = cdt.getFeilds();
+				Query realQuery = removeHostParam(task);
 				IndexSearcher searcher = getCachedSearcher(indexFile, host);
-				TopDocs docs = searcher.search(realQuery, cdt.getSize());
-				matchs.getAndAdd(docs.totalHits);
+				int size = cdt.getSize();
+				TopDocs docs = searcher.search(realQuery, size);
+				long match = matchs.getAndAdd(docs.totalHits);
 				for (ScoreDoc scoreDoc : docs.scoreDocs) {
 					Document doc = searcher.doc(scoreDoc.doc, feilds);
-					String file = doc.get(DocField.FILE);
-					String line = doc.get(DocField.LINE);
-					if (!search.handle(host, file, line)) {
+					SearchResult res = new SearchResult();
+					res.setFile(doc.get(DocField.FILE));
+					res.setLine(doc.get(DocField.LINE));
+					res.setFinish(size-- > 0);
+					res.setMatchCount(match);
+					res.setHost(host);
+
+					task.getCallback().handle(res);
+					if (res.isFinish()) {
 						isBreak.set(true);
 						break;
 					}
@@ -100,8 +112,9 @@ public class FileParallelSearch {
 			} catch (Exception e) {
 				LOG.error("ansy sear error", e);
 			} finally {
-				if (isBreak.get() || waitSeachNum.decrementAndGet() == 0)
-					search.onFinish(total, matchs.get());
+				if (isBreak.get() || waitSeachNum.decrementAndGet() == 0) {
+					task.getCallback().finish();
+				}
 			}
 		});
 
@@ -111,25 +124,26 @@ public class FileParallelSearch {
 		worker.shutdownNow();
 	}
 
-	public void search(SearchCallback search, long allDocs, int memMatch) {
+	public void search(SearchTask task, int memMatch) {
 		AtomicLong match = new AtomicLong(memMatch);
 		AtomicBoolean isBreak = new AtomicBoolean();
 		AtomicInteger waitSeachNum = new AtomicInteger();
 		try {
-			List<LuceneFile> dirs = findMatchDir(search);
+			List<LuceneFile> dirs = findMatchDir(task);
 			waitSeachNum.set(dirs.size());
 
 			for (LuceneFile item : dirs) {
 				String host = item.getServer();
 				File file = new File(item.getPath());
-				asynSearch(isBreak, match, waitSeachNum, file, search, host, allDocs);
+				asynSearch(isBreak, match, waitSeachNum, file, task, host);
 			}
 		} catch (Exception e) {
 			isBreak.set(true);
 			LOG.error("search erro", e);
 		} finally {
-			if (isBreak.get() || waitSeachNum.get() == 0)
-				search.onFinish(allDocs, match.get());
+			if (isBreak.get() || waitSeachNum.get() == 0) {
+				task.getCallback().finish();
+			}
 		}
 
 	}
@@ -169,11 +183,11 @@ public class FileParallelSearch {
 	 * @param end
 	 * @return
 	 */
-	public List<LuceneFile> findMatchDir(SearchCallback searcher) {
+	public List<LuceneFile> findMatchDir(SearchTask searcher) {
 		QueryCondtion query = searcher.getQuery();
 		List<LuceneFile> files = lFileDao.query(query);
 		removeVaildFile(files);
-		LOG.info("find:[{}]dirs for:{}", files.size(), searcher.getQuery().getQuery());
+		LOG.info("find:[{}]dirs for:{}", files.size(), query);
 		return files;
 	}
 
@@ -202,7 +216,7 @@ public class FileParallelSearch {
 		}
 	}
 
-	public long count(SearchCallback search, Map<String, Long> json) {
+	public long count(SearchTask search, Map<String, Long> json) {
 		List<LuceneFile> dirs = findMatchDir(search);
 		if (dirs.isEmpty())
 			return 0;
@@ -220,7 +234,7 @@ public class FileParallelSearch {
 		return count.get();
 	}
 
-	private void executeCountTask(SearchCallback search, Map<String, Long> json, AtomicLong count, CountDownLatch lock,
+	private void executeCountTask(SearchTask search, Map<String, Long> json, AtomicLong count, CountDownLatch lock,
 			LuceneFile luceneFile) {
 		worker.execute(() -> {
 			try {
@@ -244,7 +258,7 @@ public class FileParallelSearch {
 	 * @param search
 	 * @return
 	 */
-	private Query removeHostParam(SearchCallback search) {
-		return search.getQuery().buildFileIndexQuery();
+	private Query removeHostParam(SearchTask search) {
+		return QueryBuilder.getFileQuery(analyzer, search.getQuery());
 	}
 }

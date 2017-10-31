@@ -1,7 +1,5 @@
 package com.czp.ulc.test;
 
-import java.util.Scanner;
-
 import org.zeromq.ZMQ;
 
 /**
@@ -12,21 +10,21 @@ import org.zeromq.ZMQ;
  * 
  * @version 0.0.1
  */
-public class ZmqTest {
+public class ZmqPullTest {
 
 	public static void main(String[] args) throws InterruptedException {
 		ZMQ.Context context = ZMQ.context(1);
 		ZMQ.Socket pub = context.socket(ZMQ.PUB);
-		pub.bind("tcp://*:5558");
+		ZMQ.Socket pull = context.socket(ZMQ.PULL);
+		pull.bind("tcp://192.168.0.59:5555");
+		pub.bind("tcp://192.168.0.59:5556");
 
-		Scanner sc = new Scanner(System.in);
 		while (!Thread.interrupted()) {
-			System.out.println("Enter info");
-			String line = sc.nextLine();
-			pub.send("B".getBytes(), ZMQ.SNDMORE);
-			pub.send(line.getBytes(),0);
+			byte[] recv = pull.recv();
+			System.out.println("recv pull:" + recv);
+			pub.send("M".getBytes(), ZMQ.SNDMORE);
+			pub.send(recv, 0);
 		}
-		sc.close();
 		pub.close();
 		context.term();
 	}

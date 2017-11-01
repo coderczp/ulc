@@ -39,7 +39,6 @@ public class ClusterConnManager extends ConnectionManager implements ZkListener 
 	private ExecutorService worker = ThreadPools.getInstance().newPool("zk-event-handler", 1);
 
 	public ClusterConnManager(String port, ZkManager zkMgr) {
-		super();
 		this.port = port;
 		this.zkMgr = zkMgr;
 		this.zkClient = zkMgr.getZkClient();

@@ -9,6 +9,7 @@ import com.czp.ulc.module.lucene.search.ILocalSearchCallback;
 import com.czp.ulc.module.lucene.search.LocalIndexSearcher;
 import com.czp.ulc.module.lucene.search.SearchResult;
 import com.czp.ulc.module.lucene.search.SearchTask;
+import com.czp.ulc.module.mapreduce.operation.IOperation;
 import com.czp.ulc.module.mapreduce.rpc.RpcClientProxy;
 
 /**
@@ -72,27 +73,22 @@ public class SearchTaskConsumer implements Runnable {
 	 */
 	private void doIndexSearch(byte[] data) {
 		try {
-			MapReduceTask task = MapreduceModule.decodeMapReduceTask(data);
-			if (task.getRpcUrl().equals(mpr.getRpcUrl())) {
+			MapReduceTask task = MapreduceModule.decodeTask(data);
+			String type = task.getQuery().getType();
+			String rpcUrl = task.getRpcUrl();
+			
+			if (rpcUrl.equals(mpr.getRpcUrl())) {
 				LOG.info("this search request is send by myself");
 				return;
 			}
-
-			SearchTask stask = new SearchTask(task.getQuery());
-			IRemoteSearchCallback redSer = client.getServer(task.getRpcUrl(), IRemoteSearchCallback.class);
-			stask.setCallback(new ILocalSearchCallback() {
-
-				@Override
-				public boolean handle(SearchResult result) {
-					return redSer.handle(task.getReqId(), result);
-				}
-
-				@Override
-				public void finish() {
-					redSer.finish(task.getReqId());
-				}
-			});
-			getSearcher().localSearch(stask);
+			
+			IRemoteSearchCallback redSer = client.getServer(rpcUrl, IRemoteSearchCallback.class);
+			IOperation op = mpr.getRegistTable().find(type);
+			if (op == null) {
+				LOG.info("unsupport operation:{}", type);
+				return;
+			}
+			op.handle(redSer, getSearcher(),task);
 		} catch (Exception e) {
 			LOG.error("query index error", e);
 		}

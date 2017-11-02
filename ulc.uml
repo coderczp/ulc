@@ -46,12 +46,23 @@ package task_moudle {
 	component   SystemInfoCollectTask
 }
 
+package mapreduce_moudle {
+	component  TaskConsumer
+	component  ResultReduce
+	component  RpcTransport
+}
 
 package notify_moudle {
 	component  MailNotify
 	component  DingdingNotify
 }
+
 }
+
+'mapreduce_moudle引用关系
+ResultReduce -d-> RpcTransport
+TaskConsumer -d-> ParallelSearcher
+
 
 'web_moudle引用关系
 HostManager -d-> DAO
@@ -93,9 +104,9 @@ core_module -d-> task_moudle
 '/
 
 database MySql {
-    component base_info
+   component base_info
    component log_table
-    note right
+   note right
           由于不需要事物,且对插入和查询
           性能要求较高,所以采用MyISAM
           先将原始记录插入临时表

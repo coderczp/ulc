@@ -10,9 +10,9 @@
 package com.czp.ulc.module.lucene;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -173,24 +173,26 @@ public class MemIndexBuilder implements MessageListener<ReadResult> {
 		return new IndexWriter(new RAMDirectory(), conf);
 	}
 
-	public Map<String, Long> count(SearchTask search) throws IOException {
+	public void count(SearchTask search) throws IOException {
 		long st = System.currentTimeMillis();
 		QueryCondtion query = search.getQuery();
 		IndexSearcher ramSearcher = getRamSearcher();
 		TopDocs result = ramSearcher.search(QueryBuilder.getMemQuery(analyzer, query), Integer.MAX_VALUE);
-		ConcurrentHashMap<String, Long> json = new ConcurrentHashMap<>();
+		HashMap<String, Long> json = new HashMap<>();
 		for (ScoreDoc did : result.scoreDocs) {
 			Document doc = ramSearcher.doc(did.doc);
 			String host = doc.get(DocField.HOST);
-			Long pv = (Long) json.get(host);
-			if (pv != null) {
-				json.put(host, pv + 1);
-			} else {
-				json.put(host, 1L);
-			}
+			json.put(host, json.getOrDefault(host, 0L)+1);
 		}
+
+		json.forEach((k, v) -> {
+			SearchResult res = new SearchResult();
+			res.setHost(k);
+			res.setMatchCount(v);
+			search.getCallback().handle(res);
+		});
+
 		long end = System.currentTimeMillis();
-		LOG.info("count in ram time:{}", (end - st));
-		return json;
+		LOG.info("count in ram time:{},retrun:{}", (end - st),result.totalHits);
 	}
 }

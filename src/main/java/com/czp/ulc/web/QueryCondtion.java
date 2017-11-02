@@ -38,6 +38,9 @@ public class QueryCondtion {
 	/** 是否加载内容行 */
 	private boolean loadLine;
 
+	/** 查询类型:search|cout|getFile */
+	private String type;
+
 	private long start = System.currentTimeMillis();
 
 	/***
@@ -51,16 +54,23 @@ public class QueryCondtion {
 	/** 结束时间 */
 	private long end = start;
 
+	public String getType() {
+		return type;
+	}
+
+	public void setType(String type) {
+		this.type = type;
+	}
+
 	public void setHost(String host) {
 		if (host != null && host.length() > 0)
 			this.hosts = Sets.newHashSet(host.split(","));
 	}
 
-
 	public void setFeilds(Set<String> feilds) {
 		this.feilds = feilds;
 	}
-	
+
 	public Set<String> getFeilds() {
 		return feilds;
 	}

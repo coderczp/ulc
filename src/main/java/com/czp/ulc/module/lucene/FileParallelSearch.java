@@ -12,7 +12,6 @@ package com.czp.ulc.module.lucene;
 import java.io.File;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -75,7 +74,7 @@ public class FileParallelSearch {
 
 	private static final Logger LOG = LoggerFactory.getLogger(FileParallelSearch.class);
 
-	public FileParallelSearch( Analyzer analyzer,LuceneFileDao lFileDao) {
+	public FileParallelSearch(Analyzer analyzer, LuceneFileDao lFileDao) {
 		this.analyzer = analyzer;
 		this.lFileDao = lFileDao;
 		int threadSize = LuceneConfig.PARALLEL_SEARCH_THREADS;
@@ -216,26 +215,22 @@ public class FileParallelSearch {
 		}
 	}
 
-	public long count(SearchTask search, Map<String, Long> json) {
+	public void count(SearchTask search) {
 		List<LuceneFile> dirs = findMatchDir(search);
-		if (dirs.isEmpty())
-			return 0;
+		if (dirs.isEmpty()) {
+			search.getCallback().finish();
+			return;
+		}
 
 		AtomicLong count = new AtomicLong();
 		CountDownLatch lock = new CountDownLatch(dirs.size());
 		for (LuceneFile luceneFile : dirs) {
-			executeCountTask(search, json, count, lock, luceneFile);
+			executeCountTask(search, count, lock, luceneFile);
 		}
-		try {
-			lock.await();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		return count.get();
+
 	}
 
-	private void executeCountTask(SearchTask search, Map<String, Long> json, AtomicLong count, CountDownLatch lock,
-			LuceneFile luceneFile) {
+	private void executeCountTask(SearchTask search, AtomicLong count, CountDownLatch lock, LuceneFile luceneFile) {
 		worker.execute(() -> {
 			try {
 				String host = luceneFile.getServer();
@@ -243,11 +238,21 @@ public class FileParallelSearch {
 				Query realQuery = removeHostParam(search);
 				IndexSearcher searcher = getCachedSearcher(new File(path), host);
 				long match = searcher.count(realQuery);
-				json.put(host, match + json.getOrDefault(host, 0L));
 				count.getAndAdd(match);
 				lock.countDown();
+
+				SearchResult result = new SearchResult();
+				result.setMatchCount(match);
+				result.setFile(path);
+				result.setHost(host);
+				search.getCallback().handle(result);
+
 			} catch (Exception e) {
-				e.printStackTrace();
+				LOG.error("count err", e);
+			} finally {
+				if (lock.getCount() == 0L) {
+					search.getCallback().finish();
+				}
 			}
 		});
 	}

@@ -114,7 +114,7 @@
 					return;
 				}
 				$('#result').html('searching');
-				$.post('./count', {
+				$.post('./q/count', {
 					'json' : JSON.stringify(json)
 				}, function(resp) {
 					var html = "";

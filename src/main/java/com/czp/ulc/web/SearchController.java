@@ -59,9 +59,29 @@ public class SearchController {
 	@RequestMapping("/count")
 	public JSONObject count(@RequestParam String json) throws Exception {
 		long start = System.currentTimeMillis();
+		CountDownLatch lock = new CountDownLatch(1);
 		QueryCondtion cdt = createCdtFromJson(json);
+		cdt.setType("count");
+		
 		SearchTask search = new SearchTask(cdt);
-		Map<String, Long> res = getSearcher().count(search);
+		ConcurrentHashMap<String, Long> res = new ConcurrentHashMap<>();
+		search.setCallback(new ILocalSearchCallback() {
+
+			@Override
+			public boolean handle(SearchResult result) {
+				String host = result.getHost();
+				res.put(host, res.getOrDefault(host, 0L) + result.getMatchCount());
+				return true;
+			}
+
+			@Override
+			public void finish() {
+				lock.countDown();
+			}
+		});
+		getSearcher().localCount(search);
+		lock.await(1, TimeUnit.MINUTES);
+
 		long now = System.currentTimeMillis();
 		res.put("time", (now - start));
 		return (JSONObject) JSONObject.toJSON(res);
@@ -105,7 +125,7 @@ public class SearchController {
 		cdt.addFeild(DocField.ALL_FEILD);
 		SearchTask cb = new SearchTask(cdt);
 		CountDownLatch lock = new CountDownLatch(1);
-		
+
 		cb.setCallback(new ILocalSearchCallback() {
 
 			@Override
@@ -145,7 +165,7 @@ public class SearchController {
 		} else {
 			cdt.addFeild(DocField.NO_LINE_FEILD);
 		}
-
+		cdt.setType("search");
 		SearchTask cb = new SearchTask(cdt);
 		cb.setCallback(new ILocalSearchCallback() {
 
@@ -175,8 +195,8 @@ public class SearchController {
 				lock.countDown();
 			}
 		});
-		getSearcher().disturbSearch(cb);
-		
+		getSearcher().searchAll(cb);
+
 		long docCount = getSearcher().getMeta().getDocs();
 		long end = System.currentTimeMillis();
 		lock.await(1, TimeUnit.MINUTES);

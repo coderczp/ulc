@@ -21,6 +21,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.czp.ulc.core.ThreadPools;
 import com.czp.ulc.module.IModule;
 import com.czp.ulc.module.lucene.search.SearchTask;
+import com.czp.ulc.module.mapreduce.operation.OptionRegistTable;
 import com.czp.ulc.module.mapreduce.rpc.RpcClientProxy;
 import com.czp.ulc.module.mapreduce.rpc.TransportImpl;
 import com.czp.ulc.util.Utils;
@@ -47,6 +48,9 @@ public class MapreduceModule implements IModule {
 	private ZMQ.Context context;
 
 	private RpcClientProxy rpcClient;
+
+	private OptionRegistTable registTable = new OptionRegistTable();
+
 	/***
 	 * 保存Mapreduce的ID,其他进程搜索返回时回写结果给当前进程
 	 */
@@ -82,6 +86,10 @@ public class MapreduceModule implements IModule {
 		return rpcUrl;
 	}
 
+	public OptionRegistTable getRegistTable() {
+		return registTable;
+	}
+
 	/***
 	 * 等待mp任务
 	 * 
@@ -106,8 +114,7 @@ public class MapreduceModule implements IModule {
 			System.setProperty("java.rmi.server.hostname", ip);
 		} else {
 			// 如果指定bind*,则取内网ip
-			String webSerIp = Utils.innerInetIp();
-			addr = addr.replaceAll("\\*", webSerIp);
+			addr = addr.replaceAll("\\*", Utils.innerInetIp());
 		}
 		TransportImpl transport = new TransportImpl();
 		namingCtx = new InitialContext();
@@ -140,12 +147,14 @@ public class MapreduceModule implements IModule {
 	 * @param task
 	 */
 	public void doRemoteSearch(SearchTask task) {
+		Objects.requireNonNull(task.getQuery().getType(), "query type is null");
+		MapReduceTask mTask = new MapReduceTask();
+		mTask.setReqId(System.nanoTime());
+		mTask.setQuery(task.getQuery());
+		mTask.setRpcUrl(rpcUrl);
 		try {
-			MapReduceTask mTask = new MapReduceTask();
-			mTask.setReqId(System.nanoTime());
-			mTask.setQuery(task.getQuery());
-			mTask.setRpcUrl(rpcUrl);
-			boolean res = zmqReq.send(encodeMapReduceTask(mTask));
+			byte[] bytes = encodeTask(mTask);
+			boolean res = zmqReq.send(bytes);
 			tasks.put(mTask.getReqId(), task);
 			LOG.info("send remote search return:{}", res);
 		} catch (Exception e) {
@@ -153,19 +162,19 @@ public class MapreduceModule implements IModule {
 		}
 	}
 
-	public void cleanTask(long reqId) {
-		tasks.remove(reqId);
+	public SearchTask cleanTask(long reqId) {
+		return tasks.remove(reqId);
 	}
 
 	public SearchTask getMaprequceTask(long reqId) {
 		return tasks.get(reqId);
 	}
 
-	public static byte[] encodeMapReduceTask(MapReduceTask task) {
+	public static byte[] encodeTask(MapReduceTask task) {
 		return JSONObject.toJSONString(task).getBytes(Charset.forName("utf-8"));
 	}
 
-	public static MapReduceTask decodeMapReduceTask(byte[] data) {
+	public static MapReduceTask decodeTask(byte[] data) {
 		String json = new String(data, Charset.forName("utf-8"));
 		return JSONObject.parseObject(json, MapReduceTask.class);
 	}

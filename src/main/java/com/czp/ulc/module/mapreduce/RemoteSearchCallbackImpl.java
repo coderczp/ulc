@@ -27,8 +27,10 @@ public class RemoteSearchCallbackImpl implements IRemoteSearchCallback {
 
 	@Override
 	public void finish(long reqId) {
+		// ILocalSearchCallback callback =
+		// mpr.getMaprequceTask(reqId).getCallback();
+		// callback.finish();
 		mpr.cleanTask(reqId);
-
 	}
 
 }

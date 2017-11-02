@@ -4,7 +4,6 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.rmi.Naming;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 请添加描述
@@ -16,11 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class RpcClientProxy {
 
-	/** 缓存url对应的IServerCall */
-	private ConcurrentHashMap<String, ITransport> callSers = new ConcurrentHashMap<>();
-
 	@SuppressWarnings("unchecked")
-	public <T> T getServer(String url, Class<T> itf) {
+	public <T> T getServer(String url, Class<T> itf) throws Exception {
 		ITransport callSer = findTransport(url);
 		return (T) Proxy.newProxyInstance(itf.getClassLoader(), new Class[] { itf }, new InvocationHandler() {
 
@@ -32,20 +28,7 @@ public class RpcClientProxy {
 		});
 	}
 
-	private ITransport findTransport(String url) {
-		ITransport callServer = callSers.get(url);
-		if (callServer == null) {
-			synchronized (callSers) {
-				if (callServer == null) {
-					try {
-						callServer = (ITransport) Naming.lookup(url);
-						callSers.put(url, callServer);
-					} catch (Exception e) {
-						throw new RuntimeException("fail to found rmi ser in:" + url, e);
-					}
-				}
-			}
-		}
-		return callServer;
+	private ITransport findTransport(String url) throws Exception {
+		return (ITransport) Naming.lookup(url);
 	}
 }

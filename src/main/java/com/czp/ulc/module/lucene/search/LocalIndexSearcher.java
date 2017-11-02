@@ -1,7 +1,6 @@
 package com.czp.ulc.module.lucene.search;
 
 import java.io.IOException;
-import java.util.Map;
 
 import org.apache.lucene.analysis.Analyzer;
 
@@ -62,7 +61,7 @@ public class LocalIndexSearcher {
 		}
 	}
 
-	public void disturbSearch(SearchTask task) throws IOException {
+	public void searchAll(SearchTask task) throws IOException {
 		mrModule.doRemoteSearch(task);
 		localSearch(task);
 	}
@@ -75,10 +74,9 @@ public class LocalIndexSearcher {
 		return count;
 	}
 
-	public Map<String, Long> count(SearchTask search) throws IOException {
-		Map<String, Long> count = memSer.count(search);
-		fileSearch.count(search, count);
-		return count;
+	public void localCount(SearchTask search) throws IOException {
+		memSer.count(search);
+		fileSearch.count(search);
 	}
 
 	public Analyzer getAnalyzer() {
